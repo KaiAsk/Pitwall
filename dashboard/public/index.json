@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-05T11:21:11.021649Z",
+  "updated_at": "2026-06-05T22:55:42.820038Z",
   "events": [
     {
       "event_public_id": 358384,
@@ -8,7 +8,7 @@
       "date": "March 5, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/358384",
-      "scraped_at": "2026-06-04T13:26:18.879691Z",
+      "scraped_at": "2026-06-05T22:19:33.217771Z",
       "session_count": 18,
       "has_overall_result": true,
       "file": "events/358384.json"
@@ -20,7 +20,7 @@
       "date": "March 4, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/358226",
-      "scraped_at": "2026-06-04T13:27:13.435391Z",
+      "scraped_at": "2026-06-05T22:52:55.340867Z",
       "session_count": 6,
       "has_overall_result": true,
       "file": "events/358226.json"
@@ -32,7 +32,7 @@
       "date": "March 4, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/358227",
-      "scraped_at": "2026-06-04T13:26:48.362535Z",
+      "scraped_at": "2026-06-05T22:52:29.660451Z",
       "session_count": 6,
       "has_overall_result": true,
       "file": "events/358227.json"
@@ -44,7 +44,7 @@
       "date": "March 20, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/361550",
-      "scraped_at": "2026-06-04T12:54:18.241438Z",
+      "scraped_at": "2026-06-05T22:17:31.931357Z",
       "session_count": 18,
       "has_overall_result": true,
       "file": "events/361550.json"
@@ -56,7 +56,7 @@
       "date": "March 19, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/361364",
-      "scraped_at": "2026-06-04T12:55:12.824258Z",
+      "scraped_at": "2026-06-05T22:18:27.326060Z",
       "session_count": 6,
       "has_overall_result": true,
       "file": "events/361364.json"
@@ -68,7 +68,7 @@
       "date": "March 19, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/361380",
-      "scraped_at": "2026-06-04T12:54:48.216690Z",
+      "scraped_at": "2026-06-05T22:18:02.231918Z",
       "session_count": 6,
       "has_overall_result": true,
       "file": "events/361380.json"
@@ -80,7 +80,7 @@
       "date": "January 30, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/350242",
-      "scraped_at": "2026-06-04T13:28:19.447721Z",
+      "scraped_at": "2026-06-05T22:54:02.734878Z",
       "session_count": 18,
       "has_overall_result": true,
       "file": "events/350242.json"
@@ -92,7 +92,7 @@
       "date": "January 29, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/350138",
-      "scraped_at": "2026-06-04T13:29:14.812578Z",
+      "scraped_at": "2026-06-05T22:54:59.208937Z",
       "session_count": 6,
       "has_overall_result": true,
       "file": "events/350138.json"
@@ -104,7 +104,7 @@
       "date": "January 29, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/350155",
-      "scraped_at": "2026-06-04T13:28:49.471330Z",
+      "scraped_at": "2026-06-05T22:54:33.789590Z",
       "session_count": 6,
       "has_overall_result": true,
       "file": "events/350155.json"
@@ -116,7 +116,7 @@
       "date": "April 23, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/371810",
-      "scraped_at": "2026-06-04T12:50:08.750463Z",
+      "scraped_at": "2026-06-05T17:51:24.951179Z",
       "session_count": 18,
       "has_overall_result": true,
       "file": "events/371810.json"
@@ -128,7 +128,7 @@
       "date": "April 22, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/371694",
-      "scraped_at": "2026-06-04T12:52:23.009070Z",
+      "scraped_at": "2026-06-05T22:15:36.032518Z",
       "session_count": 37,
       "has_overall_result": false,
       "file": "events/371694.json"
@@ -140,7 +140,7 @@
       "date": "April 21, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/371608",
-      "scraped_at": "2026-06-04T12:53:11.936214Z",
+      "scraped_at": "2026-06-05T22:16:25.565571Z",
       "session_count": 6,
       "has_overall_result": true,
       "file": "events/371608.json"
@@ -152,7 +152,7 @@
       "date": "April 21, 2026",
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/371618",
-      "scraped_at": "2026-06-04T12:52:47.303055Z",
+      "scraped_at": "2026-06-05T22:16:00.584478Z",
       "session_count": 6,
       "has_overall_result": true,
       "file": "events/371618.json"
@@ -164,7 +164,7 @@
       "date": null,
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/349603",
-      "scraped_at": "2026-06-04T13:29:57.490950Z",
+      "scraped_at": "2026-06-05T22:55:42.756709Z",
       "session_count": 12,
       "has_overall_result": false,
       "file": "events/349603.json"
@@ -176,7 +176,7 @@
       "date": null,
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/350241",
-      "scraped_at": "2026-06-04T13:28:24.742644Z",
+      "scraped_at": "2026-06-05T22:54:08.163885Z",
       "session_count": 1,
       "has_overall_result": false,
       "file": "events/350241.json"
@@ -188,7 +188,7 @@
       "date": null,
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/358385",
-      "scraped_at": "2026-06-04T13:26:24.105840Z",
+      "scraped_at": "2026-06-05T22:19:38.390719Z",
       "session_count": 1,
       "has_overall_result": false,
       "file": "events/358385.json"
@@ -200,7 +200,7 @@
       "date": null,
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/361453",
-      "scraped_at": "2026-06-04T12:54:23.709312Z",
+      "scraped_at": "2026-06-05T22:17:37.550586Z",
       "session_count": 1,
       "has_overall_result": false,
       "file": "events/361453.json"
@@ -212,7 +212,7 @@
       "date": null,
       "championship": "bukc",
       "url": "https://www.alpharacehub.com/bukc/e/371813",
-      "scraped_at": "2026-06-04T12:50:14.004061Z",
+      "scraped_at": "2026-06-05T17:51:30.268911Z",
       "session_count": 1,
       "has_overall_result": false,
       "file": "events/371813.json"
