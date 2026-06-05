@@ -138,6 +138,29 @@ function fieldStats(session) {
 /* Ranks every kart in a session on the fastest 50% of its clean laps.
    Clean = lap 1 dropped, within 110% of class fastest AND 105% of own fastest.
    Z-score = average per-lap standardised pace vs the field (negative = faster). */
+// Reconstruct net positions gained (signed) per kart from lap times alone:
+// rank by (laps completed, then cumulative time) at the first lap vs the finish.
+function racecraftGain(session) {
+  const karts = (session.allKarts || []).map((k) => k.num);
+  if (!session.laps || !session.laps.length || karts.length < 2) return {};
+  const lap1 = {}, total = {}, done = {};
+  karts.forEach((k) => { total[k] = 0; done[k] = 0; });
+  session.laps.forEach(({ lap, times }) => {
+    karts.forEach((k) => {
+      const t = times[k];
+      if (t != null) { total[k] += t; done[k] += 1; if (lap === 1) lap1[k] = t; }
+    });
+  });
+  const started = karts.filter((k) => lap1[k] != null);
+  const finishers = karts.filter((k) => done[k] > 0);
+  if (started.length < 2 || finishers.length < 2) return {};
+  const startPos = {}; [...started].sort((a, b) => lap1[a] - lap1[b]).forEach((k, i) => { startPos[k] = i + 1; });
+  const finishPos = {}; [...finishers].sort((a, b) => (done[b] - done[a]) || (total[a] - total[b])).forEach((k, i) => { finishPos[k] = i + 1; });
+  const gained = {};
+  karts.forEach((k) => { if (startPos[k] != null && finishPos[k] != null) gained[k] = startPos[k] - finishPos[k]; });
+  return gained;
+}
+
 function driverReport(session, leedsNums = [], extraNums = []) {
   if (!session || !session.laps || !session.laps.length) return null;
   const fieldKarts = (session.allKarts && session.allKarts.length) ? session.allKarts : session.karts;
@@ -720,21 +743,25 @@ export default function App() {
       if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;  // real races only, no qualifying
       const report = driverReport(s, extraTeams, extraNums);
       if (!report) return;
+      const gains = racecraftGain(s);
       report.rows.forEach((r) => {
         if (!r.isLeeds) return;
         const name = assign[`${s.id}|${r.num}`]?.trim() || r.team;
         const cv = r.avg ? (r.sd / r.avg) * 100 : 5;       // coefficient of variation %
-        agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], races: 0 };
+        agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], races: 0 };
         agg[name].pace.push(clamp(5 - (r.z ?? 0) * 2.5));    // z -2 -> 10, 0 -> 5, +2 -> 0
         agg[name].cons.push(clamp(10 - (cv - 0.4) * 7.3));   // 0.4% -> 10, 1.5% -> ~2
+        if (gains[r.num] != null) { agg[name].race.push(clamp(5 + gains[r.num] * 0.7)); agg[name].gain.push(gains[r.num]); }
         agg[name].races += 1;
       });
     });
     const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+    const sum = (a) => a.reduce((x, y) => x + y, 0);
     return Object.values(agg).map((d) => {
-      const pace = avg(d.pace), cons = avg(d.cons);
-      const overall = pace * 0.60 + cons * 0.40;
-      return { ...d, pace, cons, overall };
+      const pace = avg(d.pace), cons = avg(d.cons), race = avg(d.race);
+      const hasRace = d.race.length > 0;
+      const overall = hasRace ? pace * 0.50 + cons * 0.30 + race * 0.20 : pace * 0.60 + cons * 0.40;
+      return { ...d, pace, cons, race, hasRace, netGain: sum(d.gain), overall };
     }).sort((a, b) => b.overall - a.overall);
   }, [seasonSessions, assign, extraTeams, extraNums]);
 
@@ -1212,7 +1239,7 @@ export default function App() {
                     <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 480 }}>
                       <thead>
                         <tr style={{ color: "#6b7685" }}>
-                          {["#", "DRIVER", "RACES", "PACE", "CONSISTENCY", "RATING"].map((h, i) => (
+                          {["#", "DRIVER", "RACES", "PACE", "CONSISTENCY", "RACECRAFT", "RATING"].map((h, i) => (
                             <th key={h} style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
                           ))}
                         </tr>
@@ -1230,6 +1257,11 @@ export default function App() {
                               <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
                               <td style={{ padding: "7px 10px", textAlign: "right" }}>{bar(d.pace)}</td>
                               <td style={{ padding: "7px 10px", textAlign: "right" }}>{bar(d.cons)}</td>
+                              <td style={{ padding: "7px 10px", textAlign: "right" }}>
+                                {d.hasRace ? (
+                                  <>{bar(d.race)} <span style={{ color: d.netGain >= 0 ? "#43d977" : "#ff8a5b", fontSize: 10.5 }}>({d.netGain >= 0 ? "+" : ""}{d.netGain})</span></>
+                                ) : <span style={{ color: "#3a4655" }}>—</span>}
+                              </td>
                               <td style={{ padding: "7px 10px", textAlign: "right", color: c, fontWeight: 700, fontSize: 14 }}>{d.overall.toFixed(2)}</td>
                             </tr>
                           );
@@ -1237,9 +1269,9 @@ export default function App() {
                       </tbody>
                     </table>
                     <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
-                      Rating = 60% pace (lap speed vs the field, per-lap) + 40% consistency (lap-time spread),
-                      combined across every race in the season where the driver is named. "Races" shows how many that is.
-                      Racecraft/overtakes is left out until the scraper pulls reliable grid and overtake data.
+                      Rating = 50% pace + 30% consistency + 20% racecraft (or 60/40 pace/consistency if no race-position data).
+                      Racecraft is net positions gained or lost, reconstructed from lap times (running order at the start vs the finish) —
+                      the green/red number is the net change. Qualifying sessions are excluded. Combined across the whole season.
                     </div>
                   </div>
                 )}
