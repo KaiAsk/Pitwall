@@ -1,0 +1,37 @@
+name: Scrape BUKC
+
+# Runs the scraper on a schedule and commits any new rounds.
+# Cloudflare auto-deploys when the data is pushed.
+on:
+  schedule:
+    - cron: '0 */3 * * *'   # every 3 hours. Bump to '*/30 * * * *' during a race weekend if you want it fresher.
+  workflow_dispatch: {}      # lets you run it manually from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: pip install -r scraper/requirements.txt
+
+      - name: Scrape new rounds
+        run: |
+          cd scraper
+          python scraper.py --full --skip-existing --output ../dashboard/public
+
+      - name: Commit any new data
+        run: |
+          git config user.name "pitwall-bot"
+          git config user.email "pitwall-bot@users.noreply.github.com"
+          git add dashboard/public
+          git commit -m "auto: refresh scraped data" || echo "nothing new to commit"
+          git push
