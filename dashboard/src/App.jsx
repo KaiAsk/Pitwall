@@ -525,7 +525,7 @@ export default function App() {
     eventIndex.forEach((e) => {
       if (seasonRaws[e.id]) return;
       fetch(`/${e.file}`).then((r) => r.text())
-        .then((t) => setSeasonRaws((c) => ({ ...c, [e.id]: JSON.parse(t.replace(/\uFFFD/g, "·")) })))
+        .then((t) => { const j = JSON.parse(t.replace(/\uFFFD/g, "·")); setSeasonRaws((c) => ({ ...c, [e.id]: j })); })
         .catch(() => {});
     });
   }, [eventIndex, seasonRaws]);
@@ -544,7 +544,7 @@ export default function App() {
       const ev = eventIndex.find((e) => e.id === eid);
       const url = ev ? `/${ev.file}` : `/${eid}.json`;
       fetch(url).then((r) => r.text())
-        .then((t) => setCompareCache((c) => ({ ...c, [eid]: JSON.parse(t.replace(/\uFFFD/g, "·")) })))
+        .then((t) => { const j = JSON.parse(t.replace(/\uFFFD/g, "·")); setCompareCache((c) => ({ ...c, [eid]: j })); })
         .catch(() => {});
     });
   }, [compareIds, eventIndex, compareCache]);
