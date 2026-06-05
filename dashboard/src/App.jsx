@@ -454,6 +454,7 @@ export default function App() {
   const csvRef = useRef();
   const [tab, setTab] = useState("scraped");   const [cleanOnly, setCleanOnly] = useState(true);
   const [reportSession, setReportSession] = useState(null);
+  const [ratingScope, setRatingScope] = useState("season");
   const [extraInput, setExtraInput] = useState(() => LS("extra", ""));
   const [compareIds, setCompareIds] = useState(() => LS("compareIds", []));
   const [compareCache, setCompareCache] = useState({});
@@ -738,20 +739,23 @@ export default function App() {
   // Driver rating /10 from pace (z-score vs field), consistency (lap spread), and racecraft (net positions gained)
   const driverRatings = useMemo(() => {
     const clamp = (v) => Math.max(0, Math.min(10, v));
-    const agg = {}; // name -> { pace:[], cons:[], race:[], team }
-    seasonSessions.forEach((s) => {
-      if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;  // real races only, no qualifying
+    const agg = {};
+    const sessionsForRating = ratingScope === "season" ? seasonSessions : convertedSessions;
+    // racecraft only switches on once the data has the official signed gained/lost (a negative value proves it)
+    const signed = sessionsForRating.some((s) => Object.values(s.posByKart || {}).some((v) => v < 0));
+    sessionsForRating.forEach((s) => {
+      if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;  // real races only
       const report = driverReport(s, extraTeams, extraNums);
       if (!report) return;
-      const gains = racecraftGain(s);
       report.rows.forEach((r) => {
         if (!r.isLeeds) return;
         const name = assign[`${s.id}|${r.num}`]?.trim() || r.team;
-        const cv = r.avg ? (r.sd / r.avg) * 100 : 5;       // coefficient of variation %
+        const cv = r.avg ? (r.sd / r.avg) * 100 : 5;
         agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], races: 0 };
-        agg[name].pace.push(clamp(5 - (r.z ?? 0) * 2.5));    // z -2 -> 10, 0 -> 5, +2 -> 0
-        agg[name].cons.push(clamp(10 - (cv - 0.4) * 7.3));   // 0.4% -> 10, 1.5% -> ~2
-        if (gains[r.num] != null) { agg[name].race.push(clamp(5 + gains[r.num] * 0.7)); agg[name].gain.push(gains[r.num]); }
+        agg[name].pace.push(clamp(5 - (r.z ?? 0) * 2.5));
+        agg[name].cons.push(clamp(10 - (cv - 0.4) * 7.3));
+        const pos = s.posByKart ? s.posByKart[r.num] : null;
+        if (signed && pos != null) { agg[name].race.push(clamp(5 + pos * 0.35)); agg[name].gain.push(pos); }
         agg[name].races += 1;
       });
     });
@@ -763,7 +767,7 @@ export default function App() {
       const overall = hasRace ? pace * 0.50 + cons * 0.30 + race * 0.20 : pace * 0.60 + cons * 0.40;
       return { ...d, pace, cons, race, hasRace, netGain: sum(d.gain), overall };
     }).sort((a, b) => b.overall - a.overall);
-  }, [seasonSessions, assign, extraTeams, extraNums]);
+  }, [ratingScope, seasonSessions, convertedSessions, assign, extraTeams, extraNums]);
 
   const onLineupCsv = async (file) => {
     if (!file) return;
@@ -1047,7 +1051,6 @@ export default function App() {
                             <thead>
                               <tr style={{ color: "#6b7685", textAlign: "left" }}>
                                 <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>POS</th>
-                                <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>+/-</th>
                                 <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>TEAM</th>
                                 <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>KART</th>
                                 <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>BEST LAP</th>
@@ -1057,13 +1060,9 @@ export default function App() {
                             </thead>
                             <tbody>
                               {leedsSessionRows.map((row, rIdx) => {
-                                const pChg = row.position_change;
                                 return (
                                   <tr key={rIdx} style={{ borderBottom: "1px solid #11171f" }}>
                                     <td style={{ padding: "8px", color: AMBER, fontWeight: "700" }}>{row.position || "—"}</td>
-                                    <td style={{ padding: "8px", fontWeight: "600", color: pChg > 0 ? "#43d977" : pChg < 0 ? "#ff3355" : "#4b5563" }}>
-                                      {pChg > 0 ? `+${pChg}` : pChg === 0 ? "0" : pChg || "—"}
-                                    </td>
                                     <td style={{ padding: "8px", color: "#fff", fontWeight: "600" }}>
                                       {row.team} {row.penalty && <span style={{ color: "#ff3355", fontSize: 10, marginLeft: 6 }}>[+PENALTY]</span>}
                                     </td>
@@ -1164,7 +1163,9 @@ export default function App() {
                     <XAxis dataKey="lap" stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }}
                       label={{ value: "LAP", position: "insideBottom", offset: -2, fill: "#5b6776", fontSize: 11 }} />
                     <YAxis stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }}
-                      domain={["dataMin - 0.5", "dataMax + 0.5"]} width={52} />
+                      domain={["dataMin - 0.5", "dataMax + 0.5"]} width={52}
+                      allowDecimals={false} interval={0} tickFormatter={(v) => v.toFixed(1)}
+                      ticks={(() => { const all = traceData.flatMap((r) => Object.entries(r).filter(([k]) => k !== "lap").map(([, v]) => v)).filter((v) => typeof v === "number"); if (!all.length) return undefined; const lo = Math.floor(Math.min(...all) * 2) / 2, hi = Math.ceil(Math.max(...all) * 2) / 2; const t = []; for (let v = lo; v <= hi + 0.001; v += 0.5) t.push(Math.round(v * 2) / 2); return t; })()} />
                     <Tooltip formatter={(v) => (typeof v === "number" ? v.toFixed(3) + "s" : v)}
                       contentStyle={{ background: "#0d141c", border: "1px solid #222c38", borderRadius: 8,
                       fontFamily: "IBM Plex Mono", fontSize: 12 }} labelStyle={{ color: AMBER }} />
@@ -1192,7 +1193,8 @@ export default function App() {
                       <CartesianGrid stroke="#161d27" />
                       <XAxis dataKey="round" stroke="#5b6776" tick={{ fontSize: 10, fontFamily: "IBM Plex Mono" }} />
                       <YAxis stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }}
-                        domain={["dataMin - 0.3", "dataMax + 0.3"]} width={52}
+                        domain={["dataMin - 0.3", "dataMax + 0.3"]} width={52} tickFormatter={(v) => v.toFixed(1)}
+                        ticks={(() => { const all = progression.data.flatMap((r) => Object.entries(r).filter(([k]) => k !== "round").map(([, v]) => v)).filter((v) => typeof v === "number"); if (!all.length) return undefined; const lo = Math.floor(Math.min(...all) * 2) / 2, hi = Math.ceil(Math.max(...all) * 2) / 2; const t = []; for (let v = lo; v <= hi + 0.001; v += 0.5) t.push(Math.round(v * 2) / 2); return t; })()}
                         label={{ value: "avg clean lap (s)", angle: -90, position: "insideLeft", fill: "#5b6776", fontSize: 10 }} />
                       <Tooltip formatter={(v) => (typeof v === "number" ? v.toFixed(2) + "s" : v)}
                         contentStyle={{ background: "#0d141c", border: "1px solid #222c38", borderRadius: 8,
@@ -1231,15 +1233,26 @@ export default function App() {
             })()}
 
             {tab === "rating" && (
-              <Panel title="DRIVER RATING — WHOLE SEASON, OUT OF 10">
+              <Panel title={`DRIVER RATING — ${ratingScope === "season" ? "WHOLE SEASON" : "SELECTED ROUND(S)"}, OUT OF 10`}>
+                <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                  {[["round", "THIS ROUND"], ["season", "WHOLE SEASON"]].map(([k, l]) => (
+                    <button key={k} onClick={() => setRatingScope(k)} className="disp"
+                      style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+                        border: `1px solid ${ratingScope === k ? AMBER : "#222c38"}`,
+                        background: ratingScope === k ? "#1a160a" : "#0b1017", color: ratingScope === k ? AMBER : "#8b97a7" }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
                 {driverRatings.length === 0 ? (
-                  <Empty msg="Name drivers in the roster (any round) to rate them. Ratings combine every race they're named in, across the whole season." />
+                  <Empty msg="Name drivers in the roster to rate them. 'This round' rates the round you've selected (plus any compare rounds); 'Whole season' combines everything." />
                 ) : (
                   <div style={{ overflowX: "auto" }}>
-                    <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 480 }}>
+                    {(() => { const showRace = driverRatings.some((d) => d.hasRace); return (
+                    <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 420 }}>
                       <thead>
                         <tr style={{ color: "#6b7685" }}>
-                          {["#", "DRIVER", "RACES", "PACE", "CONSISTENCY", "RACECRAFT", "RATING"].map((h, i) => (
+                          {["#", "DRIVER", "RACES", "PACE", "CONSISTENCY", ...(showRace ? ["RACECRAFT"] : []), "RATING"].map((h, i) => (
                             <th key={h} style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
                           ))}
                         </tr>
@@ -1257,21 +1270,24 @@ export default function App() {
                               <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
                               <td style={{ padding: "7px 10px", textAlign: "right" }}>{bar(d.pace)}</td>
                               <td style={{ padding: "7px 10px", textAlign: "right" }}>{bar(d.cons)}</td>
-                              <td style={{ padding: "7px 10px", textAlign: "right" }}>
-                                {d.hasRace ? (
-                                  <>{bar(d.race)} <span style={{ color: d.netGain >= 0 ? "#43d977" : "#ff8a5b", fontSize: 10.5 }}>({d.netGain >= 0 ? "+" : ""}{d.netGain})</span></>
-                                ) : <span style={{ color: "#3a4655" }}>—</span>}
-                              </td>
+                              {showRace && (
+                                <td style={{ padding: "7px 10px", textAlign: "right" }}>
+                                  {d.hasRace ? (
+                                    <>{bar(d.race)} <span style={{ color: d.netGain >= 0 ? "#43d977" : "#ff8a5b", fontSize: 10.5 }}>({d.netGain >= 0 ? "+" : ""}{d.netGain})</span></>
+                                  ) : <span style={{ color: "#3a4655" }}>—</span>}
+                                </td>
+                              )}
                               <td style={{ padding: "7px 10px", textAlign: "right", color: c, fontWeight: 700, fontSize: 14 }}>{d.overall.toFixed(2)}</td>
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
+                    ); })()}
                     <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
-                      Rating = 50% pace + 30% consistency + 20% racecraft (or 60/40 pace/consistency if no race-position data).
-                      Racecraft is net positions gained or lost, reconstructed from lap times (running order at the start vs the finish) —
-                      the green/red number is the net change. Qualifying sessions are excluded. Combined across the whole season.
+                      Pace (lap speed vs the field) and consistency (lap-time spread) always count. Racecraft (official net positions
+                      gained/lost) is added at 20% once you've re-scraped with the signed data; until then it's pace 60 / consistency 40.
+                      "This round" uses your selected round plus any compare rounds; "Whole season" uses everything.
                     </div>
                   </div>
                 )}
