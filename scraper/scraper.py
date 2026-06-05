@@ -40,20 +40,28 @@ log = logging.getLogger(__name__)
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
 
+LONG_COOLDOWN = 300  # if the server asks us to wait longer than this, stop and resume later
+
+class RateLimited(Exception):
+    """Raised when the server imposes a cooldown too long to wait out in one run."""
+    def __init__(self, wait):
+        self.wait = wait
+        super().__init__(f"rate limited, server asked for {wait}s")
+
 def get(url: str, fragment: bool = False, max_retries: int = 5) -> BeautifulSoup:
     headers = {"HX-Request": "true"} if fragment else {}
     log.debug(f"GET {url}")
     attempt = 0
     while True:
         r = SESSION.get(url, headers=headers, timeout=TIMEOUT)
-        # 429 = rate limited, 5xx = transient server error -> back off and retry
         if r.status_code == 429 or r.status_code >= 500:
             attempt += 1
             if attempt > max_retries:
                 r.raise_for_status()
-            # respect Retry-After header if the server sends one, else exponential backoff
             retry_after = r.headers.get("Retry-After")
             wait = int(retry_after) if (retry_after and retry_after.isdigit()) else min(60, DELAY * (2 ** attempt))
+            if wait > LONG_COOLDOWN:
+                raise RateLimited(wait)  # too long to sit through; stop and resume later
             log.warning(f"{r.status_code} from server, backing off {wait}s (attempt {attempt}/{max_retries})...")
             time.sleep(wait)
             continue
@@ -192,6 +200,16 @@ def parse_result_table(soup: BeautifulSoup) -> list:
             change_digits = re.findall(r'-?\d+', pos_change_raw)
             if change_digits:
                 cleaned_change = int(change_digits[0])
+
+        # Direction lives in the arrow's CSS class, not the text:
+        # gain-arrow-box = positions gained (+), loss-arrow-box = positions lost (-)
+        arrow = row.find("div", class_=lambda c: c and ("gain-arrow-box" in c or "loss-arrow-box" in c))
+        if arrow is not None:
+            digits = re.findall(r'\d+', arrow.get_text(strip=True))
+            if digits:
+                mag = int(digits[0])
+                classes = arrow.get("class") or []
+                cleaned_change = -mag if "loss-arrow-box" in classes else mag
 
         result = {
             "position":       int(pos_raw) if pos_raw.isdigit() else None,
@@ -517,18 +535,25 @@ def main():
         event_data = scrape_event(args.event, include_laps=args.full)
         save_event(event_data)
     else:
-        event_ids = discover_events(args.championship, args.season)
-        log.info(f"Found {len(event_ids)} events.")
-        events_dir = OUTPUT_DIR / "events"
-        for eid in event_ids:
-            if args.skip_existing and (events_dir / f"{eid}.json").exists():
-                log.info(f"Skipping {eid} (already saved)")
-                continue
-            try:
-                event_data = scrape_event(eid, include_laps=args.full)
-                save_event(event_data)
-            except Exception as e:
-                log.error(f"Failed event {eid}: {e}")
+        try:
+            event_ids = discover_events(args.championship, args.season)
+            log.info(f"Found {len(event_ids)} events.")
+            events_dir = OUTPUT_DIR / "events"
+            for eid in event_ids:
+                if args.skip_existing and (events_dir / f"{eid}.json").exists():
+                    log.info(f"Skipping {eid} (already saved)")
+                    continue
+                try:
+                    event_data = scrape_event(eid, include_laps=args.full)
+                    save_event(event_data)
+                except RateLimited:
+                    raise
+                except Exception as e:
+                    log.error(f"Failed event {eid}: {e}")
+        except RateLimited as rl:
+            mins = round(rl.wait / 60)
+            log.warning(f"Rate limited — server wants a ~{mins} min cooldown. Stopping here.")
+            log.warning(f"Saved rounds are kept. Wait ~{mins} min, then re-run with --skip-existing to grab the rest.")
 
     update_index()
     log.info("Done.")
