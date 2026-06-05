@@ -1,0 +1,25 @@
+PULL FRESH DATA — THE SCRAPER
+-----------------------------
+Open a SECOND terminal for this.
+ 
+Whole season (auto — finds every event itself):
+    cd C:\Users\kai\Documents\leeds-telemetry\scraper
+    python scraper.py --full --output ../dashboard/public
+ 
+Just one event (faster):
+    cd C:\Users\kai\Documents\leeds-telemetry\scraper
+    python scraper.py --event 317059 --full --output ../dashboard/public
+ 
+After it finishes, refresh the dashboard and load the event ID at the top.
+The event IDs are printed in the terminal as it runs.
+ 
+ 
+FLAGS
+-----
+--full                      also pulls lap times (needed for box plots — basically always use it)
+--output ../dashboard/public  writes where the dashboard reads (skip it and files land in scraper/output/ instead)
+--event 317059              one specific event instead of the whole season
+--season 2026               a past season (defaults to current year)
+ 
+Scraper waits 1 second between requests on purpose. A full season takes a few
+minutes. Don't try to speed it up — you risk getting blocked.

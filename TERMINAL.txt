@@ -1,0 +1,2 @@
+cd C:\Users\kai\Documents\leeds-telemetry\dashboard
+npm run dev

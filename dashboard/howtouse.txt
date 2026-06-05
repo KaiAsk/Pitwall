@@ -1,0 +1,23 @@
+LEEDS MOTORSPORT TELEMETRY — HOW TO RUN
+========================================
+(If "python" errors, try "python3". Same for any command.)
+ 
+ 
+ONE-TIME SETUP
+--------------
+Dashboard:
+    cd C:\Users\kai\Documents\leeds-telemetry\dashboard
+    npm install
+ 
+Scraper:
+    cd C:\Users\kai\Documents\leeds-telemetry\scraper
+    pip install -r requirements.txt
+ 
+ 
+EVERY TIME — START THE DASHBOARD
+--------------------------------
+    cd C:\Users\kai\Documents\leeds-telemetry\dashboard
+    npm run dev
+ 
+Then open the localhost link it prints (usually http://localhost:5173).
+Leave the terminal open while using it. Ctrl + C stops it.
