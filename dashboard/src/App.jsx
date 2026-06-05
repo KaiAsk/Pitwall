@@ -434,6 +434,7 @@ export default function App() {
   const [extraInput, setExtraInput] = useState(() => LS("extra", ""));
   const [compareIds, setCompareIds] = useState(() => LS("compareIds", []));
   const [compareCache, setCompareCache] = useState({});
+  const [seasonRaws, setSeasonRaws] = useState({});
   const [removed, setRemoved] = useState(() => new Set(LS("removed", [])));
   const [compareOpen, setCompareOpen] = useState(false);
 
@@ -495,6 +496,23 @@ export default function App() {
       .flatMap((raw) => convertEvent(raw, extraTeams, extraNums))
       .filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)));
   }, [scrapedEventData, compareIds, compareCache, extraTeams, extraNums]);
+
+  // load every round in the season (for whole-season driver ratings)
+  useEffect(() => {
+    eventIndex.forEach((e) => {
+      if (seasonRaws[e.id]) return;
+      fetch(`/${e.file}`).then((r) => r.text())
+        .then((t) => setSeasonRaws((c) => ({ ...c, [e.id]: JSON.parse(t.replace(/\uFFFD/g, "·")) })))
+        .catch(() => {});
+    });
+  }, [eventIndex, seasonRaws]);
+
+  const seasonSessions = useMemo(() => {
+    const seen = new Set();
+    return Object.values(seasonRaws)
+      .flatMap((raw) => convertEvent(raw, extraTeams, extraNums))
+      .filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)));
+  }, [seasonRaws, extraTeams, extraNums]);
 
   // fetch any selected comparison rounds not yet cached
   useEffect(() => {
@@ -698,28 +716,27 @@ export default function App() {
   const driverRatings = useMemo(() => {
     const clamp = (v) => Math.max(0, Math.min(10, v));
     const agg = {}; // name -> { pace:[], cons:[], race:[], team }
-    convertedSessions.forEach((s) => {
-      if (!/race/i.test(s.raceLabel)) return;
+    seasonSessions.forEach((s) => {
+      if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;  // real races only, no qualifying
       const report = driverReport(s, extraTeams, extraNums);
       if (!report) return;
       report.rows.forEach((r) => {
         if (!r.isLeeds) return;
         const name = assign[`${s.id}|${r.num}`]?.trim() || r.team;
         const cv = r.avg ? (r.sd / r.avg) * 100 : 5;       // coefficient of variation %
-        const pos = (s.posByKart && s.posByKart[r.num]) || 0;
-        agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [] };
+        agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], races: 0 };
         agg[name].pace.push(clamp(5 - (r.z ?? 0) * 2.5));    // z -2 -> 10, 0 -> 5, +2 -> 0
-        agg[name].cons.push(clamp(10 - (cv - 0.4) * 7.3));   // more variable: 0.4% -> 10, 1.5% -> ~2
-        agg[name].race.push(clamp(5 + Math.max(0, pos) * 0.9)); // bonus only — never punished for starting at the front
+        agg[name].cons.push(clamp(10 - (cv - 0.4) * 7.3));   // 0.4% -> 10, 1.5% -> ~2
+        agg[name].races += 1;
       });
     });
     const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
     return Object.values(agg).map((d) => {
-      const pace = avg(d.pace), cons = avg(d.cons), race = avg(d.race);
-      const overall = pace * 0.50 + cons * 0.35 + race * 0.15;
-      return { ...d, pace, cons, race, overall };
+      const pace = avg(d.pace), cons = avg(d.cons);
+      const overall = pace * 0.60 + cons * 0.40;
+      return { ...d, pace, cons, overall };
     }).sort((a, b) => b.overall - a.overall);
-  }, [convertedSessions, assign, extraTeams, extraNums]);
+  }, [seasonSessions, assign, extraTeams, extraNums]);
 
   const onLineupCsv = async (file) => {
     if (!file) return;
@@ -1187,15 +1204,15 @@ export default function App() {
             })()}
 
             {tab === "rating" && (
-              <Panel title="DRIVER RATING — OUT OF 10">
+              <Panel title="DRIVER RATING — WHOLE SEASON, OUT OF 10">
                 {driverRatings.length === 0 ? (
-                  <Empty msg="Name drivers in the roster to rate them. Add compare rounds at the top to rate across more races." />
+                  <Empty msg="Name drivers in the roster (any round) to rate them. Ratings combine every race they're named in, across the whole season." />
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 480 }}>
                       <thead>
                         <tr style={{ color: "#6b7685" }}>
-                          {["#", "DRIVER", "PACE", "CONSISTENCY", "RACECRAFT", "RATING"].map((h, i) => (
+                          {["#", "DRIVER", "RACES", "PACE", "CONSISTENCY", "RATING"].map((h, i) => (
                             <th key={h} style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
                           ))}
                         </tr>
@@ -1210,9 +1227,9 @@ export default function App() {
                             <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
                               <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
                               <td style={{ padding: "7px 10px", color: c, fontWeight: 600 }}>{d.name}</td>
+                              <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
                               <td style={{ padding: "7px 10px", textAlign: "right" }}>{bar(d.pace)}</td>
                               <td style={{ padding: "7px 10px", textAlign: "right" }}>{bar(d.cons)}</td>
-                              <td style={{ padding: "7px 10px", textAlign: "right" }}>{bar(d.race)}</td>
                               <td style={{ padding: "7px 10px", textAlign: "right", color: c, fontWeight: 700, fontSize: 14 }}>{d.overall.toFixed(2)}</td>
                             </tr>
                           );
@@ -1220,10 +1237,9 @@ export default function App() {
                       </tbody>
                     </table>
                     <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
-                      Rating = 50% pace (lap speed vs the field, per-lap), 35% consistency (lap-time spread), 15% racecraft.
-                      Racecraft is bonus-only — gaining places adds to the score, but starting at the front never costs you.
-                      It uses net position change as an overtakes proxy; true overtakes need the AlphaRaceHub chart data, not scraped yet.
-                      Add compare rounds at the top to rate a driver across more races.
+                      Rating = 60% pace (lap speed vs the field, per-lap) + 40% consistency (lap-time spread),
+                      combined across every race in the season where the driver is named. "Races" shows how many that is.
+                      Racecraft/overtakes is left out until the scraper pulls reliable grid and overtake data.
                     </div>
                   </div>
                 )}
