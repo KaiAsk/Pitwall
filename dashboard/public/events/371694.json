@@ -4,7 +4,7 @@
   "title": "BUKC Drivers Champs 2026",
   "championship": "bukc",
   "url": "https://www.alpharacehub.com/bukc/e/371694",
-  "scraped_at": "2026-06-04T12:52:23.009070Z",
+  "scraped_at": "2026-06-05T22:15:36.032518Z",
   "sessions": [
     {
       "session_id": 767688,
@@ -145,7 +145,7 @@
         {
           "position": 8,
           "position_raw": "8",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "54",
           "team": "Olly WARD",
           "penalty": false,
@@ -163,7 +163,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "78",
           "team": "Ben ROBERTSON",
           "penalty": false,
@@ -217,7 +217,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "48",
           "team": "Ben ROBERTS",
           "penalty": false,
@@ -235,7 +235,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "55",
           "team": "Vasilisa BOROVSKAYA",
           "penalty": false,
@@ -253,7 +253,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "38",
           "team": "Frey DAVIDSON",
           "penalty": false,
@@ -271,7 +271,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "39",
           "team": "Martin BOUNDS",
           "penalty": false,
@@ -289,7 +289,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "25",
           "team": "Kurt FAWDRY",
           "penalty": false,
@@ -606,7 +606,7 @@
         {
           "position": 6,
           "position_raw": "6",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "4",
           "team": "George nick GORZYNSKI",
           "penalty": false,
@@ -696,7 +696,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "49",
           "team": "Jack CROSS",
           "penalty": true,
@@ -732,7 +732,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "72",
           "team": "Ornan HENSTOCK",
           "penalty": false,
@@ -750,7 +750,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 13,
+          "position_change": -13,
           "kart": "2",
           "team": "Jack GOODLIFFE",
           "penalty": false,
@@ -768,7 +768,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "29",
           "team": "Thomas WOOD",
           "penalty": false,
@@ -786,7 +786,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "41",
           "team": "Max MCCABE",
           "penalty": true,
@@ -1120,7 +1120,7 @@
         {
           "position": 6,
           "position_raw": "6",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "41",
           "team": "Kye KINCH",
           "penalty": false,
@@ -1156,7 +1156,7 @@
         {
           "position": 8,
           "position_raw": "8",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "52",
           "team": "Zakk FINNIE",
           "penalty": false,
@@ -1174,7 +1174,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "4",
           "team": "Isaac LYONS",
           "penalty": false,
@@ -1210,7 +1210,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "42",
           "team": "Ademi ELUKANLO",
           "penalty": false,
@@ -1264,7 +1264,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 13,
+          "position_change": -13,
           "kart": "46",
           "team": "Alfie THORNTON",
           "penalty": false,
@@ -1282,7 +1282,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "51",
           "team": "Samantha SEWARD",
           "penalty": false,
@@ -1300,7 +1300,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "63",
           "team": "Bobby KRISTOVIC",
           "penalty": true,
@@ -1552,7 +1552,7 @@
         {
           "position": 2,
           "position_raw": "2",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "77",
           "team": "Callum BARNETT",
           "penalty": false,
@@ -1606,7 +1606,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "6",
           "team": "Lucas FISHER",
           "penalty": false,
@@ -1624,7 +1624,7 @@
         {
           "position": 6,
           "position_raw": "6",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "43",
           "team": "Nick HENRY",
           "penalty": false,
@@ -1750,7 +1750,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "61",
           "team": "Harry SLINGER",
           "penalty": true,
@@ -1768,7 +1768,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "51",
           "team": "Udi MENON",
           "penalty": true,
@@ -1786,7 +1786,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "67",
           "team": "Dirar ELMASRI",
           "penalty": true,
@@ -1804,7 +1804,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "10",
           "team": "George KATOCHIANOS",
           "penalty": true,
@@ -2080,7 +2080,7 @@
         {
           "position": 2,
           "position_raw": "2",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "36",
           "team": "Chirag GHORPADE",
           "penalty": false,
@@ -2188,7 +2188,7 @@
         {
           "position": 8,
           "position_raw": "8",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "34",
           "team": "Hugo ERICSON",
           "penalty": true,
@@ -2206,7 +2206,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "24",
           "team": "Joel BILLINGTON",
           "penalty": true,
@@ -2224,7 +2224,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "69",
           "team": "Ryan HARRIS",
           "penalty": false,
@@ -2260,7 +2260,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "72",
           "team": "Patrick LEAFE",
           "penalty": false,
@@ -2296,7 +2296,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "53",
           "team": "Max HAWKINS",
           "penalty": false,
@@ -2314,7 +2314,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "61",
           "team": "Oliver MULVEAGH-WALKER",
           "penalty": false,
@@ -2332,7 +2332,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "37",
           "team": "Lewis WHITE",
           "penalty": false,
@@ -2622,7 +2622,7 @@
         {
           "position": 4,
           "position_raw": "4",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "16",
           "team": "Daniel TKACHENKO",
           "penalty": false,
@@ -2712,7 +2712,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "21",
           "team": "Andrew LLOYD",
           "penalty": false,
@@ -2748,7 +2748,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "62",
           "team": "Tom NEWNHAM",
           "penalty": false,
@@ -2766,7 +2766,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "56",
           "team": "Sjoerd VAN DOORN",
           "penalty": false,
@@ -2784,7 +2784,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "55",
           "team": "Brad BUTCHER",
           "penalty": false,
@@ -2802,7 +2802,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "47",
           "team": "Nathan MORRIS",
           "penalty": true,
@@ -2820,7 +2820,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "58",
           "team": "Daniel WHITE",
           "penalty": false,
@@ -2838,7 +2838,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "46",
           "team": "William O’TOOLE",
           "penalty": true,
@@ -3102,7 +3102,7 @@
         {
           "position": 2,
           "position_raw": "2",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "49",
           "team": "Ben FODEN",
           "penalty": false,
@@ -3192,7 +3192,7 @@
         {
           "position": 7,
           "position_raw": "7",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "27",
           "team": "Jean SAMMUT",
           "penalty": false,
@@ -3246,7 +3246,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "77",
           "team": "Zainuddin KHWAJA",
           "penalty": false,
@@ -3282,7 +3282,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "65",
           "team": "Sajed GNEDI",
           "penalty": false,
@@ -3300,7 +3300,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "19",
           "team": "Luke MCCUE",
           "penalty": false,
@@ -3318,7 +3318,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "66",
           "team": "James BOXER",
           "penalty": false,
@@ -3336,7 +3336,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "7",
           "team": "Hushrav BUHARIWALLA",
           "penalty": false,
@@ -3354,7 +3354,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "75",
           "team": "William CURTLER",
           "penalty": false,
@@ -3660,7 +3660,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "23",
           "team": "Pavlo DENYSENKO",
           "penalty": false,
@@ -3678,7 +3678,7 @@
         {
           "position": 6,
           "position_raw": "6",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "24",
           "team": "Joel EVANS",
           "penalty": false,
@@ -3768,7 +3768,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "34",
           "team": "Nathan CLIFFORD",
           "penalty": true,
@@ -3804,7 +3804,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "12",
           "team": "Archie MARTINE",
           "penalty": false,
@@ -3822,7 +3822,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "63",
           "team": "Will MALLARD",
           "penalty": false,
@@ -3840,7 +3840,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "76",
           "team": "Harry SCOTT-HALL",
           "penalty": false,
@@ -3858,7 +3858,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "7",
           "team": "Tyler DU CROS",
           "penalty": true,
@@ -4152,7 +4152,7 @@
         {
           "position": 4,
           "position_raw": "4",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "13",
           "team": "David MANUWA",
           "penalty": false,
@@ -4260,7 +4260,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "31",
           "team": "Farhad ARIAN",
           "penalty": false,
@@ -4296,7 +4296,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "11",
           "team": "Daniel SKELTON",
           "penalty": false,
@@ -4314,7 +4314,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "22",
           "team": "Harry HAND",
           "penalty": false,
@@ -4332,7 +4332,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "26",
           "team": "Connor MORTON",
           "penalty": false,
@@ -4350,7 +4350,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "80",
           "team": "Luca WIGLEY",
           "penalty": false,
@@ -4734,7 +4734,7 @@
         {
           "position": 8,
           "position_raw": "8",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "35",
           "team": "Theo PALMES",
           "penalty": false,
@@ -4770,7 +4770,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "73",
           "team": "Lucas BURROW",
           "penalty": false,
@@ -4788,7 +4788,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "11",
           "team": "Mahdi KADIRI",
           "penalty": false,
@@ -4824,7 +4824,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "64",
           "team": "Lewis WITTMAACK",
           "penalty": false,
@@ -4842,7 +4842,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "18",
           "team": "Adam STATE",
           "penalty": false,
@@ -4860,7 +4860,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "75",
           "team": "Benjamin SHUM",
           "penalty": false,
@@ -4878,7 +4878,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "69",
           "team": "Andy STOBART",
           "penalty": false,
@@ -5195,7 +5195,7 @@
         {
           "position": 6,
           "position_raw": "6",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "20",
           "team": "Archie COVENEY",
           "penalty": false,
@@ -5267,7 +5267,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "16",
           "team": "Michael JONES",
           "penalty": false,
@@ -5303,7 +5303,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "78",
           "team": "Ben ROBERTSON",
           "penalty": false,
@@ -5339,7 +5339,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "39",
           "team": "Martin BOUNDS",
           "penalty": false,
@@ -5357,7 +5357,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "46",
           "team": "Alfie THORNTON",
           "penalty": false,
@@ -5375,7 +5375,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 15,
+          "position_change": -15,
           "kart": "35",
           "team": "Larry TINDALL",
           "penalty": false,
@@ -5663,7 +5663,7 @@
         {
           "position": 4,
           "position_raw": "4",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "30",
           "team": "Liam PERERA",
           "penalty": false,
@@ -5681,7 +5681,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "40",
           "team": "Simon RAM",
           "penalty": false,
@@ -5753,7 +5753,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "3",
           "team": "Oisin HARTLE DOYLE",
           "penalty": false,
@@ -5771,7 +5771,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "74",
           "team": "Thomas HARVEY",
           "penalty": false,
@@ -5789,7 +5789,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "20",
           "team": "Anthony HARRINGTON",
           "penalty": false,
@@ -5807,7 +5807,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "67",
           "team": "Dirar ELMASRI",
           "penalty": false,
@@ -5825,7 +5825,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "4",
           "team": "George nick GORZYNSKI",
           "penalty": false,
@@ -5843,7 +5843,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "21",
           "team": "Andrew LLOYD",
           "penalty": false,
@@ -5861,7 +5861,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "48",
           "team": "Adam. HARDING.",
           "penalty": false,
@@ -5879,7 +5879,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "10",
           "team": "George KATOCHIANOS",
           "penalty": false,
@@ -6131,7 +6131,7 @@
         {
           "position": 2,
           "position_raw": "2",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "23",
           "team": "Harry SAITO-BROWN",
           "penalty": false,
@@ -6239,7 +6239,7 @@
         {
           "position": 8,
           "position_raw": "8",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "26",
           "team": "Connor MORTON",
           "penalty": false,
@@ -6257,7 +6257,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "44",
           "team": "Henry HUDSON",
           "penalty": false,
@@ -6275,7 +6275,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "77",
           "team": "Zainuddin KHWAJA",
           "penalty": false,
@@ -6293,7 +6293,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "41",
           "team": "Kye KINCH",
           "penalty": true,
@@ -6329,7 +6329,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "7",
           "team": "Hushrav BUHARIWALLA",
           "penalty": true,
@@ -6347,7 +6347,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "80",
           "team": "Luca WIGLEY",
           "penalty": false,
@@ -6365,7 +6365,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "61",
           "team": "Oliver MULVEAGH-WALKER",
           "penalty": false,
@@ -6670,7 +6670,7 @@
         {
           "position": 4,
           "position_raw": "4",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "8",
           "team": "Ben STREET",
           "penalty": false,
@@ -6688,7 +6688,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "44",
           "team": "Euan RITCHIE",
           "penalty": true,
@@ -6778,7 +6778,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "77",
           "team": "Callum BARNETT",
           "penalty": false,
@@ -6796,7 +6796,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "7",
           "team": "Tyler DU CROS",
           "penalty": false,
@@ -6832,7 +6832,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "62",
           "team": "Tom NEWNHAM",
           "penalty": false,
@@ -6850,7 +6850,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "75",
           "team": "Benjamin SHUM",
           "penalty": false,
@@ -6868,7 +6868,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "58",
           "team": "Daniel WHITE",
           "penalty": false,
@@ -7198,7 +7198,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "70",
           "team": "Leo BELL",
           "penalty": true,
@@ -7288,7 +7288,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "34",
           "team": "Hugo ERICSON",
           "penalty": false,
@@ -7306,7 +7306,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "5",
           "team": "Alessandro CERONETTI",
           "penalty": true,
@@ -7342,7 +7342,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "1",
           "team": "Fraser BRUNTON",
           "penalty": false,
@@ -7360,7 +7360,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 13,
+          "position_change": -13,
           "kart": "29",
           "team": "Ewan MCLAGGAN",
           "penalty": false,
@@ -7378,7 +7378,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "53",
           "team": "Max HAWKINS",
           "penalty": true,
@@ -7396,7 +7396,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "22",
           "team": "Harry HAND",
           "penalty": true,
@@ -7702,7 +7702,7 @@
         {
           "position": 4,
           "position_raw": "4",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "33",
           "team": "Alex JENNINGS",
           "penalty": false,
@@ -7810,7 +7810,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "38",
           "team": "William STACEY",
           "penalty": false,
@@ -7828,7 +7828,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "18",
           "team": "Adam STATE",
           "penalty": false,
@@ -7864,7 +7864,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "56",
           "team": "Sjoerd VAN DOORN",
           "penalty": false,
@@ -7882,7 +7882,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "69",
           "team": "Andy STOBART",
           "penalty": false,
@@ -7918,7 +7918,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "70",
           "team": "Oliver FLASHMAN",
           "penalty": false,
@@ -8217,7 +8217,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "18",
           "team": "Cavern TAYLOR",
           "penalty": false,
@@ -8271,7 +8271,7 @@
         {
           "position": 8,
           "position_raw": "8",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "12",
           "team": "Jonathan LUND",
           "penalty": false,
@@ -8307,7 +8307,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "49",
           "team": "Ben FODEN",
           "penalty": false,
@@ -8325,7 +8325,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "15",
           "team": "Enzo TERAOKA",
           "penalty": false,
@@ -8361,7 +8361,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "21",
           "team": "Jude YOUNG",
           "penalty": true,
@@ -8397,7 +8397,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "66",
           "team": "James BOXER",
           "penalty": false,
@@ -8415,7 +8415,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "31",
           "team": "Farhad ARIAN",
           "penalty": false,
@@ -8680,7 +8680,7 @@
         {
           "position": 3,
           "position_raw": "3",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "54",
           "team": "Sebastian MILLER",
           "penalty": false,
@@ -8806,7 +8806,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "23",
           "team": "Pavlo DENYSENKO",
           "penalty": false,
@@ -8824,7 +8824,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "49",
           "team": "Jack CROSS",
           "penalty": false,
@@ -8860,7 +8860,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "76",
           "team": "Harry SCOTT-HALL",
           "penalty": false,
@@ -8896,7 +8896,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "68",
           "team": "Arad MOHSENIAN",
           "penalty": false,
@@ -8914,7 +8914,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "35",
           "team": "Theo PALMES",
           "penalty": true,
@@ -9196,7 +9196,7 @@
         {
           "position": 3,
           "position_raw": "3",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "59",
           "team": "Max DAVISON",
           "penalty": false,
@@ -9214,7 +9214,7 @@
         {
           "position": 4,
           "position_raw": "4",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "79",
           "team": "Jake PALMER",
           "penalty": false,
@@ -9304,7 +9304,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "60",
           "team": "Daniel BOULTON RAMOS",
           "penalty": false,
@@ -9340,7 +9340,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "42",
           "team": "Ademi ELUKANLO",
           "penalty": false,
@@ -9358,7 +9358,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "13",
           "team": "David MANUWA",
           "penalty": false,
@@ -9376,7 +9376,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "51",
           "team": "Samantha SEWARD",
           "penalty": false,
@@ -9412,7 +9412,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "68",
           "team": "Tanveer BHANDARI",
           "penalty": true,
@@ -9711,7 +9711,7 @@
         {
           "position": 4,
           "position_raw": "4",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "52",
           "team": "Kieran WAKEFIELD",
           "penalty": false,
@@ -9729,7 +9729,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "36",
           "team": "Adam NATHA",
           "penalty": false,
@@ -9801,7 +9801,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "43",
           "team": "Nick HENRY",
           "penalty": false,
@@ -9855,7 +9855,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "32",
           "team": "Josh MARCHANT",
           "penalty": false,
@@ -9873,7 +9873,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "63",
           "team": "Will MALLARD",
           "penalty": false,
@@ -9891,7 +9891,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "65",
           "team": "Anand PARMAR",
           "penalty": false,
@@ -9909,7 +9909,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "41",
           "team": "Max MCCABE",
           "penalty": false,
@@ -9927,7 +9927,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "2",
           "team": "Jack GOODLIFFE",
           "penalty": false,
@@ -10179,7 +10179,7 @@
         {
           "position": 2,
           "position_raw": "2",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "63",
           "team": "Bobby KRISTOVIC",
           "penalty": false,
@@ -10269,7 +10269,7 @@
         {
           "position": 7,
           "position_raw": "7",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "72",
           "team": "Patrick LEAFE",
           "penalty": false,
@@ -10323,7 +10323,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "31",
           "team": "Farhad ARIAN",
           "penalty": false,
@@ -10359,7 +10359,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "23",
           "team": "Harry SAITO-BROWN",
           "penalty": false,
@@ -10377,7 +10377,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "48",
           "team": "Ben ROBERTS",
           "penalty": false,
@@ -10395,7 +10395,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "37",
           "team": "Lewis WHITE",
           "penalty": false,
@@ -10413,7 +10413,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "53",
           "team": "Max HAWKINS",
           "penalty": false,
@@ -10844,7 +10844,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "35",
           "team": "Theo PALMES",
           "penalty": true,
@@ -10898,7 +10898,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 13,
+          "position_change": -13,
           "kart": "61",
           "team": "Harry SLINGER",
           "penalty": false,
@@ -10916,7 +10916,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "58",
           "team": "Daniel WHITE",
           "penalty": false,
@@ -10934,7 +10934,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "62",
           "team": "Tom NEWNHAM",
           "penalty": false,
@@ -11258,7 +11258,7 @@
         {
           "position": 6,
           "position_raw": "6",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "76",
           "team": "Vishal PATEL",
           "penalty": true,
@@ -11294,7 +11294,7 @@
         {
           "position": 8,
           "position_raw": "8",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "71",
           "team": "Patrick DEBATTISTA",
           "penalty": false,
@@ -11348,7 +11348,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "15",
           "team": "Enzo TERAOKA",
           "penalty": false,
@@ -11384,7 +11384,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "62",
           "team": "Tiago NOBRE",
           "penalty": false,
@@ -11402,7 +11402,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "12",
           "team": "Jonathan LUND",
           "penalty": false,
@@ -11420,7 +11420,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "79",
           "team": "Jake PALMER",
           "penalty": false,
@@ -11438,7 +11438,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "16",
           "team": "Michael JONES",
           "penalty": false,
@@ -11759,7 +11759,7 @@
         {
           "position": 6,
           "position_raw": "6",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "60",
           "team": "Kyle MORBY",
           "penalty": false,
@@ -11849,7 +11849,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "30",
           "team": "Liam PERERA",
           "penalty": false,
@@ -11885,7 +11885,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "41",
           "team": "Max MCCABE",
           "penalty": false,
@@ -11903,7 +11903,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "51",
           "team": "Udi MENON",
           "penalty": true,
@@ -11921,7 +11921,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 13,
+          "position_change": -13,
           "kart": "29",
           "team": "Thomas WOOD",
           "penalty": true,
@@ -12257,7 +12257,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "17",
           "team": "James DZIUBA",
           "penalty": false,
@@ -12311,7 +12311,7 @@
         {
           "position": 8,
           "position_raw": "8",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "45",
           "team": "Rana MENON",
           "penalty": false,
@@ -12329,7 +12329,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "61",
           "team": "Oliver MULVEAGH-WALKER",
           "penalty": false,
@@ -12347,7 +12347,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "74",
           "team": "Matthew CONIBEER",
           "penalty": false,
@@ -12365,7 +12365,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "64",
           "team": "William TAYLOR",
           "penalty": false,
@@ -12383,7 +12383,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "70",
           "team": "Leo BELL",
           "penalty": false,
@@ -12419,7 +12419,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "66",
           "team": "James BOXER",
           "penalty": false,
@@ -12437,7 +12437,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "25",
           "team": "Kurt FAWDRY",
           "penalty": false,
@@ -12455,7 +12455,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "60",
           "team": "Daniel BOULTON RAMOS",
           "penalty": false,
@@ -12817,7 +12817,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "31",
           "team": "Nic FALLON",
           "penalty": false,
@@ -12835,7 +12835,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "32",
           "team": "Josh MARCHANT",
           "penalty": false,
@@ -12871,7 +12871,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "47",
           "team": "Nathan MORRIS",
           "penalty": false,
@@ -12925,7 +12925,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "13",
           "team": "Alistair MALLARD",
           "penalty": false,
@@ -12943,7 +12943,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "65",
           "team": "Anand PARMAR",
           "penalty": false,
@@ -13206,7 +13206,7 @@
         {
           "position": 3,
           "position_raw": "3",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "40",
           "team": "Taylor JARRETT",
           "penalty": false,
@@ -13242,7 +13242,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "10",
           "team": "Logan PARKER",
           "penalty": false,
@@ -13332,7 +13332,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "19",
           "team": "Luke MCCUE",
           "penalty": false,
@@ -13350,7 +13350,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "26",
           "team": "Connor MORTON",
           "penalty": false,
@@ -13386,7 +13386,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "42",
           "team": "Ademi ELUKANLO",
           "penalty": false,
@@ -13422,7 +13422,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "51",
           "team": "Samantha SEWARD",
           "penalty": false,
@@ -13440,7 +13440,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "29",
           "team": "Ewan MCLAGGAN",
           "penalty": false,
@@ -13703,7 +13703,7 @@
         {
           "position": 3,
           "position_raw": "3",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "78",
           "team": "Ocean BACH",
           "penalty": false,
@@ -13739,7 +13739,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "79",
           "team": "Tom NORTHCOTT",
           "penalty": false,
@@ -13775,7 +13775,7 @@
         {
           "position": 7,
           "position_raw": "7",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "22",
           "team": "Ethan ANNETT",
           "penalty": false,
@@ -13829,7 +13829,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "70",
           "team": "Oliver FLASHMAN",
           "penalty": false,
@@ -13847,7 +13847,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "54",
           "team": "Sebastian MILLER",
           "penalty": false,
@@ -13883,7 +13883,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "63",
           "team": "Will MALLARD",
           "penalty": false,
@@ -13919,7 +13919,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "67",
           "team": "Dirar ELMASRI",
           "penalty": false,
@@ -13937,7 +13937,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "68",
           "team": "Arad MOHSENIAN",
           "penalty": false,
@@ -14236,7 +14236,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "55",
           "team": "Vasilisa BOROVSKAYA",
           "penalty": false,
@@ -14326,7 +14326,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "75",
           "team": "William CURTLER",
           "penalty": false,
@@ -14344,7 +14344,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "20",
           "team": "Archie COVENEY",
           "penalty": false,
@@ -14380,7 +14380,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "68",
           "team": "Tanveer BHANDARI",
           "penalty": false,
@@ -14398,7 +14398,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "80",
           "team": "Luca WIGLEY",
           "penalty": false,
@@ -14416,7 +14416,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "38",
           "team": "Frey DAVIDSON",
           "penalty": false,
@@ -14434,7 +14434,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "34",
           "team": "Hugo ERICSON",
           "penalty": true,
@@ -14686,7 +14686,7 @@
         {
           "position": 2,
           "position_raw": "2",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "26",
           "team": "Sam POOLEY",
           "penalty": false,
@@ -14884,7 +14884,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "12",
           "team": "Archie MARTINE",
           "penalty": false,
@@ -14902,7 +14902,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "10",
           "team": "George KATOCHIANOS",
           "penalty": false,
@@ -14920,7 +14920,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "69",
           "team": "Andy STOBART",
           "penalty": false,
@@ -14938,7 +14938,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 14,
+          "position_change": -14,
           "kart": "46",
           "team": "William O’TOOLE",
           "penalty": true,
@@ -15234,7 +15234,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "60",
           "team": "Daniel BOULTON RAMOS",
           "penalty": false,
@@ -15306,7 +15306,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "34",
           "team": "Hugo ERICSON",
           "penalty": false,
@@ -15324,7 +15324,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "75",
           "team": "William CURTLER",
           "penalty": true,
@@ -15342,7 +15342,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "12",
           "team": "Jonathan LUND",
           "penalty": false,
@@ -15360,7 +15360,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "15",
           "team": "Enzo TERAOKA",
           "penalty": true,
@@ -15432,7 +15432,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 15,
+          "position_change": -15,
           "kart": "77",
           "team": "Zainuddin KHWAJA",
           "penalty": false,
@@ -15450,7 +15450,7 @@
         {
           "position": 17,
           "position_raw": "17",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "61",
           "team": "Oliver MULVEAGH-WALKER",
           "penalty": true,
@@ -15486,7 +15486,7 @@
         {
           "position": 19,
           "position_raw": "19",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "38",
           "team": "Frey DAVIDSON",
           "penalty": false,
@@ -15504,7 +15504,7 @@
         {
           "position": 20,
           "position_raw": "20",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "31",
           "team": "Farhad ARIAN",
           "penalty": false,
@@ -15522,7 +15522,7 @@
         {
           "position": 21,
           "position_raw": "21",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "37",
           "team": "Lewis WHITE",
           "penalty": false,
@@ -15540,7 +15540,7 @@
         {
           "position": 22,
           "position_raw": "22",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "39",
           "team": "Martin BOUNDS",
           "penalty": false,
@@ -15558,7 +15558,7 @@
         {
           "position": 23,
           "position_raw": "23",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "80",
           "team": "Luca WIGLEY",
           "penalty": false,
@@ -15594,7 +15594,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "46",
           "team": "Alfie THORNTON",
           "penalty": false,
@@ -16261,7 +16261,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "21",
           "team": "Andrew LLOYD",
           "penalty": true,
@@ -16297,7 +16297,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "72",
           "team": "Ornan HENSTOCK",
           "penalty": false,
@@ -16315,7 +16315,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "62",
           "team": "Tom NEWNHAM",
           "penalty": false,
@@ -16351,7 +16351,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "35",
           "team": "Theo PALMES",
           "penalty": true,
@@ -16405,7 +16405,7 @@
         {
           "position": 19,
           "position_raw": "19",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "12",
           "team": "Archie MARTINE",
           "penalty": true,
@@ -16495,7 +16495,7 @@
         {
           "position": 24,
           "position_raw": "24",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "68",
           "team": "Arad MOHSENIAN",
           "penalty": false,
@@ -16513,7 +16513,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 16,
+          "position_change": -16,
           "kart": "75",
           "team": "Benjamin SHUM",
           "penalty": false,
@@ -16531,7 +16531,7 @@
         {
           "position": 26,
           "position_raw": "26",
-          "position_change": 15,
+          "position_change": -15,
           "kart": "56",
           "team": "Sjoerd VAN DOORN",
           "penalty": true,
@@ -16549,7 +16549,7 @@
         {
           "position": 27,
           "position_raw": "27",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "63",
           "team": "Will MALLARD",
           "penalty": false,
@@ -16567,7 +16567,7 @@
         {
           "position": 28,
           "position_raw": "28",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "65",
           "team": "Anand PARMAR",
           "penalty": false,
@@ -17071,7 +17071,7 @@
         {
           "position": 2,
           "position_raw": "2",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "58",
           "team": "Ben SANDERS",
           "penalty": false,
@@ -17143,7 +17143,7 @@
         {
           "position": 6,
           "position_raw": "6",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "8",
           "team": "Brody SKINNER",
           "penalty": false,
@@ -17161,7 +17161,7 @@
         {
           "position": 7,
           "position_raw": "7",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "40",
           "team": "Taylor JARRETT",
           "penalty": true,
@@ -17197,7 +17197,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "49",
           "team": "Ben FODEN",
           "penalty": false,
@@ -17233,7 +17233,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "20",
           "team": "Archie COVENEY",
           "penalty": false,
@@ -17305,7 +17305,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "52",
           "team": "Zakk FINNIE",
           "penalty": false,
@@ -17323,7 +17323,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "74",
           "team": "Matthew CONIBEER",
           "penalty": false,
@@ -17341,7 +17341,7 @@
         {
           "position": 17,
           "position_raw": "17",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "13",
           "team": "David MANUWA",
           "penalty": false,
@@ -17413,7 +17413,7 @@
         {
           "position": 21,
           "position_raw": "21",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "11",
           "team": "Daniel SKELTON",
           "penalty": false,
@@ -17467,7 +17467,7 @@
         {
           "position": 24,
           "position_raw": "24",
-          "position_change": 17,
+          "position_change": -17,
           "kart": "18",
           "team": "Cavern TAYLOR",
           "penalty": false,
@@ -17485,7 +17485,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "44",
           "team": "Henry HUDSON",
           "penalty": false,
@@ -17521,7 +17521,7 @@
         {
           "position": 27,
           "position_raw": "27",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "55",
           "team": "Vasilisa BOROVSKAYA",
           "penalty": false,
@@ -18073,7 +18073,7 @@
         {
           "position": 4,
           "position_raw": "4",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "40",
           "team": "Simon RAM",
           "penalty": false,
@@ -18145,7 +18145,7 @@
         {
           "position": 8,
           "position_raw": "8",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "11",
           "team": "Mahdi KADIRI",
           "penalty": true,
@@ -18163,7 +18163,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "54",
           "team": "Sebastian MILLER",
           "penalty": false,
@@ -18217,7 +18217,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "31",
           "team": "Nic FALLON",
           "penalty": true,
@@ -18271,7 +18271,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "23",
           "team": "Pavlo DENYSENKO",
           "penalty": false,
@@ -18325,7 +18325,7 @@
         {
           "position": 18,
           "position_raw": "18",
-          "position_change": 14,
+          "position_change": -14,
           "kart": "22",
           "team": "Ethan ANNETT",
           "penalty": false,
@@ -18379,7 +18379,7 @@
         {
           "position": 21,
           "position_raw": "21",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "34",
           "team": "Nathan CLIFFORD",
           "penalty": false,
@@ -18415,7 +18415,7 @@
         {
           "position": 23,
           "position_raw": "23",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "48",
           "team": "Adam. HARDING.",
           "penalty": false,
@@ -18451,7 +18451,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "30",
           "team": "Liam PERERA",
           "penalty": true,
@@ -19029,7 +19029,7 @@
         {
           "position": 2,
           "position_raw": "2",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "47",
           "team": "Peter KNIGHT",
           "penalty": false,
@@ -19263,7 +19263,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "9",
           "team": "Oli ANDREWS",
           "penalty": false,
@@ -19281,7 +19281,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "3",
           "team": "Ieuan THOMAS",
           "penalty": false,
@@ -19299,7 +19299,7 @@
         {
           "position": 17,
           "position_raw": "17",
-          "position_change": 13,
+          "position_change": -13,
           "kart": "43",
           "team": "Arion NELA",
           "penalty": true,
@@ -19335,7 +19335,7 @@
         {
           "position": 19,
           "position_raw": "19",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "24",
           "team": "Joel BILLINGTON",
           "penalty": true,
@@ -19425,7 +19425,7 @@
         {
           "position": 24,
           "position_raw": "24",
-          "position_change": 19,
+          "position_change": -19,
           "kart": "33",
           "team": "Ferapont BARINOV",
           "penalty": true,
@@ -19443,7 +19443,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "71",
           "team": "Patrick DEBATTISTA",
           "penalty": false,
@@ -19497,7 +19497,7 @@
         {
           "position": 28,
           "position_raw": "28",
-          "position_change": 16,
+          "position_change": -16,
           "kart": "27",
           "team": "Jean SAMMUT",
           "penalty": false,
@@ -20004,7 +20004,7 @@
         {
           "position": 2,
           "position_raw": "2",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "14",
           "team": "Dominic ROBERTS",
           "penalty": false,
@@ -20094,7 +20094,7 @@
         {
           "position": 7,
           "position_raw": "7",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "17",
           "team": "Sam HEATHCOTE",
           "penalty": false,
@@ -20130,7 +20130,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "79",
           "team": "Tom NORTHCOTT",
           "penalty": false,
@@ -20274,7 +20274,7 @@
         {
           "position": 17,
           "position_raw": "17",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "9",
           "team": "Max BARNETT",
           "penalty": true,
@@ -20292,7 +20292,7 @@
         {
           "position": 18,
           "position_raw": "18",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "36",
           "team": "Adam NATHA",
           "penalty": false,
@@ -20310,7 +20310,7 @@
         {
           "position": 19,
           "position_raw": "19",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "15",
           "team": "Kai ASKEY",
           "penalty": false,
@@ -20328,7 +20328,7 @@
         {
           "position": 20,
           "position_raw": "20",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "66",
           "team": "Jesse DOORGEEST",
           "penalty": false,
@@ -20346,7 +20346,7 @@
         {
           "position": 21,
           "position_raw": "21",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "39",
           "team": "Philip PAWLIK",
           "penalty": true,
@@ -20364,7 +20364,7 @@
         {
           "position": 22,
           "position_raw": "22",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "50",
           "team": "Thomas DIXON",
           "penalty": false,
@@ -20382,7 +20382,7 @@
         {
           "position": 23,
           "position_raw": "23",
-          "position_change": 16,
+          "position_change": -16,
           "kart": "27",
           "team": "Reece BRIGHT",
           "penalty": false,
@@ -20418,7 +20418,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "26",
           "team": "Sam POOLEY",
           "penalty": false,
@@ -20454,7 +20454,7 @@
         {
           "position": 27,
           "position_raw": "27",
-          "position_change": 13,
+          "position_change": -13,
           "kart": "52",
           "team": "Kieran WAKEFIELD",
           "penalty": false,
@@ -20472,7 +20472,7 @@
         {
           "position": 28,
           "position_raw": "28",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "24",
           "team": "Joel EVANS",
           "penalty": true,
@@ -20892,7 +20892,7 @@
         {
           "position": 2,
           "position_raw": "2",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "1",
           "team": "Maxwell DODDS",
           "penalty": false,
@@ -20964,7 +20964,7 @@
         {
           "position": 6,
           "position_raw": "6",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "11",
           "team": "Axel SLIJEPCEVIC",
           "penalty": false,
@@ -21018,7 +21018,7 @@
         {
           "position": 9,
           "position_raw": "9",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "13",
           "team": "Matthew BOULTON",
           "penalty": false,
@@ -21036,7 +21036,7 @@
         {
           "position": 10,
           "position_raw": "10",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "4",
           "team": "Luca OSMAN-PRICE",
           "penalty": false,
@@ -21054,7 +21054,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "12",
           "team": "Dominic ROBERTS",
           "penalty": true,
@@ -21108,7 +21108,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "6",
           "team": "Fraser BRUNTON",
           "penalty": false,
@@ -21126,7 +21126,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "16",
           "team": "Jake YANAGISAWA",
           "penalty": false,
@@ -21144,7 +21144,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "15",
           "team": "Jonathan DALTON",
           "penalty": false,
@@ -21162,7 +21162,7 @@
         {
           "position": 17,
           "position_raw": "17",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "5",
           "team": "Tom BALLANTYNE",
           "penalty": false,
@@ -21180,7 +21180,7 @@
         {
           "position": 18,
           "position_raw": "18",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "7",
           "team": "Jacob MCCOMB",
           "penalty": false,
@@ -21216,7 +21216,7 @@
         {
           "position": 20,
           "position_raw": "20",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "8",
           "team": "Logan PARKER",
           "penalty": true,

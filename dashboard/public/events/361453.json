@@ -4,7 +4,7 @@
   "title": "Inters Pre-Event Testing - Llandow",
   "championship": "bukc",
   "url": "https://www.alpharacehub.com/bukc/e/361453",
-  "scraped_at": "2026-06-04T12:54:23.709312Z",
+  "scraped_at": "2026-06-05T22:17:37.550586Z",
   "sessions": [
     {
       "session_id": 747803,
@@ -199,7 +199,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "4",
           "team": "George nick GORZYNSKI",
           "penalty": false,
@@ -271,7 +271,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 13,
+          "position_change": -13,
           "kart": "2",
           "team": "Dirar ELMASRI",
           "penalty": false,
@@ -289,7 +289,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "6",
           "team": "Fabian REUT",
           "penalty": false,
@@ -325,7 +325,7 @@
         {
           "position": 18,
           "position_raw": "18",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "13",
           "team": "Alexander BOULGER",
           "penalty": false,
@@ -397,7 +397,7 @@
         {
           "position": 22,
           "position_raw": "22",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "12",
           "team": "Adam SYED",
           "penalty": false,
@@ -433,7 +433,7 @@
         {
           "position": 24,
           "position_raw": "24",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "15",
           "team": "Nasos TYCHALAS",
           "penalty": false,
@@ -451,7 +451,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 18,
+          "position_change": -18,
           "kart": "7",
           "team": "Connor MORTON",
           "penalty": false,
@@ -469,7 +469,7 @@
         {
           "position": 26,
           "position_raw": "26",
-          "position_change": 18,
+          "position_change": -18,
           "kart": "8",
           "team": "Key heng CHAN",
           "penalty": false,
@@ -487,7 +487,7 @@
         {
           "position": 27,
           "position_raw": "27",
-          "position_change": 26,
+          "position_change": -26,
           "kart": "1",
           "team": "Simon NGWA",
           "penalty": false,
@@ -505,7 +505,7 @@
         {
           "position": 28,
           "position_raw": "28",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "19",
           "team": "Chenrui HU",
           "penalty": false,
@@ -523,7 +523,7 @@
         {
           "position": 29,
           "position_raw": "29",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "26",
           "team": "Shishuo WEN",
           "penalty": false,
@@ -541,7 +541,7 @@
         {
           "position": 30,
           "position_raw": "30",
-          "position_change": 20,
+          "position_change": -20,
           "kart": "10",
           "team": "Saumyakant MALLICK",
           "penalty": false,

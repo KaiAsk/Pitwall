@@ -4,7 +4,7 @@
   "title": "Inters Pre-Event Testing - Silverstone",
   "championship": "bukc",
   "url": "https://www.alpharacehub.com/bukc/e/371813",
-  "scraped_at": "2026-06-04T12:50:14.004061Z",
+  "scraped_at": "2026-06-05T17:51:30.268911Z",
   "sessions": [
     {
       "session_id": 767971,
@@ -127,7 +127,7 @@
         {
           "position": 7,
           "position_raw": "7",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "5",
           "team": "Elliot BLAIZE",
           "penalty": false,
@@ -199,7 +199,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "8",
           "team": "Max HAWKINS",
           "penalty": false,
@@ -253,7 +253,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "11",
           "team": "Vasilisa BOROVSKAYA",
           "penalty": false,
@@ -271,7 +271,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 14,
+          "position_change": -14,
           "kart": "1",
           "team": "Francesco RONCAROLI",
           "penalty": false,
@@ -343,7 +343,7 @@
         {
           "position": 19,
           "position_raw": "19",
-          "position_change": 16,
+          "position_change": -16,
           "kart": "3",
           "team": "Cameron MOLLITOR",
           "penalty": false,
@@ -361,7 +361,7 @@
         {
           "position": 20,
           "position_raw": "20",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "10",
           "team": "Tejo JEHART",
           "penalty": false,
@@ -379,7 +379,7 @@
         {
           "position": 21,
           "position_raw": "21",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "14",
           "team": "Jake SCOURFIELD",
           "penalty": false,
@@ -415,7 +415,7 @@
         {
           "position": 23,
           "position_raw": "23",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "21",
           "team": "Benjamin LAVERACK",
           "penalty": false,
@@ -451,7 +451,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "15",
           "team": "Benjamin LEES",
           "penalty": false,
@@ -469,7 +469,7 @@
         {
           "position": 26,
           "position_raw": "26",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "19",
           "team": "Weizhe TAO",
           "penalty": false,
@@ -487,7 +487,7 @@
         {
           "position": 27,
           "position_raw": "27",
-          "position_change": 21,
+          "position_change": -21,
           "kart": "6",
           "team": "Edward ACKROYD",
           "penalty": false,
@@ -505,7 +505,7 @@
         {
           "position": 28,
           "position_raw": "28",
-          "position_change": 15,
+          "position_change": -15,
           "kart": "13",
           "team": "Samuel LATIMER",
           "penalty": false,
@@ -523,7 +523,7 @@
         {
           "position": 29,
           "position_raw": "29",
-          "position_change": 27,
+          "position_change": -27,
           "kart": "2",
           "team": "Yunhao DING",
           "penalty": false,
@@ -541,7 +541,7 @@
         {
           "position": 30,
           "position_raw": "30",
-          "position_change": 26,
+          "position_change": -26,
           "kart": "4",
           "team": "Liz STEVENSON",
           "penalty": false,

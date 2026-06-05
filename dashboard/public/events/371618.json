@@ -4,7 +4,7 @@
   "title": "Mains Round 8",
   "championship": "bukc",
   "url": "https://www.alpharacehub.com/bukc/e/371618",
-  "scraped_at": "2026-06-04T12:52:47.303055Z",
+  "scraped_at": "2026-06-05T22:16:00.584478Z",
   "sessions": [
     {
       "session_id": 767574,
@@ -127,7 +127,7 @@
         {
           "position": 7,
           "position_raw": "7",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "42",
           "team": "Oxford Brookes D",
           "penalty": false,
@@ -217,7 +217,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "35",
           "team": "Nottingham A",
           "penalty": false,
@@ -235,7 +235,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "16",
           "team": "UCL A",
           "penalty": false,
@@ -271,7 +271,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "23",
           "team": "Surrey B",
           "penalty": false,
@@ -325,7 +325,7 @@
         {
           "position": 18,
           "position_raw": "18",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "66",
           "team": "Birmingham B",
           "penalty": false,
@@ -343,7 +343,7 @@
         {
           "position": 19,
           "position_raw": "19",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "11",
           "team": "Edinburgh A",
           "penalty": true,
@@ -361,7 +361,7 @@
         {
           "position": 20,
           "position_raw": "20",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "60",
           "team": "Nottingham Trent B",
           "penalty": false,
@@ -379,7 +379,7 @@
         {
           "position": 21,
           "position_raw": "21",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "57",
           "team": "Edinburgh B",
           "penalty": false,
@@ -415,7 +415,7 @@
         {
           "position": 23,
           "position_raw": "23",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "14",
           "team": "Warwick A",
           "penalty": true,
@@ -469,7 +469,7 @@
         {
           "position": 26,
           "position_raw": "26",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "2",
           "team": "Cardiff A",
           "penalty": true,
@@ -487,7 +487,7 @@
         {
           "position": 27,
           "position_raw": "27",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "30",
           "team": "Manchester A",
           "penalty": false,
@@ -505,7 +505,7 @@
         {
           "position": 28,
           "position_raw": "28",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "73",
           "team": "Brunel A",
           "penalty": false,
@@ -523,7 +523,7 @@
         {
           "position": 29,
           "position_raw": "29",
-          "position_change": 17,
+          "position_change": -17,
           "kart": "20",
           "team": "Oxford Brookes C",
           "penalty": true,
@@ -559,7 +559,7 @@
         {
           "position": 31,
           "position_raw": "31",
-          "position_change": 28,
+          "position_change": -28,
           "kart": "19",
           "team": "Loughborough B",
           "penalty": false,
@@ -577,7 +577,7 @@
         {
           "position": 32,
           "position_raw": "32",
-          "position_change": 28,
+          "position_change": -28,
           "kart": "94",
           "team": "UWE D",
           "penalty": false,
@@ -595,7 +595,7 @@
         {
           "position": 33,
           "position_raw": "33",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "28",
           "team": "Bristol A",
           "penalty": true,
@@ -649,7 +649,7 @@
         {
           "position": 36,
           "position_raw": "36",
-          "position_change": 22,
+          "position_change": -22,
           "kart": "21",
           "team": "Lancashire A",
           "penalty": true,
@@ -1801,7 +1801,7 @@
         {
           "position": 4,
           "position_raw": "4",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "6",
           "team": "Coventry A",
           "penalty": false,
@@ -1837,7 +1837,7 @@
         {
           "position": 6,
           "position_raw": "6",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "20",
           "team": "Oxford Brookes C",
           "penalty": false,
@@ -1873,7 +1873,7 @@
         {
           "position": 8,
           "position_raw": "8",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "137",
           "team": "Uni of Life",
           "penalty": true,
@@ -2035,7 +2035,7 @@
         {
           "position": 17,
           "position_raw": "17",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "4",
           "team": "Southampton A",
           "penalty": false,
@@ -2089,7 +2089,7 @@
         {
           "position": 20,
           "position_raw": "20",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "94",
           "team": "UWE D",
           "penalty": false,
@@ -2125,7 +2125,7 @@
         {
           "position": 22,
           "position_raw": "22",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "36",
           "team": "Huddersfield A",
           "penalty": true,
@@ -2143,7 +2143,7 @@
         {
           "position": 23,
           "position_raw": "23",
-          "position_change": 15,
+          "position_change": -15,
           "kart": "57",
           "team": "Edinburgh B",
           "penalty": false,
@@ -2161,7 +2161,7 @@
         {
           "position": 24,
           "position_raw": "24",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "82",
           "team": "Manchester Met A",
           "penalty": false,
@@ -2179,7 +2179,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "23",
           "team": "Surrey B",
           "penalty": false,
@@ -2233,7 +2233,7 @@
         {
           "position": 28,
           "position_raw": "28",
-          "position_change": 15,
+          "position_change": -15,
           "kart": "72",
           "team": "Nottingham Trent C",
           "penalty": false,
@@ -2251,7 +2251,7 @@
         {
           "position": 29,
           "position_raw": "29",
-          "position_change": 28,
+          "position_change": -28,
           "kart": "15",
           "team": "Loughborough C",
           "penalty": true,
@@ -2269,7 +2269,7 @@
         {
           "position": 30,
           "position_raw": "30",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "43",
           "team": "Southampton C",
           "penalty": false,
@@ -2287,7 +2287,7 @@
         {
           "position": 31,
           "position_raw": "31",
-          "position_change": 25,
+          "position_change": -25,
           "kart": "44",
           "team": "Reading B",
           "penalty": false,
@@ -2305,7 +2305,7 @@
         {
           "position": 32,
           "position_raw": "32",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "14",
           "team": "Warwick A",
           "penalty": false,
@@ -2323,7 +2323,7 @@
         {
           "position": 33,
           "position_raw": "33",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "59",
           "team": "Hertfordshire A",
           "penalty": true,
@@ -2341,7 +2341,7 @@
         {
           "position": 34,
           "position_raw": "34",
-          "position_change": 19,
+          "position_change": -19,
           "kart": "22",
           "team": "Nottingham Trent A",
           "penalty": false,
@@ -2359,7 +2359,7 @@
         {
           "position": 35,
           "position_raw": "35",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "56",
           "team": "Coventry D",
           "penalty": true,
@@ -2377,7 +2377,7 @@
         {
           "position": 36,
           "position_raw": "36",
-          "position_change": 19,
+          "position_change": -19,
           "kart": "33",
           "team": "UWE A",
           "penalty": true,
@@ -3544,7 +3544,7 @@
         {
           "position": 6,
           "position_raw": "6",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "82",
           "team": "Manchester Met A",
           "penalty": false,
@@ -3562,7 +3562,7 @@
         {
           "position": 7,
           "position_raw": "7",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "61",
           "team": "York A",
           "penalty": false,
@@ -3670,7 +3670,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "97",
           "team": "Leeds A",
           "penalty": false,
@@ -3688,7 +3688,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "73",
           "team": "Brunel A",
           "penalty": false,
@@ -3706,7 +3706,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "96",
           "team": "Loughborough F",
           "penalty": false,
@@ -3742,7 +3742,7 @@
         {
           "position": 17,
           "position_raw": "17",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "36",
           "team": "Huddersfield A",
           "penalty": false,
@@ -3796,7 +3796,7 @@
         {
           "position": 20,
           "position_raw": "20",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "38",
           "team": "Bath B",
           "penalty": false,
@@ -3886,7 +3886,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "35",
           "team": "Nottingham A",
           "penalty": true,
@@ -3904,7 +3904,7 @@
         {
           "position": 26,
           "position_raw": "26",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "12",
           "team": "Oxford Brookes B",
           "penalty": true,
@@ -3940,7 +3940,7 @@
         {
           "position": 28,
           "position_raw": "28",
-          "position_change": 20,
+          "position_change": -20,
           "kart": "24",
           "team": "Swansea A",
           "penalty": false,
@@ -3958,7 +3958,7 @@
         {
           "position": 29,
           "position_raw": "29",
-          "position_change": 18,
+          "position_change": -18,
           "kart": "45",
           "team": "Loughborough D",
           "penalty": true,
@@ -3994,7 +3994,7 @@
         {
           "position": 31,
           "position_raw": "31",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "66",
           "team": "Birmingham B",
           "penalty": false,
@@ -4030,7 +4030,7 @@
         {
           "position": 33,
           "position_raw": "33",
-          "position_change": 26,
+          "position_change": -26,
           "kart": "92",
           "team": "Lancashire B",
           "penalty": false,
@@ -4048,7 +4048,7 @@
         {
           "position": 34,
           "position_raw": "34",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "57",
           "team": "Edinburgh B",
           "penalty": false,
@@ -4066,7 +4066,7 @@
         {
           "position": 35,
           "position_raw": "35",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "15",
           "team": "Loughborough C",
           "penalty": false,
@@ -5185,7 +5185,7 @@
         {
           "position": 5,
           "position_raw": "5",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "43",
           "team": "Southampton C",
           "penalty": false,
@@ -5221,7 +5221,7 @@
         {
           "position": 7,
           "position_raw": "7",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "41",
           "team": "Lancaster A",
           "penalty": false,
@@ -5293,7 +5293,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "66",
           "team": "Birmingham B",
           "penalty": false,
@@ -5365,7 +5365,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "38",
           "team": "Bath B",
           "penalty": true,
@@ -5383,7 +5383,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 14,
+          "position_change": -14,
           "kart": "26",
           "team": "Southampton B",
           "penalty": false,
@@ -5437,7 +5437,7 @@
         {
           "position": 19,
           "position_raw": "19",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "61",
           "team": "York A",
           "penalty": false,
@@ -5509,7 +5509,7 @@
         {
           "position": 23,
           "position_raw": "23",
-          "position_change": 19,
+          "position_change": -19,
           "kart": "56",
           "team": "Coventry D",
           "penalty": false,
@@ -5527,7 +5527,7 @@
         {
           "position": 24,
           "position_raw": "24",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "44",
           "team": "Reading B",
           "penalty": false,
@@ -5563,7 +5563,7 @@
         {
           "position": 26,
           "position_raw": "26",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "45",
           "team": "Loughborough D",
           "penalty": true,
@@ -5581,7 +5581,7 @@
         {
           "position": 27,
           "position_raw": "27",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "94",
           "team": "UWE D",
           "penalty": false,
@@ -5599,7 +5599,7 @@
         {
           "position": 28,
           "position_raw": "28",
-          "position_change": 19,
+          "position_change": -19,
           "kart": "50",
           "team": "Lancaster B",
           "penalty": true,
@@ -5653,7 +5653,7 @@
         {
           "position": 31,
           "position_raw": "31",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "82",
           "team": "Manchester Met A",
           "penalty": true,
@@ -5689,7 +5689,7 @@
         {
           "position": 33,
           "position_raw": "33",
-          "position_change": 18,
+          "position_change": -18,
           "kart": "15",
           "team": "Loughborough C",
           "penalty": false,
@@ -5707,7 +5707,7 @@
         {
           "position": 34,
           "position_raw": "34",
-          "position_change": 23,
+          "position_change": -23,
           "kart": "67",
           "team": "UWE C",
           "penalty": false,
@@ -6676,7 +6676,7 @@
         {
           "position": 7,
           "position_raw": "7",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "10",
           "team": "Sheffield A",
           "penalty": true,
@@ -6694,7 +6694,7 @@
         {
           "position": 8,
           "position_raw": "8",
-          "position_change": 6,
+          "position_change": -6,
           "kart": "17",
           "team": "Birmingham A",
           "penalty": true,
@@ -6766,7 +6766,7 @@
         {
           "position": 12,
           "position_raw": "12",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "14",
           "team": "Warwick A",
           "penalty": false,
@@ -6784,7 +6784,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "58",
           "team": "Surrey A",
           "penalty": true,
@@ -6802,7 +6802,7 @@
         {
           "position": 14,
           "position_raw": "14",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "11",
           "team": "Edinburgh A",
           "penalty": true,
@@ -6820,7 +6820,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "45",
           "team": "Loughborough D",
           "penalty": false,
@@ -6856,7 +6856,7 @@
         {
           "position": 17,
           "position_raw": "17",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "8",
           "team": "Exeter A",
           "penalty": false,
@@ -6910,7 +6910,7 @@
         {
           "position": 20,
           "position_raw": "20",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "5",
           "team": "Reading A",
           "penalty": true,
@@ -6928,7 +6928,7 @@
         {
           "position": 21,
           "position_raw": "21",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "18",
           "team": "Derby A",
           "penalty": true,
@@ -6946,7 +6946,7 @@
         {
           "position": 22,
           "position_raw": "22",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "73",
           "team": "Brunel A",
           "penalty": false,
@@ -6982,7 +6982,7 @@
         {
           "position": 24,
           "position_raw": "24",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "35",
           "team": "Nottingham A",
           "penalty": false,
@@ -7000,7 +7000,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "72",
           "team": "Nottingham Trent C",
           "penalty": false,
@@ -7072,7 +7072,7 @@
         {
           "position": 29,
           "position_raw": "29",
-          "position_change": 14,
+          "position_change": -14,
           "kart": "42",
           "team": "Oxford Brookes D",
           "penalty": true,
@@ -7090,7 +7090,7 @@
         {
           "position": 30,
           "position_raw": "30",
-          "position_change": 12,
+          "position_change": -12,
           "kart": "41",
           "team": "Lancaster A",
           "penalty": true,
@@ -7108,7 +7108,7 @@
         {
           "position": 31,
           "position_raw": "31",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "6",
           "team": "Coventry A",
           "penalty": false,
@@ -7144,7 +7144,7 @@
         {
           "position": 33,
           "position_raw": "33",
-          "position_change": 14,
+          "position_change": -14,
           "kart": "38",
           "team": "Bath B",
           "penalty": true,
@@ -7162,7 +7162,7 @@
         {
           "position": 34,
           "position_raw": "34",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "94",
           "team": "UWE D",
           "penalty": true,
@@ -7198,7 +7198,7 @@
         {
           "position": 36,
           "position_raw": "36",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "92",
           "team": "Lancashire B",
           "penalty": true,
@@ -8266,7 +8266,7 @@
         {
           "position": 4,
           "position_raw": "4",
-          "position_change": 3,
+          "position_change": -3,
           "kart": "31",
           "team": "Portsmouth A",
           "penalty": false,
@@ -8392,7 +8392,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "60",
           "team": "Nottingham Trent B",
           "penalty": false,
@@ -8428,7 +8428,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "33",
           "team": "UWE A",
           "penalty": true,
@@ -8464,7 +8464,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "26",
           "team": "Southampton B",
           "penalty": false,
@@ -8500,7 +8500,7 @@
         {
           "position": 17,
           "position_raw": "17",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "18",
           "team": "Derby A",
           "penalty": false,
@@ -8554,7 +8554,7 @@
         {
           "position": 20,
           "position_raw": "20",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "23",
           "team": "Surrey B",
           "penalty": true,
@@ -8572,7 +8572,7 @@
         {
           "position": 21,
           "position_raw": "21",
-          "position_change": 13,
+          "position_change": -13,
           "kart": "72",
           "team": "Nottingham Trent C",
           "penalty": true,
@@ -8590,7 +8590,7 @@
         {
           "position": 22,
           "position_raw": "22",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "12",
           "team": "Oxford Brookes B",
           "penalty": true,
@@ -8644,7 +8644,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "28",
           "team": "Bristol A",
           "penalty": false,
@@ -8662,7 +8662,7 @@
         {
           "position": 26,
           "position_raw": "26",
-          "position_change": 13,
+          "position_change": -13,
           "kart": "44",
           "team": "Reading B",
           "penalty": false,
@@ -8680,7 +8680,7 @@
         {
           "position": 27,
           "position_raw": "27",
-          "position_change": 25,
+          "position_change": -25,
           "kart": "59",
           "team": "Hertfordshire A",
           "penalty": false,
@@ -8716,7 +8716,7 @@
         {
           "position": 29,
           "position_raw": "29",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "24",
           "team": "Swansea A",
           "penalty": false,
@@ -8734,7 +8734,7 @@
         {
           "position": 30,
           "position_raw": "30",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "66",
           "team": "Birmingham B",
           "penalty": false,
@@ -8752,7 +8752,7 @@
         {
           "position": 31,
           "position_raw": "31",
-          "position_change": 26,
+          "position_change": -26,
           "kart": "67",
           "team": "UWE C",
           "penalty": false,
@@ -8770,7 +8770,7 @@
         {
           "position": 32,
           "position_raw": "32",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "5",
           "team": "Reading A",
           "penalty": true,
@@ -8788,7 +8788,7 @@
         {
           "position": 33,
           "position_raw": "33",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "92",
           "team": "Lancashire B",
           "penalty": false,
@@ -8806,7 +8806,7 @@
         {
           "position": 34,
           "position_raw": "34",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "21",
           "team": "Lancashire A",
           "penalty": false,
@@ -8824,7 +8824,7 @@
         {
           "position": 35,
           "position_raw": "35",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "16",
           "team": "UCL A",
           "penalty": false,

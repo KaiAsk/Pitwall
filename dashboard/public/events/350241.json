@@ -4,7 +4,7 @@
   "title": "Inters Pre-Event Testing - Buckmore Park",
   "championship": "bukc",
   "url": "https://www.alpharacehub.com/bukc/e/350241",
-  "scraped_at": "2026-06-04T13:28:24.742644Z",
+  "scraped_at": "2026-06-05T22:54:08.163885Z",
   "sessions": [
     {
       "session_id": 726047,
@@ -127,7 +127,7 @@
         {
           "position": 7,
           "position_raw": "7",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "2",
           "team": "George nick GORZYNSKI",
           "penalty": false,
@@ -199,7 +199,7 @@
         {
           "position": 11,
           "position_raw": "11",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "9",
           "team": "Alfie THORNTON",
           "penalty": false,
@@ -235,7 +235,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "5",
           "team": "Vivaan BAIG",
           "penalty": false,
@@ -271,7 +271,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 11,
+          "position_change": -11,
           "kart": "4",
           "team": "Josh ORME-HERBERT",
           "penalty": false,
@@ -343,7 +343,7 @@
         {
           "position": 19,
           "position_raw": "19",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "12",
           "team": "Ademi ELUKANLO",
           "penalty": false,
@@ -361,7 +361,7 @@
         {
           "position": 20,
           "position_raw": "20",
-          "position_change": 14,
+          "position_change": -14,
           "kart": "6",
           "team": "Iago SIERLECKI",
           "penalty": false,
@@ -379,7 +379,7 @@
         {
           "position": 21,
           "position_raw": "21",
-          "position_change": 4,
+          "position_change": -4,
           "kart": "17",
           "team": "Reuben KNIGHT",
           "penalty": false,
@@ -397,7 +397,7 @@
         {
           "position": 22,
           "position_raw": "22",
-          "position_change": 21,
+          "position_change": -21,
           "kart": "1",
           "team": "Yunhao DING",
           "penalty": false,
@@ -451,7 +451,7 @@
         {
           "position": 25,
           "position_raw": "25",
-          "position_change": 22,
+          "position_change": -22,
           "kart": "3",
           "team": "Ali SALIM",
           "penalty": false,
@@ -487,7 +487,7 @@
         {
           "position": 27,
           "position_raw": "27",
-          "position_change": 14,
+          "position_change": -14,
           "kart": "13",
           "team": "Anand PARMAR",
           "penalty": false,
@@ -505,7 +505,7 @@
         {
           "position": 28,
           "position_raw": "28",
-          "position_change": 20,
+          "position_change": -20,
           "kart": "8",
           "team": "Alexander JONES",
           "penalty": false,
@@ -523,7 +523,7 @@
         {
           "position": 29,
           "position_raw": "29",
-          "position_change": 2,
+          "position_change": -2,
           "kart": "27",
           "team": "Ethan ROBERTS",
           "penalty": false,
@@ -541,7 +541,7 @@
         {
           "position": 30,
           "position_raw": "30",
-          "position_change": 10,
+          "position_change": -10,
           "kart": "20",
           "team": "Chenrui HU",
           "penalty": false,

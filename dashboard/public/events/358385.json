@@ -4,7 +4,7 @@
   "title": "Inters Pre-Event Testing - Warden Law",
   "championship": "bukc",
   "url": "https://www.alpharacehub.com/bukc/e/358385",
-  "scraped_at": "2026-06-04T13:26:24.105840Z",
+  "scraped_at": "2026-06-05T22:19:38.390719Z",
   "sessions": [
     {
       "session_id": 741346,
@@ -235,7 +235,7 @@
         {
           "position": 13,
           "position_raw": "13",
-          "position_change": 8,
+          "position_change": -8,
           "kart": "5",
           "team": "Alexander BOULGER",
           "penalty": false,
@@ -271,7 +271,7 @@
         {
           "position": 15,
           "position_raw": "15",
-          "position_change": 7,
+          "position_change": -7,
           "kart": "8",
           "team": "Zainuddin KHWAJA",
           "penalty": false,
@@ -289,7 +289,7 @@
         {
           "position": 16,
           "position_raw": "16",
-          "position_change": 9,
+          "position_change": -9,
           "kart": "7",
           "team": "Ewan MCLAGGAN",
           "penalty": false,
@@ -307,7 +307,7 @@
         {
           "position": 17,
           "position_raw": "17",
-          "position_change": 14,
+          "position_change": -14,
           "kart": "3",
           "team": "Alex MCPHERSON",
           "penalty": false,
@@ -361,7 +361,7 @@
         {
           "position": 20,
           "position_raw": "20",
-          "position_change": 16,
+          "position_change": -16,
           "kart": "4",
           "team": "Emmanuel POLYCHRONAKIS",
           "penalty": false,
@@ -379,7 +379,7 @@
         {
           "position": 21,
           "position_raw": "21",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "20",
           "team": "Max HAWKINS",
           "penalty": false,
@@ -397,7 +397,7 @@
         {
           "position": 22,
           "position_raw": "22",
-          "position_change": 5,
+          "position_change": -5,
           "kart": "17",
           "team": "Chenrui HU",
           "penalty": false,
@@ -469,7 +469,7 @@
         {
           "position": 26,
           "position_raw": "26",
-          "position_change": 25,
+          "position_change": -25,
           "kart": "1",
           "team": "Josh ORME-HERBERT",
           "penalty": false,
@@ -487,7 +487,7 @@
         {
           "position": 27,
           "position_raw": "27",
-          "position_change": 1,
+          "position_change": -1,
           "kart": "26",
           "team": "Teodor ANDRASI",
           "penalty": false,
@@ -505,7 +505,7 @@
         {
           "position": 28,
           "position_raw": "28",
-          "position_change": 26,
+          "position_change": -26,
           "kart": "2",
           "team": "Simon NGWA",
           "penalty": false,
@@ -523,7 +523,7 @@
         {
           "position": 29,
           "position_raw": "29",
-          "position_change": 18,
+          "position_change": -18,
           "kart": "11",
           "team": "James JOYCE",
           "penalty": false,
@@ -541,7 +541,7 @@
         {
           "position": 30,
           "position_raw": "30",
-          "position_change": 20,
+          "position_change": -20,
           "kart": "10",
           "team": "Mara DRAGOMIR",
           "penalty": false,
