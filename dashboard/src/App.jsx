@@ -455,6 +455,8 @@ export default function App() {
   const [tab, setTab] = useState("scraped");   const [cleanOnly, setCleanOnly] = useState(true);
   const [reportSession, setReportSession] = useState(null);
   const [ratingScope, setRatingScope] = useState("season");
+  const [debrief, setDebrief] = useState("");
+  const [debriefLoading, setDebriefLoading] = useState(false);
   const [extraInput, setExtraInput] = useState(() => LS("extra", ""));
   const [compareIds, setCompareIds] = useState(() => LS("compareIds", []));
   const [compareCache, setCompareCache] = useState({});
@@ -537,6 +539,39 @@ export default function App() {
       .flatMap((raw) => convertEvent(raw, extraTeams, extraNums))
       .filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)));
   }, [seasonRaws, extraTeams, extraNums]);
+
+  // Mains-pace baseline per round: Mains rounds use their own field median; Inters rounds borrow
+  // the Mains field median from the nearest-date round (same race weekend = same track).
+  const roundBaselines = useMemo(() => {
+    const info = {};
+    Object.values(seasonRaws).forEach((raw) => {
+      if (!raw || !raw.title) return;
+      const cat = /main/i.test(raw.title) ? "M" : /inter/i.test(raw.title) ? "I" : "O";
+      let date = null; const pooled = [];
+      (raw.sessions || []).forEach((s) => {
+        const lab = s.label || s.title || "";
+        if (s.date && !date) { const dt = new Date(s.date); if (!isNaN(dt)) date = dt; }
+        if (!/race/i.test(lab) || /quali/i.test(lab)) return;
+        (s.lap_times || []).forEach((e) => {
+          const laps = (e.laps || []).map(parseSecs).filter((x) => x != null);
+          splitClean(laps).clean.forEach((x) => pooled.push(x));
+        });
+      });
+      info[raw.title] = { cat, date, median: quantile(pooled.sort((a, b) => a - b), 0.5) };
+    });
+    const titles = Object.keys(info);
+    const mains = titles.filter((t) => info[t].cat === "M" && info[t].median != null && info[t].date);
+    const baselines = {};
+    titles.forEach((t) => {
+      const r = info[t];
+      if (r.median == null) return;
+      if (r.cat === "M" || !r.date || !mains.length) { baselines[t] = r.median; return; }
+      let best = null, bestDiff = Infinity;
+      mains.forEach((mt) => { const diff = Math.abs(info[mt].date - r.date); if (diff < bestDiff) { bestDiff = diff; best = mt; } });
+      baselines[t] = (best && bestDiff <= 10 * 86400000) ? info[best].median : r.median;
+    });
+    return baselines;
+  }, [seasonRaws]);
 
   // fetch any selected comparison rounds not yet cached
   useEffect(() => {
@@ -735,6 +770,7 @@ export default function App() {
   }, [scrapedEventData]);
 
   const hasData = scrapedEventData !== null;
+  const signedOverview = !!scrapedEventData && (scrapedEventData.sessions || []).some((s) => (s.results || []).some((r) => (r.position_change || 0) < 0));
 
   // Driver rating /10 from pace (z-score vs field), consistency (lap spread), and racecraft (net positions gained)
   const driverRatings = useMemo(() => {
@@ -747,12 +783,28 @@ export default function App() {
       if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;  // real races only
       const report = driverReport(s, extraTeams, extraNums);
       if (!report) return;
+      // field consistency spread this session (cv = lap-time spread %), for relative scoring
+      const fieldCvs = (s.allKarts || []).map((k) => {
+        const kl = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
+        const kc = splitClean(kl).clean;
+        const ka = mean(kc), ks = kc.length > 1 ? sd(kc) : null;
+        return (ka && ks != null) ? (ks / ka) * 100 : null;
+      }).filter((x) => x != null);
+      const cvMean = mean(fieldCvs), cvSd = sd(fieldCvs) || 0.0001;
       report.rows.forEach((r) => {
         if (!r.isLeeds) return;
         const name = assign[`${s.id}|${r.num}`]?.trim() || r.team;
-        const cv = r.avg ? (r.sd / r.avg) * 100 : 5;
+        const ls = s.laps.map((l) => l.times[r.num]).filter((x) => x != null);
+        const clean = splitClean(ls).clean;
+        const cavg = mean(clean), csd = clean.length > 1 ? sd(clean) : 0;
+        const cv = cavg ? (csd / cavg) * 100 : 5;   // this driver's lap-spread %
+        const consZ = (cvMean - cv) / cvSd;          // tighter than field = positive
+        const baseline = roundBaselines[s.round];
+        const pacePct = (baseline && cavg) ? (cavg / baseline - 1) * 100 : null;  // % off the Mains field at this track
+        const pace10 = pacePct != null ? clamp(6 - pacePct * 2) : clamp(5 - (r.z ?? 0) * 2.5);
         agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], races: 0 };
-        agg[name].pace.push(clamp(5 - (r.z ?? 0) * 2.5));
+        agg[name].pace.push(pace10);
+        agg[name].cons.push(clamp(5 + consZ * 2.5));
         agg[name].cons.push(clamp(10 - (cv - 0.4) * 7.3));
         const pos = s.posByKart ? s.posByKart[r.num] : null;
         if (signed && pos != null) { agg[name].race.push(clamp(5 + pos * 0.35)); agg[name].gain.push(pos); }
@@ -767,7 +819,7 @@ export default function App() {
       const overall = hasRace ? pace * 0.50 + cons * 0.30 + race * 0.20 : pace * 0.60 + cons * 0.40;
       return { ...d, pace, cons, race, hasRace, netGain: sum(d.gain), overall };
     }).sort((a, b) => b.overall - a.overall);
-  }, [ratingScope, seasonSessions, convertedSessions, assign, extraTeams, extraNums]);
+  }, [ratingScope, seasonSessions, convertedSessions, assign, extraTeams, extraNums, roundBaselines]);
 
   const onLineupCsv = async (file) => {
     if (!file) return;
@@ -1051,6 +1103,7 @@ export default function App() {
                             <thead>
                               <tr style={{ color: "#6b7685", textAlign: "left" }}>
                                 <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>POS</th>
+                                {signedOverview && <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>+/-</th>}
                                 <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>TEAM</th>
                                 <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>KART</th>
                                 <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>BEST LAP</th>
@@ -1063,6 +1116,11 @@ export default function App() {
                                 return (
                                   <tr key={rIdx} style={{ borderBottom: "1px solid #11171f" }}>
                                     <td style={{ padding: "8px", color: AMBER, fontWeight: "700" }}>{row.position || "—"}</td>
+                                    {signedOverview && (
+                                      <td style={{ padding: "8px", fontWeight: "600", color: row.position_change > 0 ? "#43d977" : row.position_change < 0 ? "#ff3355" : "#4b5563" }}>
+                                        {row.position_change > 0 ? `+${row.position_change}` : row.position_change < 0 ? row.position_change : row.position_change === 0 ? "0" : "—"}
+                                      </td>
+                                    )}
                                     <td style={{ padding: "8px", color: "#fff", fontWeight: "600" }}>
                                       {row.team} {row.penalty && <span style={{ color: "#ff3355", fontSize: 10, marginLeft: 6 }}>[+PENALTY]</span>}
                                     </td>
@@ -1228,6 +1286,34 @@ export default function App() {
                     </select>
                   </div>
                   {report ? <ReportTable report={report} nameOf={nameOf} /> : <Empty msg="No lap data in this session." />}
+                  {report && (() => {
+                    const ours = report.rows.filter((r) => r.isLeeds);
+                    if (!ours.length) return null;
+                    const runDebrief = async () => {
+                      setDebriefLoading(true); setDebrief("");
+                      const lines = ours.map((r) => `${nameOf(r.num) || r.team} (#${r.num}): avg ${fmt(r.avg)}s, fastest ${fmt(r.fastest)}s, consistency ±${r.sd.toFixed(3)}s, ${r.z == null ? "" : "field z-score " + r.z.toFixed(2) + ", "}${r.shown}/${r.total} clean laps`).join("\n");
+                      const prompt = `You are a karting race engineer writing a short, sharp post-race debrief for Leeds University Motorsport. Session: ${tidyLabel(rep.raceLabel)}. Class fastest lap was ${fmt(report.classFastest)}s. Here are our drivers:\n${lines}\n\nFor each driver give 2-3 plain-English sentences: their pace vs the field, their consistency, and one concrete thing to work on. British spelling, no waffle, no headers, talk like a race engineer to a driver.`;
+                      try {
+                        const res = await fetch("/api/debrief", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt }) });
+                        const d = await res.json();
+                        setDebrief(d.text || d.error || "No response.");
+                      } catch (e) { setDebrief("Couldn't reach the debrief service (only works on the live site with an API key set)."); }
+                      setDebriefLoading(false);
+                    };
+                    return (
+                      <div style={{ marginTop: 20, borderTop: "1px solid #161d27", paddingTop: 16 }}>
+                        <button onClick={runDebrief} disabled={debriefLoading} className="disp"
+                          style={{ background: "#11233a", color: AMBER, border: `1px solid ${AMBER}55`, borderRadius: 7, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                          {debriefLoading ? "THINKING…" : "✦ AI DEBRIEF (LEEDS DRIVERS)"}
+                        </button>
+                        {debrief && (
+                          <div style={{ marginTop: 14, background: "#0b1017", border: "1px solid #222c38", borderRadius: 8, padding: "14px 16px", whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.6, color: "#dbe2ea" }}>
+                            {debrief}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </Panel>
               );
             })()}
@@ -1285,9 +1371,9 @@ export default function App() {
                     </table>
                     ); })()}
                     <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
-                      Pace (lap speed vs the field) and consistency (lap-time spread) always count. Racecraft (official net positions
-                      gained/lost) is added at 20% once you've re-scraped with the signed data; until then it's pace 60 / consistency 40.
-                      "This round" uses your selected round plus any compare rounds; "Whole season" uses everything.
+                      Pace is measured against the <b style={{ color: "#c2cbd6" }}>Mains field at the same track</b> (Inters rounds borrow the
+                      same-weekend Mains pace), so Inters drivers aren't flattered by a softer field — they only rate highly if they're near Mains pace.
+                      Consistency is clean-lap spread. Racecraft (official net positions gained/lost) adds 20% once you've re-scraped with the signed data.
                     </div>
                   </div>
                 )}
