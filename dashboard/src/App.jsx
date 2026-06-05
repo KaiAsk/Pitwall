@@ -380,6 +380,10 @@ const parseSecs = (v) => {
   const s = str.includes(":") ? parseFloat(str.split(":")[0]) * 60 + parseFloat(str.split(":")[1]) : parseFloat(str);
   return (!isNaN(s) && s > 0) ? Math.round(s * 1000) / 1000 : null;
 };
+
+// persistence — saves roster/extras between visits on this device
+const LS = (k, fallback) => { try { const v = localStorage.getItem("pitwall_" + k); return v != null ? JSON.parse(v) : fallback; } catch { return fallback; } };
+const saveLS = (k, v) => { try { localStorage.setItem("pitwall_" + k, JSON.stringify(v)); } catch {} };
 const isOurTeam = (teamName, extraTeams = []) => {
   const t = (teamName || "").toLowerCase();
   if (t.includes("leeds") && !t.includes("beckett")) return true;
@@ -422,16 +426,21 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
 }
 
 export default function App() {
-  const [assign, setAssign] = useState({});
+  const [assign, setAssign] = useState(() => LS("assign", {}));
   const [importMsg, setImportMsg] = useState("");
   const csvRef = useRef();
   const [tab, setTab] = useState("scraped");   const [cleanOnly, setCleanOnly] = useState(true);
   const [reportSession, setReportSession] = useState(null);
-  const [extraInput, setExtraInput] = useState("");
-  const [compareIds, setCompareIds] = useState([]);
+  const [extraInput, setExtraInput] = useState(() => LS("extra", ""));
+  const [compareIds, setCompareIds] = useState(() => LS("compareIds", []));
   const [compareCache, setCompareCache] = useState({});
-  const [removed, setRemoved] = useState(() => new Set());
+  const [removed, setRemoved] = useState(() => new Set(LS("removed", [])));
   const [compareOpen, setCompareOpen] = useState(false);
+
+  useEffect(() => { saveLS("assign", assign); }, [assign]);
+  useEffect(() => { saveLS("extra", extraInput); }, [extraInput]);
+  useEffect(() => { saveLS("compareIds", compareIds); }, [compareIds]);
+  useEffect(() => { saveLS("removed", [...removed]); }, [removed]);
   
   const [eventIndex, setEventIndex] = useState([]);
   const [activeEventId, setActiveEventId] = useState(null);
