@@ -874,10 +874,10 @@ export default function App() {
         .disp { font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px; }
         ::-webkit-scrollbar { height: 8px; width: 8px; }
         ::-webkit-scrollbar-thumb { background:#1e2733; border-radius: 4px; }
-        .appwrap { padding: 22px 26px; max-width: 1480px; margin: 0 auto; }
-        .apphead { padding: 16px 26px; }
+        .appwrap { padding: 24px 44px; max-width: 100%; margin: 0; }
+        .apphead { padding: 16px 44px; }
         @media (max-width: 680px) {
-          .appwrap { padding: 12px 10px; }
+          .appwrap { padding: 12px 12px; }
           .apphead { padding: 12px 14px; flex-wrap: wrap; gap: 10px; }
           .apptabs button { font-size: 12px !important; padding: 7px 11px !important; }
         }
