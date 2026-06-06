@@ -462,6 +462,7 @@ export default function App() {
   const [ratingSort, setRatingSort] = useState({ key: "overall", dir: "desc" });
   const [debriefScope, setDebriefScope] = useState("overall");
   const [debriefTime, setDebriefTime] = useState("season");
+  const [statsView, setStatsView] = useState("drivers");
   const [extraInput, setExtraInput] = useState(() => LS("extra", ""));
   const [compareIds, setCompareIds] = useState(() => LS("compareIds", []));
   const [compareCache, setCompareCache] = useState({});
@@ -781,39 +782,43 @@ export default function App() {
 
   const hasData = scrapedEventData !== null;
 
-  // Season summary stats (Arion's page): points, finishes, position change, pace
-  const driverStats = useMemo(() => {
-    const agg = {};
-    const avg = (x) => (x.length ? x.reduce((p, c) => p + c, 0) / x.length : null);
-    const sum = (x) => x.reduce((p, c) => p + c, 0);
+  // Season stats: per driver, per team, and overall Leeds
+  const stats = useMemo(() => {
+    const make = (name) => ({ name, races: 0, points: 0, finishes: [], posch: [], best: [], raceAvg: [], qualiPos: [] });
+    const acc = (a, s, k, isRace, ls, clean) => {
+      if (isRace) {
+        a.races += 1;
+        if (s.ptsByKart && s.ptsByKart[k.num] != null) a.points += s.ptsByKart[k.num];
+        if (s.finByKart && s.finByKart[k.num] != null) a.finishes.push(s.finByKart[k.num]);
+        if (s.posByKart && s.posByKart[k.num] != null) a.posch.push(s.posByKart[k.num]);
+        if (ls.length) a.best.push(Math.min(...ls));
+        if (clean.length) a.raceAvg.push(mean(clean));
+      } else if (s.finByKart && s.finByKart[k.num] != null) a.qualiPos.push(s.finByKart[k.num]);
+    };
+    const drivers = {}, teams = {}, overall = make("Leeds Overall");
     seasonSessions.forEach((s) => {
       const isQuali = /quali/i.test(s.raceLabel);
       const isRace = /race/i.test(s.raceLabel) && !isQuali;
-      if (!isRace && !isQuali) return;   // skip practice
+      if (!isRace && !isQuali) return;
       s.karts.forEach((k) => {
-        const name = assign[`${s.id}|${k.num}`]?.trim();
-        if (!name) return;
-        const a = agg[name] || (agg[name] = { name, races: 0, points: 0, finishes: [], posch: [], best: [], raceAvg: [], qualiBest: [] });
         const ls = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
         const clean = splitClean(ls).clean;
-        if (isRace) {
-          a.races += 1;
-          if (s.ptsByKart && s.ptsByKart[k.num] != null) a.points += s.ptsByKart[k.num];
-          if (s.finByKart && s.finByKart[k.num] != null) a.finishes.push(s.finByKart[k.num]);
-          if (s.posByKart && s.posByKart[k.num] != null) a.posch.push(s.posByKart[k.num]);
-          if (ls.length) a.best.push(Math.min(...ls));
-          if (clean.length) a.raceAvg.push(mean(clean));
-        } else if (ls.length) a.qualiBest.push(Math.min(...ls));
+        teams[k.teamName] = teams[k.teamName] || make(k.teamName);
+        acc(teams[k.teamName], s, k, isRace, ls, clean);
+        acc(overall, s, k, isRace, ls, clean);
+        const dr = assign[`${s.id}|${k.num}`]?.trim();
+        if (dr) { drivers[dr] = drivers[dr] || make(dr); acc(drivers[dr], s, k, isRace, ls, clean); }
       });
     });
-    return Object.values(agg).map((d) => ({
-      ...d,
-      avgFinish: avg(d.finishes),
-      totalPosCh: d.posch.length ? sum(d.posch) : null,
-      bestLap: d.best.length ? Math.min(...d.best) : null,
-      racePace: avg(d.raceAvg),
-      qualiBest: d.qualiBest.length ? Math.min(...d.qualiBest) : null,
-    })).sort((a, b) => b.points - a.points);
+    const avg = (x) => (x.length ? x.reduce((p, c) => p + c, 0) / x.length : null);
+    const sum = (x) => x.reduce((p, c) => p + c, 0);
+    const derive = (d) => ({ ...d, avgFinish: avg(d.finishes), totalPosCh: d.posch.length ? sum(d.posch) : null,
+      bestLap: d.best.length ? Math.min(...d.best) : null, racePace: avg(d.raceAvg), bestQualiPos: d.qualiPos.length ? Math.min(...d.qualiPos) : null });
+    return {
+      drivers: Object.values(drivers).map(derive).sort((a, b) => b.points - a.points),
+      teams: Object.values(teams).map(derive).sort((a, b) => b.points - a.points),
+      overall: derive(overall),
+    };
   }, [seasonSessions, assign]);
 
   const signedOverview = !!scrapedEventData && (scrapedEventData.sessions || []).some((s) => (s.results || []).some((r) => (r.position_change || 0) < 0));
@@ -864,8 +869,10 @@ export default function App() {
           const start = fin + gained;
           const fieldSize = (s.allKarts || []).length || 20;
           let sc;
-          if (start <= 3 && fin <= 3) sc = 9.5;
+          if (fin === 1) sc = 10;                            // won the race — max, you can't lose for winning
+          else if (start <= 3 && fin <= 3) sc = 9.5;          // podium retention
           else { const deep = start > fieldSize * 0.6 ? 1.4 : 1; sc = clamp(5.5 + gained * 0.45 * (gained > 0 ? deep : 1)); }
+          if (start <= fieldSize * 0.33 && gained >= -2) sc = Math.max(sc, 7.5);  // held a front-third start = good defending
           if ((s.penalties || []).some((p) => String(p.kart) === r.num)) sc = clamp(sc - 3);  // penalty = poor racecraft
           agg[name].race.push(sc); agg[name].gain.push(gained);
         }
@@ -903,7 +910,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#07090d", color: "#e6edf3",
+    <div style={{ minHeight: "100vh", background: "#07090d", color: "#e6edf3", zoom: 1.18,
       fontFamily: "IBM Plex Sans, system-ui, sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
@@ -1528,43 +1535,69 @@ export default function App() {
             )}
 
             {tab === "stats" && (
-              <Panel title="SEASON STATS — PER DRIVER">
-                {driverStats.length === 0 ? (
-                  <Empty msg="Name drivers in the roster to build their season stats." />
-                ) : (
-                  <div style={{ overflowX: "auto" }}>
-                    <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 640 }}>
-                      <thead>
-                        <tr style={{ color: "#6b7685" }}>
-                          {["#", "DRIVER", "RACES", "POINTS", "AVG FINISH", "TOTAL +/-", "BEST LAP", "RACE PACE", "BEST QUALI"].map((h, i) => (
-                            <th key={h} style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {driverStats.map((d, i) => (
-                          <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
-                            <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
-                            <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#43d977", fontWeight: 700 }}>{d.points}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgFinish != null ? d.avgFinish.toFixed(1) : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: d.totalPosCh == null ? "#5b6776" : d.totalPosCh >= 0 ? "#43d977" : "#ff8a5b" }}>
-                              {d.totalPosCh == null ? "—" : (d.totalPosCh >= 0 ? "+" : "") + d.totalPosCh}
-                            </td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER }}>{d.bestLap != null ? fmt(d.bestLap) : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.racePace != null ? fmt(d.racePace) : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.qualiBest != null ? fmt(d.qualiBest) : "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
-                      Whole season, races only (quali shown for pace reference). Points and finishes from results; +/- is total net positions gained/lost;
-                      best lap and race pace are clean laps; best quali is the driver's fastest qualifying lap. Sorted by points.
+              <Panel title="SEASON STATS">
+                {(() => {
+                  const list = statsView === "teams" ? stats.teams : stats.drivers;
+                  const o = stats.overall;
+                  const Stat = ({ label, value, color }) => (
+                    <div style={{ flex: "1 1 0", minWidth: 92 }}>
+                      <div className="mono" style={{ fontSize: 9.5, color: "#5b6776", letterSpacing: "0.5px" }}>{label}</div>
+                      <div className="mono" style={{ fontSize: 17, fontWeight: 600, color: color || "#e6edf3", marginTop: 2 }}>{value}</div>
                     </div>
-                  </div>
-                )}
+                  );
+                  const posCh = (v) => v == null ? "—" : (v >= 0 ? "+" : "") + v;
+                  return (
+                    <>
+                      {/* OVERALL LEEDS hero */}
+                      <div style={{ background: "linear-gradient(135deg,#11160f,#0b1017)", border: `1px solid ${AMBER}40`, borderRadius: 12, padding: "16px 20px", marginBottom: 18 }}>
+                        <div className="disp" style={{ fontSize: 14, color: AMBER, fontWeight: 700, letterSpacing: "1px", marginBottom: 12 }}>🦁 LEEDS OVERALL — SEASON</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+                          <Stat label="POINTS" value={o.points} color="#43d977" />
+                          <Stat label="RACES" value={o.races} />
+                          <Stat label="AVG FINISH" value={o.avgFinish != null ? o.avgFinish.toFixed(1) : "—"} />
+                          <Stat label="NET +/-" value={posCh(o.totalPosCh)} color={o.totalPosCh >= 0 ? "#43d977" : "#ff8a5b"} />
+                          <Stat label="BEST LAP" value={o.bestLap != null ? fmt(o.bestLap) : "—"} color={AMBER} />
+                          <Stat label="RACE PACE" value={o.racePace != null ? fmt(o.racePace) : "—"} />
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                        {[["drivers", "BY DRIVER"], ["teams", "BY TEAM"]].map(([k, l]) => (
+                          <button key={k} onClick={() => setStatsView(k)} className="disp"
+                            style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+                              border: `1px solid ${statsView === k ? AMBER : "#222c38"}`, background: statsView === k ? "#1a160a" : "#0b1017", color: statsView === k ? AMBER : "#8b97a7" }}>{l}</button>
+                        ))}
+                      </div>
+
+                      {list.length === 0 ? <Empty msg="Name drivers in the roster to build stats." /> : (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
+                          {list.map((d, i) => (
+                            <div key={d.name} style={{ background: "#0b1017", border: "1px solid #1b2430", borderRadius: 10, padding: "14px 16px" }}>
+                              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+                                <span className="disp" style={{ fontSize: 17, fontWeight: 700, color: "#e6edf3" }}>
+                                  <span style={{ color: "#5b6776", fontSize: 13 }}>{i + 1}. </span>{d.name}
+                                </span>
+                                <span className="mono" style={{ fontSize: 19, fontWeight: 700, color: "#43d977" }}>{d.points}<span style={{ fontSize: 11, color: "#5b6776" }}> pts</span></span>
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                                <Stat label="RACES" value={d.races} />
+                                <Stat label="AVG FINISH" value={d.avgFinish != null ? d.avgFinish.toFixed(1) : "—"} />
+                                <Stat label="NET +/-" value={posCh(d.totalPosCh)} color={d.totalPosCh == null ? "#5b6776" : d.totalPosCh >= 0 ? "#43d977" : "#ff8a5b"} />
+                                <Stat label="BEST LAP" value={d.bestLap != null ? fmt(d.bestLap) : "—"} color={AMBER} />
+                                <Stat label="RACE PACE" value={d.racePace != null ? fmt(d.racePace) : "—"} />
+                                <Stat label="BEST QUALI" value={d.bestQualiPos != null ? "P" + d.bestQualiPos : "—"} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 14, lineHeight: 1.5 }}>
+                        Whole season, races only. Points and finishes from results; net +/- is total positions gained/lost; best lap and race pace are clean laps;
+                        best quali is the driver's best qualifying finishing position (Inters). By driver counts named drivers; by team sums each Leeds entry.
+                      </div>
+                    </>
+                  );
+                })()}
               </Panel>
             )}
 
