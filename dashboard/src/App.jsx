@@ -869,6 +869,7 @@ export default function App() {
       fontFamily: "IBM Plex Sans, system-ui, sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+        html, body, #root { margin: 0 !important; padding: 0 !important; max-width: none !important; width: 100% !important; display: block !important; place-items: initial !important; text-align: left !important; background: #07090d; }
         * { box-sizing: border-box; }
         .mono { font-family: 'IBM Plex Mono', monospace; }
         .disp { font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px; }
