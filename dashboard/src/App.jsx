@@ -875,8 +875,8 @@ export default function App() {
         .disp { font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px; }
         ::-webkit-scrollbar { height: 8px; width: 8px; }
         ::-webkit-scrollbar-thumb { background:#1e2733; border-radius: 4px; }
-        .appwrap { padding: 24px 44px; max-width: 100%; margin: 0; }
-        .apphead { padding: 16px 44px; }
+        .appwrap { padding: 24px 28px; max-width: 1380px; margin: 0 auto; }
+        .apphead { padding: 16px 28px; max-width: 1380px; margin: 0 auto; }
         @media (max-width: 680px) {
           .appwrap { padding: 12px 12px; }
           .apphead { padding: 12px 14px; flex-wrap: wrap; gap: 10px; }
