@@ -874,10 +874,17 @@ export default function App() {
         .disp { font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px; }
         ::-webkit-scrollbar { height: 8px; width: 8px; }
         ::-webkit-scrollbar-thumb { background:#1e2733; border-radius: 4px; }
+        .appwrap { padding: 22px 26px; max-width: 1480px; margin: 0 auto; }
+        .apphead { padding: 16px 26px; }
+        @media (max-width: 680px) {
+          .appwrap { padding: 12px 10px; }
+          .apphead { padding: 12px 14px; flex-wrap: wrap; gap: 10px; }
+          .apptabs button { font-size: 12px !important; padding: 7px 11px !important; }
+        }
       `}</style>
 
       {/* header */}
-      <div style={{ borderBottom: "1px solid #161d27", padding: "18px 26px",
+      <div className="apphead" style={{ borderBottom: "1px solid #161d27",
         display: "flex", alignItems: "center", gap: 16, background: "linear-gradient(180deg,#0b0f15,#07090d)" }}>
         <div style={{ width: 10, height: 30, background: AMBER, borderRadius: 2 }} />
         <div style={{ flex: 1 }}>
@@ -947,7 +954,7 @@ export default function App() {
         )}
       </div>
 
-      <div style={{ padding: "22px 26px", maxWidth: 1180, margin: "0 auto" }}>
+      <div className="appwrap">
         
         {/* driver assignment — grouped by race, collapsible */}
         {allEntries.length > 0 && (
@@ -1061,7 +1068,7 @@ export default function App() {
 
         {hasData && (
           <>
-            <div style={{ display: "flex", gap: 8, margin: "20px 0 16px", flexWrap: "wrap", alignItems: "center" }}>
+            <div className="apptabs" style={{ display: "flex", gap: 8, margin: "20px 0 16px", flexWrap: "wrap", alignItems: "center" }}>
               {[
                 ["scraped", "LIVE EVENT OVERVIEW"],
                 ["field", "FIELD COMPARISON"], 
