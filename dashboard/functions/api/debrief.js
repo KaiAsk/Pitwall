@@ -1,5 +1,4 @@
-// Cloudflare Pages Function: POST /api/debrief  { prompt }
-// Needs env var ANTHROPIC_API_KEY set in Cloudflare Pages settings.
+// Cloudflare Pages Function: POST /api/debrief
 export async function onRequestPost({ request, env }) {
   try {
     if (!env.ANTHROPIC_API_KEY) {
@@ -21,12 +20,20 @@ export async function onRequestPost({ request, env }) {
         messages: [{ role: "user", content: prompt }],
       }),
     });
+
     const d = await r.json();
+
+    // NEW: If Anthropic returns an error, show us exactly what it is!
+    if (!r.ok) {
+      return json({ error: `Anthropic API Error: ${d.error?.message || JSON.stringify(d)}` }, r.status);
+    }
+
     const text = (d.content || []).map((b) => b.text || "").join("").trim();
     return json({ text: text || "(no response)" });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
 }
+
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
