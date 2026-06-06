@@ -15,7 +15,7 @@ export async function onRequestPost({ request, env }) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "model: "claude-haiku-4-5",
+        model: "claude-haiku-4-5",
         max_tokens: 700,
         messages: [{ role: "user", content: prompt }],
       }),
@@ -23,7 +23,6 @@ export async function onRequestPost({ request, env }) {
 
     const d = await r.json();
 
-    // NEW: If Anthropic returns an error, show us exactly what it is!
     if (!r.ok) {
       return json({ error: `Anthropic API Error: ${d.error?.message || JSON.stringify(d)}` }, r.status);
     }
