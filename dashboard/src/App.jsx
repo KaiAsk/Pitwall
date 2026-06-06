@@ -467,6 +467,8 @@ export default function App() {
   const [seasonRaws, setSeasonRaws] = useState({});
   const [removed, setRemoved] = useState(() => new Set(LS("removed", [])));
   const [compareOpen, setCompareOpen] = useState(false);
+  const [wetSessions, setWetSessions] = useState(() => new Set(LS("wet", [])));
+  useEffect(() => { saveLS("wet", [...wetSessions]); }, [wetSessions]);
 
   useEffect(() => { saveLS("assign", assign); }, [assign]);
   useEffect(() => { saveLS("extra", extraInput); }, [extraInput]);
@@ -555,6 +557,7 @@ export default function App() {
         const lab = s.label || s.title || "";
         if (s.date && !date) { const dt = new Date(s.date); if (!isNaN(dt)) date = dt; }
         if (!/race/i.test(lab) || /quali/i.test(lab)) return;
+        if (wetSessions.has(`scraped__${s.session_id}`)) return;   // dry laps only in the baseline
         (s.lap_times || []).forEach((e) => {
           if (!(isOurTeam(e.team, extraTeams) || extraNums.includes(String(e.kart || "")))) return;
           const laps = (e.laps || []).map(parseSecs).filter((x) => x != null);
@@ -577,7 +580,7 @@ export default function App() {
     });
     evs.filter((e) => !e.date).forEach((e) => { baselines[e.title] = quantile([...e.leeds].sort((a, b) => a - b), 0.5); });
     return baselines;
-  }, [seasonRaws, extraTeams, extraNums]);
+  }, [seasonRaws, extraTeams, extraNums, wetSessions]);
 
   // fetch any selected comparison rounds not yet cached
   useEffect(() => {
@@ -797,6 +800,7 @@ export default function App() {
         return (ka && ks != null) ? (ks / ka) * 100 : null;
       }).filter((x) => x != null);
       const cvMean = mean(fieldCvs), cvSd = sd(fieldCvs) || 0.0001;
+      const fieldMed = fieldStats(s).median;   // field median absorbs the session's conditions (wet/dry)
       report.rows.forEach((r) => {
         if (!r.isLeeds) return;
         const name = assign[`${s.id}|${r.num}`]?.trim() || r.team;
@@ -805,24 +809,24 @@ export default function App() {
         const cavg = mean(clean), csd = clean.length > 1 ? sd(clean) : 0;
         const cv = cavg ? (csd / cavg) * 100 : 5;   // this driver's lap-spread %
         const consZ = (cvMean - cv) / cvSd;          // tighter than field = positive
-        const baseline = roundBaselines[s.round];
-        const pacePct = (baseline && cavg) ? (cavg / baseline - 1) * 100 : null;  // % off the Mains field at this track
-        const pace10 = pacePct != null ? clamp(6 - pacePct * 2.5) : clamp(5 - (r.z ?? 0) * 2.5);
-        agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], races: 0 };
-        agg[name].pace.push(pace10);
-        agg[name].cons.push(clamp(5 + consZ * 2.5));
-        agg[name].cons.push(clamp(10 - (cv - 0.4) * 7.3));
+        const isWet = wetSessions.has(s.id);
+        agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], wet: [], races: 0 };
+        if (isWet) {
+          if (fieldMed && cavg) agg[name].wet.push(cavg - fieldMed);   // seconds vs the wet session's field median
+        } else {
+          const baseline = roundBaselines[s.round];                    // dry: vs the Leeds squad at this track
+          const pacePct = (baseline && cavg) ? (cavg / baseline - 1) * 100 : null;
+          agg[name].pace.push(pacePct != null ? clamp(6 - pacePct * 2.5) : clamp(5 - (r.z ?? 0) * 2.5));
+          agg[name].cons.push(clamp(5 + consZ * 2.5));
+        }
         const gained = s.posByKart ? s.posByKart[r.num] : null;
         const fin = s.finByKart ? s.finByKart[r.num] : null;
         if (signed && gained != null && fin != null) {
-          const start = fin + gained;                       // grid = finish + places gained
+          const start = fin + gained;
           const fieldSize = (s.allKarts || []).length || 20;
           let sc;
-          if (start <= 3 && fin <= 3) sc = 9.5;             // podium retention: front-row job done
-          else {
-            const deep = start > fieldSize * 0.6 ? 1.4 : 1; // carving from the back weighted heavily
-            sc = clamp(5.5 + gained * 0.45 * (gained > 0 ? deep : 1));
-          }
+          if (start <= 3 && fin <= 3) sc = 9.5;
+          else { const deep = start > fieldSize * 0.6 ? 1.4 : 1; sc = clamp(5.5 + gained * 0.45 * (gained > 0 ? deep : 1)); }
           agg[name].race.push(sc); agg[name].gain.push(gained);
         }
         agg[name].races += 1;
@@ -832,11 +836,16 @@ export default function App() {
     const sum = (a) => a.reduce((x, y) => x + y, 0);
     return Object.values(agg).map((d) => {
       const pace = avg(d.pace), cons = avg(d.cons), race = avg(d.race);
-      const hasRace = d.race.length > 0;
-      const overall = hasRace ? pace * 0.45 + race * 0.30 + cons * 0.25 : pace * 0.65 + cons * 0.35;
-      return { ...d, pace, cons, race, hasRace, netGain: sum(d.gain), overall };
+      const hasPace = d.pace.length > 0, hasRace = d.race.length > 0, hasCons = d.cons.length > 0;
+      let tot = 0, w = 0;
+      if (hasPace) { tot += pace * 0.45; w += 0.45; }
+      if (hasRace) { tot += race * 0.30; w += 0.30; }
+      if (hasCons) { tot += cons * 0.25; w += 0.25; }
+      const overall = w ? tot / w : 0;
+      const wetDelta = d.wet.length ? sum(d.wet) / d.wet.length : null;
+      return { ...d, pace, cons, race, hasPace, hasRace, hasCons, wetDelta, netGain: sum(d.gain), overall };
     }).sort((a, b) => b.overall - a.overall);
-  }, [ratingScope, seasonSessions, convertedSessions, assign, extraTeams, extraNums, roundBaselines]);
+  }, [ratingScope, seasonSessions, convertedSessions, assign, extraTeams, extraNums, roundBaselines, wetSessions]);
 
   const onLineupCsv = async (file) => {
     if (!file) return;
@@ -1117,8 +1126,15 @@ export default function App() {
                           <div className="disp" style={{ color: AMBER, fontSize: 14.5, fontWeight: 700 }}>
                             🏁 {session.label.toUpperCase()}
                           </div>
-                          <div className="mono" style={{ fontSize: 11, color: "#5b6776" }}>
+                          <div className="mono" style={{ fontSize: 11, color: "#5b6776", display: "flex", alignItems: "center", gap: 10 }}>
                             START: {session.start_time || "—"} · LAPS: {session.total_laps || "—"}
+                            {(() => { const sid = `scraped__${session.session_id}`; const wet = wetSessions.has(sid); return (
+                              <button onClick={() => setWetSessions((prev) => { const n = new Set(prev); wet ? n.delete(sid) : n.add(sid); return n; })}
+                                style={{ cursor: "pointer", borderRadius: 5, padding: "3px 8px", fontSize: 10.5, fontWeight: 600,
+                                  border: `1px solid ${wet ? "#3da9fc" : "#2a3543"}`, background: wet ? "#0b2030" : "#0b1017", color: wet ? "#3da9fc" : "#5b6776" }}>
+                                {wet ? "🌧 WET" : "DRY"}
+                              </button>
+                            ); })()}
                           </div>
                         </div>
                         <div style={{ overflowX: "auto" }}>
@@ -1353,17 +1369,18 @@ export default function App() {
                       </thead>
                       <tbody>
                         {sorted.map((d, i) => {
-                          const c = d.team ? (TEAM_COLORS[d.team] || AMBER) : AMBER;
-                          const bar = (v) => (
-                            <span style={{ color: v >= 7 ? "#43d977" : v >= 4.5 ? "#ffce3a" : "#ff8a5b" }}>{v.toFixed(2)}</span>
-                          );
+                          const rc = (v) => v >= 7 ? "#43d977" : v >= 4.5 ? "#ffce3a" : "#ff8a5b";
+                          const bar = (v) => (<span style={{ color: rc(v) }}>{v.toFixed(2)}</span>);
                           return (
                             <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
                               <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
-                              <td style={{ padding: "7px 10px", color: c, fontWeight: 600 }}>{d.name}</td>
+                              <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
                               <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
-                              <td style={{ padding: "7px 10px", textAlign: "right" }}>{bar(d.pace)}</td>
-                              <td style={{ padding: "7px 10px", textAlign: "right" }}>{bar(d.cons)}</td>
+                              <td style={{ padding: "7px 10px", textAlign: "right" }}>
+                                {d.hasPace ? bar(d.pace) : <span style={{ color: "#3a4655" }}>—</span>}
+                                {d.wetDelta != null && <span style={{ color: "#3da9fc", fontSize: 10.5 }}> ({d.wetDelta <= 0 ? "" : "+"}{d.wetDelta.toFixed(2)})</span>}
+                              </td>
+                              <td style={{ padding: "7px 10px", textAlign: "right" }}>{d.hasCons ? bar(d.cons) : <span style={{ color: "#3a4655" }}>—</span>}</td>
                               {showRace && (
                                 <td style={{ padding: "7px 10px", textAlign: "right" }}>
                                   {d.hasRace ? (
@@ -1371,7 +1388,7 @@ export default function App() {
                                   ) : <span style={{ color: "#3a4655" }}>—</span>}
                                 </td>
                               )}
-                              <td style={{ padding: "7px 10px", textAlign: "right", color: c, fontWeight: 700, fontSize: 14 }}>{d.overall.toFixed(2)}</td>
+                              <td style={{ padding: "7px 10px", textAlign: "right", color: rc(d.overall), fontWeight: 700, fontSize: 14 }}>{d.overall.toFixed(2)}</td>
                             </tr>
                           );
                         })}
@@ -1379,9 +1396,9 @@ export default function App() {
                     </table>
                     ); })()}
                     <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
-                      Pace is measured against the <b style={{ color: "#c2cbd6" }}>rest of the Leeds squad at the same track</b> (each race weekend's
-                      Mains and Inters pooled), so it's an internal benchmark, not flattered by a soft outside field.
-                      Consistency is clean-lap spread. Racecraft (strategy-aware net positions) adds once you've re-scraped with the signed data.
+                      Pace (dry races) is measured against the rest of the Leeds squad at the same track. Wet races are pulled out of
+                      the pace score; the blue bracket shows seconds vs the wet field median (negative = faster than the wet field).
+                      Consistency is clean-lap spread (dry only). Racecraft is strategy-aware net positions. Scores: green strong, amber mid, red weak.
                     </div>
                   </div>
                 )}
