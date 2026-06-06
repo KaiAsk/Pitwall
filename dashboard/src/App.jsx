@@ -445,6 +445,7 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
       penalties: (s.penalties || []).filter((p) => isOurTeam(p.team, extraTeams) || extraNums.includes(String(p.kart || ""))),
       posByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position_change) || 0])),
       finByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position) || null])),
+      ptsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.points) || 0])),
       kartIndex: Object.fromEntries(karts.map((k) => [k.num, k.teamName])) };
   });
 }
@@ -779,6 +780,42 @@ export default function App() {
   }, [scrapedEventData]);
 
   const hasData = scrapedEventData !== null;
+
+  // Season summary stats (Arion's page): points, finishes, position change, pace
+  const driverStats = useMemo(() => {
+    const agg = {};
+    const avg = (x) => (x.length ? x.reduce((p, c) => p + c, 0) / x.length : null);
+    const sum = (x) => x.reduce((p, c) => p + c, 0);
+    seasonSessions.forEach((s) => {
+      const isQuali = /quali/i.test(s.raceLabel);
+      const isRace = /race/i.test(s.raceLabel) && !isQuali;
+      if (!isRace && !isQuali) return;   // skip practice
+      s.karts.forEach((k) => {
+        const name = assign[`${s.id}|${k.num}`]?.trim();
+        if (!name) return;
+        const a = agg[name] || (agg[name] = { name, races: 0, points: 0, finishes: [], posch: [], best: [], raceAvg: [], qualiBest: [] });
+        const ls = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
+        const clean = splitClean(ls).clean;
+        if (isRace) {
+          a.races += 1;
+          if (s.ptsByKart && s.ptsByKart[k.num] != null) a.points += s.ptsByKart[k.num];
+          if (s.finByKart && s.finByKart[k.num] != null) a.finishes.push(s.finByKart[k.num]);
+          if (s.posByKart && s.posByKart[k.num] != null) a.posch.push(s.posByKart[k.num]);
+          if (ls.length) a.best.push(Math.min(...ls));
+          if (clean.length) a.raceAvg.push(mean(clean));
+        } else if (ls.length) a.qualiBest.push(Math.min(...ls));
+      });
+    });
+    return Object.values(agg).map((d) => ({
+      ...d,
+      avgFinish: avg(d.finishes),
+      totalPosCh: d.posch.length ? sum(d.posch) : null,
+      bestLap: d.best.length ? Math.min(...d.best) : null,
+      racePace: avg(d.raceAvg),
+      qualiBest: d.qualiBest.length ? Math.min(...d.qualiBest) : null,
+    })).sort((a, b) => b.points - a.points);
+  }, [seasonSessions, assign]);
+
   const signedOverview = !!scrapedEventData && (scrapedEventData.sessions || []).some((s) => (s.results || []).some((r) => (r.position_change || 0) < 0));
 
   // Driver rating /10 from pace (z-score vs field), consistency (lap spread), and racecraft (net positions gained)
@@ -801,7 +838,7 @@ export default function App() {
         return (ka && ks != null) ? (ks / ka) * 100 : null;
       }).filter((x) => x != null);
       const cvMean = mean(fieldCvs), cvSd = sd(fieldCvs) || 0.0001;
-      const fieldMed = fieldStats(s).median;   // field median absorbs the session's conditions (wet/dry)
+      const sessionFieldMed = fieldStats(s).median;   // session field median (absorbs wet/dry conditions)
       report.rows.forEach((r) => {
         if (!r.isLeeds) return;
         const name = assign[`${s.id}|${r.num}`]?.trim();
@@ -814,7 +851,7 @@ export default function App() {
         const isWet = wetSessions.has(s.id);
         agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], wet: [], races: 0 };
         if (isWet) {
-          if (fieldMed && cavg) agg[name].wet.push(cavg - fieldMed);   // seconds vs the wet session's field median
+          if (sessionFieldMed && cavg) agg[name].wet.push(cavg - sessionFieldMed);   // seconds vs the wet session's field median
         } else {
           const baseline = roundBaselines[s.round];                    // dry: vs the Leeds squad at this track
           const pacePct = (baseline && cavg) ? (cavg / baseline - 1) * 100 : null;
@@ -829,6 +866,7 @@ export default function App() {
           let sc;
           if (start <= 3 && fin <= 3) sc = 9.5;
           else { const deep = start > fieldSize * 0.6 ? 1.4 : 1; sc = clamp(5.5 + gained * 0.45 * (gained > 0 ? deep : 1)); }
+          if ((s.penalties || []).some((p) => String(p.kart) === r.num)) sc = clamp(sc - 3);  // penalty = poor racecraft
           agg[name].race.push(sc); agg[name].gain.push(gained);
         }
         agg[name].races += 1;
@@ -840,9 +878,9 @@ export default function App() {
       const pace = avg(d.pace), cons = avg(d.cons), race = avg(d.race);
       const hasPace = d.pace.length > 0, hasRace = d.race.length > 0, hasCons = d.cons.length > 0;
       let tot = 0, w = 0;
-      if (hasPace) { tot += pace * 0.45; w += 0.45; }
-      if (hasRace) { tot += race * 0.30; w += 0.30; }
-      if (hasCons) { tot += cons * 0.25; w += 0.25; }
+      if (hasPace) { tot += pace * 0.50; w += 0.50; }
+      if (hasRace) { tot += race * 0.20; w += 0.20; }
+      if (hasCons) { tot += cons * 0.30; w += 0.30; }
       const overall = w ? tot / w : 0;
       const wetDelta = d.wet.length ? sum(d.wet) / d.wet.length : null;
       return { ...d, pace, cons, race, hasPace, hasRace, hasCons, wetDelta, netGain: sum(d.gain), overall };
@@ -1077,7 +1115,8 @@ export default function App() {
                 ["prog", "PROGRESSION"],
                 ["report", "DRIVER REPORT"],
                 ["rating", "DRIVER RATING"],
-                ["debrief", "AI DEBRIEF"]
+                ["debrief", "AI DEBRIEF"],
+                ["stats", "STATS"]
               ].map(([k, l]) => (
                 <button key={k} onClick={() => setTab(k)} className="disp"
                   style={{ padding: "8px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer",
@@ -1485,6 +1524,47 @@ export default function App() {
                     </>
                   );
                 })()}
+              </Panel>
+            )}
+
+            {tab === "stats" && (
+              <Panel title="SEASON STATS — PER DRIVER">
+                {driverStats.length === 0 ? (
+                  <Empty msg="Name drivers in the roster to build their season stats." />
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 640 }}>
+                      <thead>
+                        <tr style={{ color: "#6b7685" }}>
+                          {["#", "DRIVER", "RACES", "POINTS", "AVG FINISH", "TOTAL +/-", "BEST LAP", "RACE PACE", "BEST QUALI"].map((h, i) => (
+                            <th key={h} style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {driverStats.map((d, i) => (
+                          <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
+                            <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
+                            <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#43d977", fontWeight: 700 }}>{d.points}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgFinish != null ? d.avgFinish.toFixed(1) : "—"}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: d.totalPosCh == null ? "#5b6776" : d.totalPosCh >= 0 ? "#43d977" : "#ff8a5b" }}>
+                              {d.totalPosCh == null ? "—" : (d.totalPosCh >= 0 ? "+" : "") + d.totalPosCh}
+                            </td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER }}>{d.bestLap != null ? fmt(d.bestLap) : "—"}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.racePace != null ? fmt(d.racePace) : "—"}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.qualiBest != null ? fmt(d.qualiBest) : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
+                      Whole season, races only (quali shown for pace reference). Points and finishes from results; +/- is total net positions gained/lost;
+                      best lap and race pace are clean laps; best quali is the driver's fastest qualifying lap. Sorted by points.
+                    </div>
+                  </div>
+                )}
               </Panel>
             )}
 
