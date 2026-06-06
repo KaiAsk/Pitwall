@@ -15,7 +15,7 @@ export async function onRequestPost({ request, env }) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "model: "claude-haiku-4-5",",
+        model: "model: "claude-haiku-4-5",
         max_tokens: 700,
         messages: [{ role: "user", content: prompt }],
       }),
