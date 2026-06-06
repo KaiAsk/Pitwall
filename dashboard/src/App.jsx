@@ -444,6 +444,7 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
     return { id: `scraped__${s.session_id}`, name: s.label, title: s.label, round, raceLabel, karts, allKarts, laps,
       penalties: (s.penalties || []).filter((p) => isOurTeam(p.team, extraTeams) || extraNums.includes(String(p.kart || ""))),
       posByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position_change) || 0])),
+      finByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position) || null])),
       kartIndex: Object.fromEntries(karts.map((k) => [k.num, k.teamName])) };
   });
 }
@@ -457,6 +458,9 @@ export default function App() {
   const [ratingScope, setRatingScope] = useState("season");
   const [debrief, setDebrief] = useState("");
   const [debriefLoading, setDebriefLoading] = useState(false);
+  const [ratingSort, setRatingSort] = useState({ key: "overall", dir: "desc" });
+  const [debriefScope, setDebriefScope] = useState("overall");
+  const [debriefTime, setDebriefTime] = useState("season");
   const [extraInput, setExtraInput] = useState(() => LS("extra", ""));
   const [compareIds, setCompareIds] = useState(() => LS("compareIds", []));
   const [compareCache, setCompareCache] = useState({});
@@ -806,8 +810,19 @@ export default function App() {
         agg[name].pace.push(pace10);
         agg[name].cons.push(clamp(5 + consZ * 2.5));
         agg[name].cons.push(clamp(10 - (cv - 0.4) * 7.3));
-        const pos = s.posByKart ? s.posByKart[r.num] : null;
-        if (signed && pos != null) { agg[name].race.push(clamp(5 + pos * 0.35)); agg[name].gain.push(pos); }
+        const gained = s.posByKart ? s.posByKart[r.num] : null;
+        const fin = s.finByKart ? s.finByKart[r.num] : null;
+        if (signed && gained != null && fin != null) {
+          const start = fin + gained;                       // grid = finish + places gained
+          const fieldSize = (s.allKarts || []).length || 20;
+          let sc;
+          if (start <= 3 && fin <= 3) sc = 9.5;             // podium retention: front-row job done
+          else {
+            const deep = start > fieldSize * 0.6 ? 1.4 : 1; // carving from the back weighted heavily
+            sc = clamp(5.5 + gained * 0.45 * (gained > 0 ? deep : 1));
+          }
+          agg[name].race.push(sc); agg[name].gain.push(gained);
+        }
         agg[name].races += 1;
       });
     });
@@ -816,7 +831,7 @@ export default function App() {
     return Object.values(agg).map((d) => {
       const pace = avg(d.pace), cons = avg(d.cons), race = avg(d.race);
       const hasRace = d.race.length > 0;
-      const overall = hasRace ? pace * 0.50 + cons * 0.30 + race * 0.20 : pace * 0.60 + cons * 0.40;
+      const overall = hasRace ? pace * 0.45 + race * 0.30 + cons * 0.25 : pace * 0.65 + cons * 0.35;
       return { ...d, pace, cons, race, hasRace, netGain: sum(d.gain), overall };
     }).sort((a, b) => b.overall - a.overall);
   }, [ratingScope, seasonSessions, convertedSessions, assign, extraTeams, extraNums, roundBaselines]);
@@ -1028,7 +1043,8 @@ export default function App() {
                 ["trace", "LAP TRACES"], 
                 ["prog", "PROGRESSION"],
                 ["report", "DRIVER REPORT"],
-                ["rating", "DRIVER RATING"]
+                ["rating", "DRIVER RATING"],
+                ["debrief", "AI DEBRIEF"]
               ].map(([k, l]) => (
                 <button key={k} onClick={() => setTab(k)} className="disp"
                   style={{ padding: "8px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer",
@@ -1081,7 +1097,10 @@ export default function App() {
                     </div>
                   )}
 
-                  {scrapedEventData.sessions.map((session) => {
+                  {[...scrapedEventData.sessions].sort((a, b) => {
+                    const rank = (s) => { const l = (s.label || s.title || "").toLowerCase(); return /quali/.test(l) ? 1 : /practice/.test(l) ? 2 : 0; };
+                    return rank(a) - rank(b);
+                  }).map((session) => {
                     const leedsSessionRows = session.results.filter(row => 
                       row.team && row.team.toLowerCase().includes("leeds") && !row.team.toLowerCase().includes("beckett")
                     );
@@ -1286,34 +1305,6 @@ export default function App() {
                     </select>
                   </div>
                   {report ? <ReportTable report={report} nameOf={nameOf} /> : <Empty msg="No lap data in this session." />}
-                  {report && (() => {
-                    const ours = report.rows.filter((r) => r.isLeeds);
-                    if (!ours.length) return null;
-                    const runDebrief = async () => {
-                      setDebriefLoading(true); setDebrief("");
-                      const lines = ours.map((r) => `${nameOf(r.num) || r.team} (#${r.num}): avg ${fmt(r.avg)}s, fastest ${fmt(r.fastest)}s, consistency ±${r.sd.toFixed(3)}s, ${r.z == null ? "" : "field z-score " + r.z.toFixed(2) + ", "}${r.shown}/${r.total} clean laps`).join("\n");
-                      const prompt = `You are a karting race engineer writing a short, sharp post-race debrief for Leeds University Motorsport. Session: ${tidyLabel(rep.raceLabel)}. Class fastest lap was ${fmt(report.classFastest)}s. Here are our drivers:\n${lines}\n\nFor each driver give 2-3 plain-English sentences: their pace vs the field, their consistency, and one concrete thing to work on. British spelling, no waffle, no headers, talk like a race engineer to a driver.`;
-                      try {
-                        const res = await fetch("/api/debrief", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt }) });
-                        const d = await res.json();
-                        setDebrief(d.text || d.error || "No response.");
-                      } catch (e) { setDebrief("Couldn't reach the debrief service (only works on the live site with an API key set)."); }
-                      setDebriefLoading(false);
-                    };
-                    return (
-                      <div style={{ marginTop: 20, borderTop: "1px solid #161d27", paddingTop: 16 }}>
-                        <button onClick={runDebrief} disabled={debriefLoading} className="disp"
-                          style={{ background: "#11233a", color: AMBER, border: `1px solid ${AMBER}55`, borderRadius: 7, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                          {debriefLoading ? "THINKING…" : "✦ AI DEBRIEF (LEEDS DRIVERS)"}
-                        </button>
-                        {debrief && (
-                          <div style={{ marginTop: 14, background: "#0b1017", border: "1px solid #222c38", borderRadius: 8, padding: "14px 16px", whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.6, color: "#dbe2ea" }}>
-                            {debrief}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
                 </Panel>
               );
             })()}
@@ -1334,17 +1325,30 @@ export default function App() {
                   <Empty msg="Name drivers in the roster to rate them. 'This round' rates the round you've selected (plus any compare rounds); 'Whole season' combines everything." />
                 ) : (
                   <div style={{ overflowX: "auto" }}>
-                    {(() => { const showRace = driverRatings.some((d) => d.hasRace); return (
+                    {(() => {
+                      const showRace = driverRatings.some((d) => d.hasRace);
+                      const cols = [["#", null], ["DRIVER", "name"], ["RACES", "races"], ["PACE", "pace"], ["CONSISTENCY", "cons"], ...(showRace ? [["RACECRAFT", "race"]] : []), ["RATING", "overall"]];
+                      const clickSort = (key) => { if (!key) return; setRatingSort((s) => ({ key, dir: s.key === key && s.dir === "desc" ? "asc" : "desc" })); };
+                      const sorted = [...driverRatings].sort((a, b) => {
+                        const k = ratingSort.key, m = ratingSort.dir === "asc" ? 1 : -1;
+                        if (k === "name") return m * String(a.name).localeCompare(String(b.name));
+                        return m * ((a[k] ?? 0) - (b[k] ?? 0));
+                      });
+                      return (
                     <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 420 }}>
                       <thead>
                         <tr style={{ color: "#6b7685" }}>
-                          {["#", "DRIVER", "RACES", "PACE", "CONSISTENCY", ...(showRace ? ["RACECRAFT"] : []), "RATING"].map((h, i) => (
-                            <th key={h} style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
+                          {cols.map(([h, key], i) => (
+                            <th key={h} onClick={() => clickSort(key)}
+                              style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733",
+                                fontWeight: 500, cursor: key ? "pointer" : "default", color: ratingSort.key === key ? AMBER : "#6b7685", userSelect: "none" }}>
+                              {h}{ratingSort.key === key ? (ratingSort.dir === "desc" ? " ▾" : " ▴") : ""}
+                            </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {driverRatings.map((d, i) => {
+                        {sorted.map((d, i) => {
                           const c = d.team ? (TEAM_COLORS[d.team] || AMBER) : AMBER;
                           const bar = (v) => (
                             <span style={{ color: v >= 7 ? "#43d977" : v >= 4.5 ? "#ffce3a" : "#ff8a5b" }}>{v.toFixed(2)}</span>
@@ -1377,6 +1381,69 @@ export default function App() {
                     </div>
                   </div>
                 )}
+              </Panel>
+            )}
+
+            {tab === "debrief" && (
+              <Panel title="AI DEBRIEF — KAI ASKEY, DRIVER COACH">
+                {(() => {
+                  const sel = (label, val, set, opts) => (
+                    <label className="mono" style={{ fontSize: 11, color: "#6b7685", display: "flex", flexDirection: "column", gap: 4 }}>
+                      {label}
+                      <select value={val} onChange={(e) => set(e.target.value)}
+                        style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 6, color: "#e6edf3", padding: "6px 8px", fontSize: 12.5, fontFamily: "IBM Plex Mono, monospace" }}>
+                        {opts.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+                      </select>
+                    </label>
+                  );
+                  const runDebrief = async () => {
+                    setDebriefLoading(true); setDebrief("");
+                    const sessions = debriefTime === "season" ? seasonSessions : convertedSessions;
+                    const inScope = (round) => debriefScope === "overall" ? true : debriefScope === "mains" ? /main/i.test(round) : /inter/i.test(round);
+                    const byDriver = {};
+                    sessions.forEach((s) => {
+                      if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel) || !inScope(s.round)) return;
+                      const rep = driverReport(s, extraTeams, extraNums); if (!rep) return;
+                      rep.rows.forEach((r) => {
+                        if (!r.isLeeds) return;
+                        const name = assign[`${s.id}|${r.num}`]?.trim() || r.team;
+                        const d = byDriver[name] || (byDriver[name] = { name, avg: [], sd: [], z: [], gain: 0, races: 0 });
+                        if (r.avg) d.avg.push(r.avg); if (r.sd != null) d.sd.push(r.sd); if (r.z != null) d.z.push(r.z);
+                        if (s.posByKart && s.posByKart[r.num] != null) d.gain += s.posByKart[r.num];
+                        d.races += 1;
+                      });
+                    });
+                    const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+                    const drivers = Object.values(byDriver);
+                    if (!drivers.length) { setDebrief("No named drivers in this scope. Name drivers in the roster first."); setDebriefLoading(false); return; }
+                    const lines = drivers.map((d) => `${d.name}: avg lap ${fmt(mean(d.avg))}s, lap-spread sd ±${(mean(d.sd) || 0).toFixed(3)}s, field z-score ${(mean(d.z) ?? 0).toFixed(2)}, net positions ${d.gain >= 0 ? "+" + d.gain : d.gain} across ${d.races} race(s)`).join("\n");
+                    const scopeName = debriefScope === "overall" ? "the whole team" : debriefScope === "mains" ? "the Mains drivers" : "the Inters drivers";
+                    const prompt = `Debrief ${scopeName}, ${debriefTime === "season" ? "across the whole season" : "for the selected round"}. Negative z-score = faster than the field; lower sd = more consistent. Drivers:\n${lines}`;
+                    try {
+                      const res = await fetch("/api/debrief", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt }) });
+                      const j = await res.json();
+                      setDebrief(j.text || j.error || "No response.");
+                    } catch { setDebrief("Couldn't reach the debrief service (works on the live site with the API key set)."); }
+                    setDebriefLoading(false);
+                  };
+                  return (
+                    <>
+                      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+                        {sel("SCOPE", debriefScope, setDebriefScope, [["overall", "Overall Team Summary"], ["mains", "Mains Only"], ["inters", "Inters Only"]])}
+                        {sel("TIMELINE", debriefTime, setDebriefTime, [["round", "This Round"], ["season", "Whole Season"]])}
+                        <button onClick={runDebrief} disabled={debriefLoading} className="disp"
+                          style={{ background: AMBER, color: "#000", border: "none", borderRadius: 7, padding: "9px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                          {debriefLoading ? "ANALYSING…" : "✦ GENERATE DEBRIEF"}
+                        </button>
+                      </div>
+                      {debrief && (
+                        <div style={{ background: "#0b0f15", borderLeft: `3px solid ${AMBER}`, border: "1px solid #222c38", borderRadius: 8, padding: "18px 20px", whiteSpace: "pre-wrap", fontSize: 13.5, lineHeight: 1.7, color: "#dbe2ea" }}>
+                          {debrief}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </Panel>
             )}
 
