@@ -788,6 +788,7 @@ export default function App() {
     const sessionsForRating = ratingScope === "season" ? seasonSessions : convertedSessions;
     // racecraft only switches on once the data has the official signed gained/lost (a negative value proves it)
     const signed = sessionsForRating.some((s) => Object.values(s.posByKart || {}).some((v) => v < 0));
+    const paceScale = ratingScope === "round" ? 3.5 : 2.5;   // harsher when comparing drivers head-to-head in one round
     sessionsForRating.forEach((s) => {
       if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;  // real races only
       const report = driverReport(s, extraTeams, extraNums);
@@ -803,7 +804,8 @@ export default function App() {
       const fieldMed = fieldStats(s).median;   // field median absorbs the session's conditions (wet/dry)
       report.rows.forEach((r) => {
         if (!r.isLeeds) return;
-        const name = assign[`${s.id}|${r.num}`]?.trim() || r.team;
+        const name = assign[`${s.id}|${r.num}`]?.trim();
+        if (!name) return;   // only rate named drivers, not team-fallback rows
         const ls = s.laps.map((l) => l.times[r.num]).filter((x) => x != null);
         const clean = splitClean(ls).clean;
         const cavg = mean(clean), csd = clean.length > 1 ? sd(clean) : 0;
@@ -816,8 +818,8 @@ export default function App() {
         } else {
           const baseline = roundBaselines[s.round];                    // dry: vs the Leeds squad at this track
           const pacePct = (baseline && cavg) ? (cavg / baseline - 1) * 100 : null;
-          agg[name].pace.push(pacePct != null ? clamp(6 - pacePct * 2.5) : clamp(5 - (r.z ?? 0) * 2.5));
-          agg[name].cons.push(clamp(5 + consZ * 2.5));
+          agg[name].pace.push(pacePct != null ? clamp(6 - pacePct * paceScale) : clamp(5 - (r.z ?? 0) * 2.5));
+          agg[name].cons.push(clamp(10 - (cv - 1.2) * 3.2));   // absolute lap-spread: tighter cv = higher, always
         }
         const gained = s.posByKart ? s.posByKart[r.num] : null;
         const fin = s.finByKart ? s.finByKart[r.num] : null;
@@ -1010,6 +1012,16 @@ export default function App() {
                 <Collapsible key={groupKey} accent={col}
                   title={`${roundName} · ${teamName}`}
                   subtitle={`#${teamEntries[0].num} · ${named}/${drivers.length} drivers named`}>
+                  {(() => {
+                    const allRemoved = teamEntries.every((e) => removed.has(e.key));
+                    return (
+                      <button onClick={() => setRemoved((prev) => { const n = new Set(prev); teamEntries.forEach((e) => allRemoved ? n.delete(e.key) : n.add(e.key)); return n; })}
+                        className="mono" style={{ marginBottom: 8, fontSize: 10.5, cursor: "pointer", background: "none",
+                          border: `1px solid ${allRemoved ? "#43d977" : "#3a2530"}`, borderRadius: 5, padding: "3px 9px", color: allRemoved ? "#43d977" : "#ff8a5b" }}>
+                        {allRemoved ? "↺ restore this team this round" : "✕ not our team this round (remove)"}
+                      </button>
+                    );
+                  })()}
                   <div style={{ display: "grid", gap: 6 }}>
                     {drivers.map((d, di) => {
                       const rows = d.rows;
@@ -1398,7 +1410,7 @@ export default function App() {
                     <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
                       Pace (dry races) is measured against the rest of the Leeds squad at the same track. Wet races are pulled out of
                       the pace score; the blue bracket shows seconds vs the wet field median (negative = faster than the wet field).
-                      Consistency is clean-lap spread (dry only). Racecraft is strategy-aware net positions. Scores: green strong, amber mid, red weak.
+                      Consistency is your own clean-lap spread (sd vs lap average) — tighter is always a higher score, matching the field comparison. (dry only)
                     </div>
                   </div>
                 )}
