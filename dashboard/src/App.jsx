@@ -544,38 +544,40 @@ export default function App() {
       .filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)));
   }, [seasonRaws, extraTeams, extraNums]);
 
-  // Mains-pace baseline per round: Mains rounds use their own field median; Inters rounds borrow
-  // the Mains field median from the nearest-date round (same race weekend = same track).
+  // Pace baseline = the Leeds squad's pace at that track (per race weekend, Mains + Inters pooled),
+  // so each driver is measured against the rest of Leeds at the same circuit.
   const roundBaselines = useMemo(() => {
-    const info = {};
+    const evs = [];
     Object.values(seasonRaws).forEach((raw) => {
       if (!raw || !raw.title) return;
-      const cat = /main/i.test(raw.title) ? "M" : /inter/i.test(raw.title) ? "I" : "O";
-      let date = null; const pooled = [];
+      let date = null; const leeds = [];
       (raw.sessions || []).forEach((s) => {
         const lab = s.label || s.title || "";
         if (s.date && !date) { const dt = new Date(s.date); if (!isNaN(dt)) date = dt; }
         if (!/race/i.test(lab) || /quali/i.test(lab)) return;
         (s.lap_times || []).forEach((e) => {
+          if (!(isOurTeam(e.team, extraTeams) || extraNums.includes(String(e.kart || "")))) return;
           const laps = (e.laps || []).map(parseSecs).filter((x) => x != null);
-          splitClean(laps).clean.forEach((x) => pooled.push(x));
+          splitClean(laps).clean.forEach((x) => leeds.push(x));
         });
       });
-      info[raw.title] = { cat, date, median: quantile(pooled.sort((a, b) => a - b), 0.5) };
+      evs.push({ title: raw.title, date, leeds });
     });
-    const titles = Object.keys(info);
-    const mains = titles.filter((t) => info[t].cat === "M" && info[t].median != null && info[t].date);
     const baselines = {};
-    titles.forEach((t) => {
-      const r = info[t];
-      if (r.median == null) return;
-      if (r.cat === "M" || !r.date || !mains.length) { baselines[t] = r.median; return; }
-      let best = null, bestDiff = Infinity;
-      mains.forEach((mt) => { const diff = Math.abs(info[mt].date - r.date); if (diff < bestDiff) { bestDiff = diff; best = mt; } });
-      baselines[t] = (best && bestDiff <= 10 * 86400000) ? info[best].median : r.median;
+    const dated = evs.filter((e) => e.date).sort((a, b) => a.date - b.date);
+    const weekends = [];
+    dated.forEach((e) => {
+      let wk = weekends.find((w) => Math.abs(w.date - e.date) <= 10 * 86400000);
+      if (!wk) { wk = { date: e.date, laps: [], titles: [] }; weekends.push(wk); }
+      wk.laps.push(...e.leeds); wk.titles.push(e.title);
     });
+    weekends.forEach((w) => {
+      const med = quantile([...w.laps].sort((a, b) => a - b), 0.5);
+      w.titles.forEach((t) => { baselines[t] = med; });
+    });
+    evs.filter((e) => !e.date).forEach((e) => { baselines[e.title] = quantile([...e.leeds].sort((a, b) => a - b), 0.5); });
     return baselines;
-  }, [seasonRaws]);
+  }, [seasonRaws, extraTeams, extraNums]);
 
   // fetch any selected comparison rounds not yet cached
   useEffect(() => {
@@ -805,7 +807,7 @@ export default function App() {
         const consZ = (cvMean - cv) / cvSd;          // tighter than field = positive
         const baseline = roundBaselines[s.round];
         const pacePct = (baseline && cavg) ? (cavg / baseline - 1) * 100 : null;  // % off the Mains field at this track
-        const pace10 = pacePct != null ? clamp(6 - pacePct * 2) : clamp(5 - (r.z ?? 0) * 2.5);
+        const pace10 = pacePct != null ? clamp(6 - pacePct * 2.5) : clamp(5 - (r.z ?? 0) * 2.5);
         agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], races: 0 };
         agg[name].pace.push(pace10);
         agg[name].cons.push(clamp(5 + consZ * 2.5));
@@ -964,11 +966,13 @@ export default function App() {
             </datalist>
             {Object.entries(
               allEntries.reduce((acc, e) => {
-                const g = `${e.session.round}||${e.teamLetter}`;
+                const g = `${e.session.round}||${e.teamName}`;
                 (acc[g] = acc[g] || []).push(e); return acc;
               }, {})
             ).sort(([a], [b]) => a.localeCompare(b)).map(([groupKey, teamEntries]) => {
-              const [roundName, letter] = groupKey.split("||");
+              const [roundName, teamName] = groupKey.split("||");
+              const letter = (teamName.match(/\b([A-G])\b/i) || [])[1]?.toUpperCase();
+              const isLeedsTeam = /leeds/i.test(teamName) && !/beckett/i.test(teamName);
               // Inters: practice/quali heats don't match race heat numbers. Pair by ORDER —
               // first practice/quali listed = first race listed, second = second, etc.
               const pqByHeat = {}, raceByHeat = {};
@@ -992,10 +996,10 @@ export default function App() {
                 drivers.push({ rows, label: `Driver ${i + 1}`, sub: parts.join(" → ") });
               }
               const named = drivers.filter((d) => assign[d.rows[0].key]?.trim()).length;
-              const col = TEAM_COLORS[letter] || "#8b97a7";
+              const col = (isLeedsTeam && letter) ? TEAM_COLORS[letter] : AMBER;
               return (
                 <Collapsible key={groupKey} accent={col}
-                  title={`${roundName} · Leeds ${letter}`}
+                  title={`${roundName} · ${teamName}`}
                   subtitle={`#${teamEntries[0].num} · ${named}/${drivers.length} drivers named`}>
                   <div style={{ display: "grid", gap: 6 }}>
                     {drivers.map((d, di) => {
@@ -1375,9 +1379,9 @@ export default function App() {
                     </table>
                     ); })()}
                     <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
-                      Pace is measured against the <b style={{ color: "#c2cbd6" }}>Mains field at the same track</b> (Inters rounds borrow the
-                      same-weekend Mains pace), so Inters drivers aren't flattered by a softer field — they only rate highly if they're near Mains pace.
-                      Consistency is clean-lap spread. Racecraft (official net positions gained/lost) adds 20% once you've re-scraped with the signed data.
+                      Pace is measured against the <b style={{ color: "#c2cbd6" }}>rest of the Leeds squad at the same track</b> (each race weekend's
+                      Mains and Inters pooled), so it's an internal benchmark, not flattered by a soft outside field.
+                      Consistency is clean-lap spread. Racecraft (strategy-aware net positions) adds once you've re-scraped with the signed data.
                     </div>
                   </div>
                 )}
