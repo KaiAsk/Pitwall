@@ -490,21 +490,37 @@ export default function App() {
   const [syncMsg, setSyncMsg] = useState("");
   const [syncing, setSyncing] = useState(false);
 
-  // pull the shared global roster on load (network is the team source of truth, local is fallback)
+  // pull the shared global roster and weather tracks on load
   useEffect(() => {
     fetch("/api/roster").then((r) => r.json())
-      .then((d) => { if (d && d.roster && Object.keys(d.roster).length) setAssign((prev) => ({ ...prev, ...d.roster })); })
+      .then((d) => { 
+        if (d && d.roster && Object.keys(d.roster).length) {
+          setAssign((prev) => ({ ...prev, ...d.roster }));
+        }
+        if (d && d.wetSessions && Array.isArray(d.wetSessions)) {
+          setWetSessions(new Set(d.wetSessions));
+        }
+      })
       .catch(() => {});
   }, []);
 
   const syncRoster = async () => {
     setSyncing(true); setSyncMsg("");
     try {
-      const res = await fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ roster: assign, adminPassword: adminPw }) });
+      const res = await fetch("/api/roster", { 
+        method: "POST", 
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ 
+          roster: assign, 
+          wetSessions: [...wetSessions], 
+          adminPassword: adminPw 
+        }) 
+      });
       const d = await res.json();
-      setSyncMsg(res.ok && d.ok ? `✓ Synced ${d.count} names to the global roster.` : (d.error || "Sync failed."));
-    } catch { setSyncMsg("Couldn't reach the sync service (only works on the live site)."); }
+      setSyncMsg(res.ok && d.ok ? `✓ Synced global roster and weather configurations.` : (d.error || "Sync failed."));
+    } catch { 
+      setSyncMsg("Couldn't reach the sync service (only works on the live site)."); 
+    }
     setSyncing(false);
   };
   const [extraList, setExtraList] = useState(() => {
