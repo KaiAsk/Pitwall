@@ -459,6 +459,10 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
       posByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position_change) || 0])),
       finByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position) || null])),
       ptsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.points) || 0])),
+      sectorsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), {
+        s1: parseSecs(r.sector_1), s2: parseSecs(r.sector_2), s3: parseSecs(r.sector_3),
+        ult: parseSecs(r.ultimate_lap), best: parseSecs(r.best_lap_time),
+      }])),
       kartIndex: Object.fromEntries(karts.map((k) => [k.num, k.teamName])) };
   });
 }
@@ -469,6 +473,7 @@ export default function App() {
   const csvRef = useRef();
   const [tab, setTab] = useState("scraped");   const [cleanOnly, setCleanOnly] = useState(true);
   const [reportSession, setReportSession] = useState(null);
+  const [sectorSession, setSectorSession] = useState(null);
   const [ratingScope, setRatingScope] = useState("season");
   const [debrief, setDebrief] = useState("");
   const [debriefLoading, setDebriefLoading] = useState(false);
@@ -1008,11 +1013,11 @@ export default function App() {
     <div style={{ minHeight: "100vh", background: "#07090d", color: "#e6edf3", zoom: 1.18,
       fontFamily: "IBM Plex Sans, system-ui, sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
         html, body, #root { margin: 0 !important; padding: 0 !important; max-width: none !important; width: 100% !important; display: block !important; place-items: initial !important; text-align: left !important; background: #07090d; }
         * { box-sizing: border-box; }
         .mono { font-family: 'IBM Plex Mono', monospace; }
-        .disp { font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px; }
+        .disp { font-family: 'Archivo', sans-serif; letter-spacing: 0.2px; }
         ::-webkit-scrollbar { height: 8px; width: 8px; }
         ::-webkit-scrollbar-thumb { background:#1e2733; border-radius: 4px; }
         .appwrap { padding: 24px 28px; max-width: 1380px; margin: 0 auto; }
@@ -1241,7 +1246,9 @@ export default function App() {
                 ["rating", "DRIVER RATING"],
                 ["debrief", "AI DEBRIEF"],
                 ["stats", "STATS"],
-                ["special", "SPECIAL EVENTS"]
+                ["special", "SPECIAL EVENTS"],
+                ["sectors", "SECTORS"],
+                ["lineup", "LINEUP"]
               ].map(([k, l]) => (
                 <button key={k} onClick={() => setTab(k)} className="disp"
                   style={{ padding: "8px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer",
@@ -1843,6 +1850,97 @@ export default function App() {
                 ))}
               </Panel>
             )}
+
+            {tab === "sectors" && (() => {
+              const races = convertedSessions.filter((s) => s.isRound && s.laps.length && /race/i.test(s.raceLabel) && !/quali/i.test(s.raceLabel));
+              const rep = races.find((s) => s.id === sectorSession) || races[0];
+              if (!rep) return <Panel title="SECTOR ANALYSIS"><Empty msg="No race session loaded." /></Panel>;
+              const sb = rep.sectorsByKart || {};
+              const allK = (rep.allKarts || []).map((k) => k.num);
+              const fieldBest = (sec) => { const v = allK.map((n) => sb[n] && sb[n][sec]).filter((x) => x != null); return v.length ? Math.min(...v) : null; };
+              const fb = { s1: fieldBest("s1"), s2: fieldBest("s2"), s3: fieldBest("s3") };
+              const ours = rep.karts.map((k) => ({ num: k.num, name: assign[`${rep.id}|${k.num}`]?.trim() || k.teamName, ...(sb[k.num] || {}) })).filter((o) => o.best != null || o.s1 != null);
+              const dCell = (v, best) => v == null ? <span style={{ color: "#3a4655" }}>—</span> :
+                <span style={{ color: best != null && v <= best + 0.001 ? "#b06bff" : "#c2cbd6" }}>{v.toFixed(3)}{best != null && v > best + 0.001 ? <span style={{ color: "#5b6776", fontSize: 10 }}> +{(v - best).toFixed(2)}</span> : ""}</span>;
+              return (
+                <Panel title="SECTOR ANALYSIS — BEST SECTORS & ULTIMATE-LAP GAP">
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                    <span className="mono" style={{ fontSize: 11, color: "#6b7685" }}>SESSION</span>
+                    <select value={rep.id} onChange={(e) => setSectorSession(e.target.value)} style={{ ...inp(300) }}>
+                      {races.map((s) => <option key={s.id} value={s.id}>{tidyLabel(s.raceLabel)}</option>)}
+                    </select>
+                  </div>
+                  {ours.length === 0 ? <Empty msg="No Leeds sector data in this race." /> : (
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 560 }}>
+                        <thead><tr style={{ color: "#6b7685" }}>
+                          {["DRIVER", "S1", "S2", "S3", "THEORETICAL", "BEST LAP", "GAP"].map((h, i) => (
+                            <th key={h} style={{ padding: "6px 10px", textAlign: i === 0 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
+                          ))}
+                        </tr></thead>
+                        <tbody>
+                          {ours.sort((a, b) => (a.best ?? 9e9) - (b.best ?? 9e9)).map((o) => {
+                            const gap = (o.best != null && o.ult != null) ? o.best - o.ult : null;
+                            return (
+                              <tr key={o.num} style={{ borderBottom: "1px solid #11171f" }}>
+                                <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{o.name} <span style={{ color: "#5b6776" }}>#{o.num}</span></td>
+                                <td style={{ padding: "7px 10px", textAlign: "right" }}>{dCell(o.s1, fb.s1)}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right" }}>{dCell(o.s2, fb.s2)}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right" }}>{dCell(o.s3, fb.s3)}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{o.ult != null ? fmt(o.ult) : "—"}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER }}>{o.best != null ? fmt(o.best) : "—"}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: gap == null ? "#5b6776" : gap > 0.3 ? "#ff8a5b" : "#43d977" }}>{gap == null ? "—" : "+" + gap.toFixed(3)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
+                        Purple = matched the field's best sector. THEORETICAL is their ultimate lap (sum of their own best sectors); GAP is best lap minus theoretical —
+                        how much they left on the table by not stringing the sectors together. A big gap = the speed's there, the lap isn't.
+                      </div>
+                    </div>
+                  )}
+                </Panel>
+              );
+            })()}
+
+            {tab === "lineup" && (() => {
+              const cat = {};
+              seasonSessions.forEach((s) => {
+                if (!s.isRound || !/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;
+                s.karts.forEach((k) => { const n = assign[`${s.id}|${k.num}`]?.trim(); if (!n) return; cat[n] = cat[n] || { Mains: 0, Inters: 0 }; cat[n][s.category] = (cat[n][s.category] || 0) + 1; });
+              });
+              const catOf = (n) => { const c = cat[n]; if (!c) return "?"; return (c.Mains || 0) >= (c.Inters || 0) ? "M" : "I"; };
+              const ranked = driverRatings;
+              const mainsScores = ranked.filter((d) => catOf(d.name) === "M").map((d) => d.overall);
+              const lowestMains = mainsScores.length ? Math.min(...mainsScores) : 0;
+              return (
+                <Panel title="LINEUP OPTIMISER — RANKED, WITH PROMOTION FLAGS">
+                  {ranked.length === 0 ? <Empty msg="Name drivers to build the lineup." /> : (
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {ranked.map((d, i) => {
+                        const c = catOf(d.name);
+                        const promote = c === "I" && d.overall > lowestMains && mainsScores.length > 0;
+                        return (
+                          <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 12, background: "#0b1017", border: `1px solid ${promote ? "#43d97755" : "#1b2430"}`, borderRadius: 8, padding: "8px 12px" }}>
+                            <span className="mono" style={{ color: "#5b6776", width: 24 }}>{i + 1}</span>
+                            <span className="disp" style={{ fontWeight: 700, color: "#e6edf3", flex: 1 }}>{d.name}</span>
+                            <span className="mono" style={{ fontSize: 10.5, padding: "2px 7px", borderRadius: 5, border: "1px solid #2a3543", color: c === "M" ? AMBER : "#3da9fc" }}>{c === "M" ? "MAINS" : c === "I" ? "INTERS" : "—"}</span>
+                            {promote && <span className="mono" style={{ fontSize: 10.5, padding: "2px 7px", borderRadius: 5, background: "#0e2018", border: "1px solid #43d97755", color: "#43d977" }}>↑ PROMOTE</span>}
+                            <span className="mono" style={{ fontSize: 15, fontWeight: 700, color: d.overall >= 7 ? "#43d977" : d.overall >= 4.5 ? "#ffce3a" : "#ff8a5b", width: 48, textAlign: "right" }}>{d.overall.toFixed(2)}</span>
+                          </div>
+                        );
+                      })}
+                      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 8, lineHeight: 1.5 }}>
+                        Ranked on overall rating (follows the rating tab's round/season scope). Drivers tagged by the category they race most.
+                        An Inters driver flagged ↑ PROMOTE is rated above your weakest Mains driver — a case to move them up.
+                      </div>
+                    </div>
+                  )}
+                </Panel>
+              );
+            })()}
 
           </>
         )}
