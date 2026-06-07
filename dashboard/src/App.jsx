@@ -466,6 +466,7 @@ export default function App() {
   const [debriefTime, setDebriefTime] = useState("season");
   const [statsView, setStatsView] = useState("drivers");
   const [statsMode, setStatsMode] = useState("cards");
+  const [statsCat, setStatsCat] = useState("all");
   const [adminPw, setAdminPw] = useState("");
   const [syncMsg, setSyncMsg] = useState("");
   const [syncing, setSyncing] = useState(false);
@@ -784,17 +785,27 @@ export default function App() {
 
   const progression = useMemo(() => {
     const byDriver = {};
-    entries.forEach((e) => {
-      const driver = assign[e.key]?.trim();
-      if (!driver) return;
-      const { clean } = kartLaps(e.session, e.num, e.teamName);
-      if (!clean.length) return;
-      byDriver[driver] = byDriver[driver] || { driver, team: e.teamLetter, pts: {} };
-      const r = e.session.round;
-      byDriver[driver].pts[r] = byDriver[driver].pts[r] || [];
-      byDriver[driver].pts[r].push(mean(clean));
+    convertedSessions.forEach((s) => {
+      if (!s.isRound || !/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;
+      // field reference: median of every kart's fastest clean lap this session
+      const fieldFastest = (s.allKarts || []).map((k) => {
+        const c = splitClean(s.laps.map((l) => l.times[k.num]).filter((x) => x != null)).clean;
+        return c.length ? Math.min(...c) : null;
+      }).filter((x) => x != null).sort((a, b) => a - b);
+      const fieldMedFast = quantile(fieldFastest, 0.5);
+      if (fieldMedFast == null) return;
+      s.karts.forEach((k) => {
+        const driver = assign[`${s.id}|${k.num}`]?.trim();
+        if (!driver) return;
+        const c = splitClean(s.laps.map((l) => l.times[k.num]).filter((x) => x != null)).clean;
+        if (!c.length) return;
+        const delta = Math.min(...c) - fieldMedFast;   // fastest lap vs field's median fastest (negative = quicker than field)
+        const m = k.teamName.match(/\b([A-G])\b/i);
+        byDriver[driver] = byDriver[driver] || { driver, team: m ? m[1].toUpperCase() : null, pts: {} };
+        (byDriver[driver].pts[s.round] = byDriver[driver].pts[s.round] || []).push(delta);
+      });
     });
-    const rounds = [...new Set(convertedSessions.map((s) => s.round))];
+    const rounds = [...new Set(convertedSessions.filter((s) => s.isRound).map((s) => s.round))];
     const data = rounds.map((r) => ({ round: r }));
     Object.values(byDriver).forEach((d) => {
       Object.entries(d.pts).forEach(([r, arr]) => {
@@ -803,7 +814,7 @@ export default function App() {
       });
     });
     return { data, drivers: Object.values(byDriver) };
-  }, [entries, assign, convertedSessions]);
+  }, [convertedSessions, assign]);
 
   const leedsOverallStandings = useMemo(() => {
     if (!scrapedEventData || !scrapedEventData.overall_result) return [];
@@ -851,6 +862,7 @@ export default function App() {
     const drivers = {}, teams = {}, overall = make("Leeds Overall");
     seasonSessions.forEach((s) => {
       if (!s.isRound) return;   // special events excluded from season stats
+      if (statsCat !== "all" && (s.category || "").toLowerCase() !== statsCat) return;
       const isQuali = /quali/i.test(s.raceLabel);
       const isRace = /race/i.test(s.raceLabel) && !isQuali;
       if (!isRace && !isQuali) return;
@@ -878,7 +890,7 @@ export default function App() {
       teams: Object.values(teams).map(derive).sort((a, b) => b.points - a.points),
       overall: derive(overall),
     };
-  }, [seasonSessions, assign, removed]);
+  }, [seasonSessions, assign, removed, statsCat]);
 
   const signedOverview = !!scrapedEventData && (scrapedEventData.sessions || []).some((s) => (s.results || []).some((r) => (r.position_change || 0) < 0));
 
@@ -945,9 +957,9 @@ export default function App() {
       const pace = avg(d.pace), cons = avg(d.cons), race = avg(d.race);
       const hasPace = d.pace.length > 0, hasRace = d.race.length > 0, hasCons = d.cons.length > 0;
       let tot = 0, w = 0;
-      if (hasPace) { tot += pace * 0.50; w += 0.50; }
+      if (hasPace) { tot += pace * 0.65; w += 0.65; }
       if (hasRace) { tot += race * 0.20; w += 0.20; }
-      if (hasCons) { tot += cons * 0.30; w += 0.30; }
+      if (hasCons) { tot += cons * 0.15; w += 0.15; }
       const overall = w ? tot / w : 0;
       const wetDelta = d.wet.length ? sum(d.wet) / d.wet.length : null;
       return { ...d, pace, cons, race, hasPace, hasRace, hasCons, wetDelta, netGain: sum(d.gain), overall };
@@ -1430,7 +1442,7 @@ export default function App() {
             )}
 
             {tab === "prog" && (
-              <Panel title="DRIVER PROGRESSION — CLEAN PACE BY ROUND">
+              <Panel title="DRIVER PROGRESSION — FASTEST LAP vs FIELD, BY ROUND">
                 {progression.drivers.length === 0 ? (
                   <Empty msg="Assign driver names above, and load telemetry lap sheets, to generate stats metrics charts." />
                 ) : (
@@ -1441,7 +1453,7 @@ export default function App() {
                       <YAxis stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }}
                         domain={["dataMin - 0.3", "dataMax + 0.3"]} width={52} tickFormatter={(v) => v.toFixed(1)}
                         ticks={(() => { const all = progression.data.flatMap((r) => Object.entries(r).filter(([k]) => k !== "round").map(([, v]) => v)).filter((v) => typeof v === "number"); if (!all.length) return undefined; const lo = Math.floor(Math.min(...all) * 2) / 2, hi = Math.ceil(Math.max(...all) * 2) / 2; const t = []; for (let v = lo; v <= hi + 0.001; v += 0.5) t.push(Math.round(v * 2) / 2); return t; })()}
-                        label={{ value: "avg clean lap (s)", angle: -90, position: "insideLeft", fill: "#5b6776", fontSize: 10 }} />
+                        label={{ value: "fastest lap vs field (s) — lower is better", angle: -90, position: "insideLeft", fill: "#5b6776", fontSize: 10 }} />
                       <Tooltip formatter={(v) => (typeof v === "number" ? v.toFixed(2) + "s" : v)}
                         contentStyle={{ background: "#0d141c", border: "1px solid #222c38", borderRadius: 8,
                         fontFamily: "IBM Plex Mono", fontSize: 12 }} labelStyle={{ color: AMBER }} />
@@ -1649,6 +1661,12 @@ export default function App() {
                           <button key={k} onClick={() => setStatsView(k)} className="disp"
                             style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
                               border: `1px solid ${statsView === k ? AMBER : "#222c38"}`, background: statsView === k ? "#1a160a" : "#0b1017", color: statsView === k ? AMBER : "#8b97a7" }}>{l}</button>
+                        ))}
+                        <span style={{ width: 14 }} />
+                        {[["all", "ALL"], ["mains", "MAINS"], ["inters", "INTERS"]].map(([k, l]) => (
+                          <button key={k} onClick={() => setStatsCat(k)} className="disp"
+                            style={{ padding: "6px 12px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+                              border: `1px solid ${statsCat === k ? "#b06bff" : "#222c38"}`, background: statsCat === k ? "#1a0f2a" : "#0b1017", color: statsCat === k ? "#b06bff" : "#8b97a7" }}>{l}</button>
                         ))}
                         <span style={{ flex: 1 }} />
                         {[["cards", "CARDS"], ["chart", "CHART"], ["table", "TABLE"]].map(([k, l]) => (
