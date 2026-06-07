@@ -13,8 +13,7 @@ const DRIVER_PALETTE = [
 ];
 const AMBER = "#ffce3a";
 
-/* display-only: tidy an over-grabbed session label for grouping/headers.
-   Mirrors the scraper's clean_label so existing JSON renders cleanly too. */
+/* display-only: tidy an over-grabbed session label for grouping/headers. */
 const tidyLabel = (s) =>
   (String(s || "")
     .split(/\s+(?:Confirmed|Live|Provisional|Unconfirmed|Result)\b|\s+[·\u00b7]\s+|\s+\d{1,2}:\d{2}\b|\s+Winner:/)[0]
@@ -32,12 +31,8 @@ const raceToken = (s) => {
   if (/quali/.test(s)) return "qualifying";
   return s.replace(/[^a-z0-9]/g, "");
 };
-/* the heat number a session belongs to (works for "Race 4" and "Race 1: ... Qualifying").
-   Inters: practice/quali/race of the same heat share one driver, so this unifies them. */
+
 const sessionHeat = (label) => {
-  // strip "Round N" first so the round number is never mistaken for the heat,
-  // then take the Practice/Race/Qualifying/Heat number. Practice 3, Quali 3 and
-  // Race 3 all resolve to heat 3 so one driver name covers them.
   let s = String(label || "").replace(/round\s*\d+/i, "");
   const m = s.match(/(?:race|practice|heat|qualifying|quali)\s*0*(\d+)/i) || s.match(/^\s*0*(\d+)\b/);
   return m ? Number(m[1]) : null;
@@ -55,7 +50,7 @@ function parseLineupCsv(text) {
     const parts = (line.includes(",") ? line.split(",") : line.split(/\s*-\s*/)).map((p) => p.trim());
     if (parts.length < 3) return;
     const [team, race, driver] = parts;
-    if (/^team$/i.test(team)) return; // skip header row
+    if (/^team$/i.test(team)) return; 
     if (team && race && driver) rows.push({ team, race, driver });
   });
   return rows;
@@ -134,12 +129,6 @@ function fieldStats(session) {
   return { median: quantile(sorted, 0.5), best: sorted[0] ?? null, n: pooled.length };
 }
 
-/* ---------- B Pillar style driver report ---------- */
-/* Ranks every kart in a session on the fastest 50% of its clean laps.
-   Clean = lap 1 dropped, within 110% of class fastest AND 105% of own fastest.
-   Z-score = average per-lap standardised pace vs the field (negative = faster). */
-// Reconstruct net positions gained (signed) per kart from lap times alone:
-// rank by (laps completed, then cumulative time) at the first lap vs the finish.
 function racecraftGain(session) {
   const karts = (session.allKarts || []).map((k) => k.num);
   if (!session.laps || !session.laps.length || karts.length < 2) return {};
@@ -222,7 +211,6 @@ function ReportTable({ report, nameOf }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <div style={{ minWidth: 760 }}>
-        {/* header */}
         <div className="mono" style={{ display: "grid", gridTemplateColumns: `28px 190px ${PW}px 64px 64px 56px 52px 64px`,
           alignItems: "end", fontSize: 10.5, borderBottom: "1px solid #1e2733", paddingBottom: 4 }}>
           <div style={head}>#</div>
@@ -240,7 +228,6 @@ function ReportTable({ report, nameOf }) {
           <div style={{ ...head, color: hCol("z") }} onClick={clickSort("z")}>Z{arrow("z")}</div>
           <div style={{ ...head, color: hCol("shown") }} onClick={clickSort("shown")}>SHOWN{arrow("shown")}</div>
         </div>
-        {/* rows */}
         {rows.map((r, i) => {
           const s = [...r.times].sort((a, b) => a - b);
           const q1 = quantile(s, 0.25), med = quantile(s, 0.5), q3 = quantile(s, 0.75);
@@ -277,50 +264,32 @@ function ReportTable({ report, nameOf }) {
       </div>
       <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
         Ranked on the fastest 50% of laps, excluding lap 1, within 110% of class fastest and 105% of the driver's own fastest.
-        Z-score is average per-lap pace vs the field (negative = faster). Clear-air % and overtakes aren't shown — BUKC timing data doesn't expose traffic position per lap.
       </div>
     </div>
   );
 }
 
-/* ---------- box plot ---------- */
 function BoxPlot({ boxes, fieldMedian }) {
   const allClean = boxes.flatMap((b) => b.clean).filter((x) => x != null && !isNaN(x));
   if (!allClean.length) return <Empty msg="No clean lap sheets data found to visualize." />;
 
   const sortedLaps = [...allClean].sort((a, b) => a - b);
-  
   let lo = quantile(sortedLaps, 0.01);
   let hi = quantile(sortedLaps, 0.99);
   
-  if (hi - lo < 0.5) {
-    lo -= 1;
-    hi += 1;
-  } else {
-    const paddingMultiplier = (hi - lo) * 0.20;
-    lo = Math.max(0, lo - paddingMultiplier);
-    hi = hi + paddingMultiplier;
-  }
+  if (hi - lo < 0.5) { lo -= 1; hi += 1; } 
+  else { const paddingMultiplier = (hi - lo) * 0.20; lo = Math.max(0, lo - paddingMultiplier); hi = hi + paddingMultiplier; }
 
   const W = Math.max(800, boxes.length * 115 + 140), H = 500;
   const padL = 70, padR = 40, padT = 40, padB = 120;
-
   const y = (v) => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
   const bw = (W - padL - padR) / boxes.length;
-
   const delta = hi - lo;
-  let gapInterval = 1;
-  if (delta > 60) gapInterval = 10;
-  else if (delta > 40) gapInterval = 5;
-  else if (delta > 20) gapInterval = 2;
-  else if (delta > 8) gapInterval = 1;
-  else gapInterval = 0.5;
+  let gapInterval = delta > 60 ? 10 : delta > 40 ? 5 : delta > 20 ? 2 : delta > 8 ? 1 : 0.5;
 
   const initialTick = Math.ceil(lo / gapInterval) * gapInterval;
   const customGridTicks = [];
-  for (let tick = initialTick; tick <= hi; tick += gapInterval) {
-    customGridTicks.push(tick);
-  }
+  for (let tick = initialTick; tick <= hi; tick += gapInterval) { customGridTicks.push(tick); }
 
   return (
     <div style={{ overflowX: "auto", background: "#0a0e14", borderRadius: 8, padding: "8px" }}>
@@ -328,83 +297,50 @@ function BoxPlot({ boxes, fieldMedian }) {
         {customGridTicks.map((tv, i) => (
           <g key={i}>
             <line x1={padL} x2={W - padR} y1={y(tv)} y2={y(tv)} stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
-            <text x={padL - 12} y={y(tv) + 4} textAnchor="end" fill="#64748b"
-              fontSize="11" fontFamily="IBM Plex Mono, monospace">{tv.toFixed(1)}s</text>
+            <text x={padL - 12} y={y(tv) + 4} textAnchor="end" fill="#64748b" fontSize="11" fontFamily="IBM Plex Mono">{tv.toFixed(1)}s</text>
           </g>
         ))}
-        
         {fieldMedian != null && y(fieldMedian) >= padT && y(fieldMedian) <= H - padB && (
           <g>
-            <line x1={padL} x2={W - padR} y1={y(fieldMedian)} y2={y(fieldMedian)}
-              stroke={AMBER} strokeWidth="2" strokeDasharray="6 4" opacity="0.9" />
-            <text x={W - padR - 6} y={y(fieldMedian) - 8} textAnchor="end" fill={AMBER}
-              fontSize="11" fontWeight="600" fontFamily="IBM Plex Mono, monospace" letterSpacing="0.5">
-              FIELD MEDIAN {fieldMedian.toFixed(3)}s
-            </text>
+            <line x1={padL} x2={W - padR} y1={y(fieldMedian)} y2={y(fieldMedian)} stroke={AMBER} strokeWidth="2" strokeDasharray="6 4" opacity="0.9" />
+            <text x={W - padR - 6} y={y(fieldMedian) - 8} textAnchor="end" fill={AMBER} fontSize="11" fontWeight="600" fontFamily="IBM Plex Mono">FIELD MEDIAN {fieldMedian.toFixed(3)}s</text>
           </g>
         )}
-
         {boxes.map((b, i) => {
           const cx = padL + bw * (i + 0.5);
           const halfBoxWidth = Math.min(35, bw * 0.35);
           const s = [...b.clean].sort((a, x) => a - x);
           if (!s.length) return null;
-
           const q1 = quantile(s, 0.25), med = quantile(s, 0.5), q3 = quantile(s, 0.75);
           const mn = s[0], mx = s[s.length - 1], mu = mean(s);
           const col = b.color;
-
           const safetyClampY = (val) => Math.max(padT, Math.min(H - padB, y(val)));
-
           return (
             <g key={i}>
               <line x1={cx} x2={cx} y1={safetyClampY(mx)} y2={safetyClampY(q3)} stroke={col} strokeWidth="1.5" />
               <line x1={cx} x2={cx} y1={safetyClampY(q1)} y2={safetyClampY(mn)} stroke={col} strokeWidth="1.5" />
-              
-              {y(mx) >= padT && y(mx) <= H - padB && (
-                <line x1={cx - halfBoxWidth * 0.5} x2={cx + halfBoxWidth * 0.5} y1={y(mx)} y2={y(mx)} stroke={col} strokeWidth="1.5" />
-              )}
-              {y(mn) >= padT && y(mn) <= H - padB && (
-                <line x1={cx - halfBoxWidth * 0.5} x2={cx + halfBoxWidth * 0.5} y1={y(mn)} y2={y(mn)} stroke={col} strokeWidth="1.5" />
-              )}
-
-              <rect x={cx - halfBoxWidth} y={safetyClampY(q3)} width={halfBoxWidth * 2} height={Math.max(3, safetyClampY(q1) - safetyClampY(q3))}
-                fill={col} fillOpacity="0.16" stroke={col} strokeWidth="1.8" rx="3" />
-              
+              {y(mx) >= padT && y(mx) <= H - padB && ( <line x1={cx - halfBoxWidth * 0.5} x2={cx + halfBoxWidth * 0.5} y1={y(mx)} y2={y(mx)} stroke={col} strokeWidth="1.5" /> )}
+              {y(mn) >= padT && y(mn) <= H - padB && ( <line x1={cx - halfBoxWidth * 0.5} x2={cx + halfBoxWidth * 0.5} y1={y(mn)} y2={y(mn)} stroke={col} strokeWidth="1.5" /> )}
+              <rect x={cx - halfBoxWidth} y={safetyClampY(q3)} width={halfBoxWidth * 2} height={Math.max(3, safetyClampY(q1) - safetyClampY(q3))} fill={col} fillOpacity="0.16" stroke={col} strokeWidth="1.8" rx="3" />
               <line x1={cx - halfBoxWidth} x2={halfBoxWidth + cx} y1={safetyClampY(med)} y2={safetyClampY(med)} stroke={col} strokeWidth="3" />
-              
-              <line x1={cx - halfBoxWidth} x2={halfBoxWidth + cx} y1={safetyClampY(mu)} y2={safetyClampY(mu)} stroke="#cbd5e1"
-                strokeWidth="1.2" strokeDasharray="3 3" opacity="0.65" />
-
+              <line x1={cx - halfBoxWidth} x2={halfBoxWidth + cx} y1={safetyClampY(mu)} y2={safetyClampY(mu)} stroke="#cbd5e1" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.65" />
               {b.incidents.map((iv, j) => {
                 const outlierY = y(iv);
-                if (outlierY < padT || outlierY > H - padB) return null; 
-                return (
-                  <circle key={j} cx={cx} cy={outlierY} r="3.5" fill="none" stroke={col} strokeOpacity="0.55" strokeWidth="1.2" />
-                );
+                if (outlierY < padT || outlierY > H - padB) return null;
+                return ( <circle key={j} cx={cx} cy={outlierY} r="3.5" fill="none" stroke={col} strokeOpacity="0.55" strokeWidth="1.2" /> );
               })}
-
-              <text x={cx} y={H - padB + 24} textAnchor="end" fill="#e2e8f0" fontSize="12"
-                fontWeight="500" fontFamily="IBM Plex Sans, sans-serif" transform={`rotate(-32 ${cx} ${H - padB + 24})`}>
-                {b.label}
-              </text>
-              <text x={cx} y={H - padB + 42} textAnchor="end" fill="#475569" fontSize="10.5"
-                fontFamily="IBM Plex Mono, monospace" transform={`rotate(-32 ${cx} ${H - padB + 42})`}>
-                {b.sub}
-              </text>
+              <text x={cx} y={H - padB + 24} textAnchor="end" fill="#e2e8f0" fontSize="12" fontWeight="500" transform={`rotate(-32 ${cx} ${H - padB + 24})`}>{b.label}</text>
+              <text x={cx} y={H - padB + 42} textAnchor="end" fill="#475569" fontSize="10.5" transform={`rotate(-32 ${cx} ${H - padB + 42})`}>{b.sub}</text>
             </g>
           );
         })}
-        <text x={14} y={(H - padB) / 2} fill="#475569" fontSize="11" fontFamily="IBM Plex Sans"
-          transform={`rotate(-90 14 ${(H - padB) / 2})`} textAnchor="middle">LAP TIME (s)</text>
       </svg>
     </div>
   );
 }
 
 const Empty = ({ msg }) => (
-  <div style={{ padding: "48px 20px", textAlign: "center", color: "#5b6776",
-    fontFamily: "IBM Plex Sans", fontSize: 14 }}>{msg}</div>
+  <div style={{ padding: "48px 20px", textAlign: "center", color: "#5b6776", fontSize: 14 }}>{msg}</div>
 );
 
 /* ---------- app ---------- */
@@ -415,7 +351,6 @@ const parseSecs = (v) => {
   return (!isNaN(s) && s > 0) ? Math.round(s * 1000) / 1000 : null;
 };
 
-// persistence — saves roster/extras between visits on this device
 const LS = (k, fallback) => { try { const v = localStorage.getItem("pitwall_" + k); return v != null ? JSON.parse(v) : fallback; } catch { return fallback; } };
 const saveLS = (k, v) => { try { localStorage.setItem("pitwall_" + k, JSON.stringify(v)); } catch {} };
 const isOurTeam = (teamName, extraTeams = []) => {
@@ -423,6 +358,7 @@ const isOurTeam = (teamName, extraTeams = []) => {
   if (t.includes("leeds") && !t.includes("beckett")) return true;
   return extraTeams.some((x) => x && t.includes(x.toLowerCase()));
 };
+
 function convertEvent(data, extraTeams = [], extraNums = []) {
   if (!data || !data.sessions) return [];
   return data.sessions.map((s) => {
@@ -459,9 +395,14 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
       posByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position_change) || 0])),
       finByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position) || null])),
       ptsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.points) || 0])),
+      
+      // RESTORED: Advanced Key-Sniffing Sector Fallbacks (Fixes empty sector UI)
       sectorsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), {
-        s1: parseSecs(r.sector_1), s2: parseSecs(r.sector_2), s3: parseSecs(r.sector_3),
-        ult: parseSecs(r.ultimate_lap), best: parseSecs(r.best_lap_time),
+        s1: parseSecs(r.sector_1 || r.sector1 || r.s1 || r.Sector1), 
+        s2: parseSecs(r.sector_2 || r.sector2 || r.s2 || r.Sector2), 
+        s3: parseSecs(r.sector_3 || r.sector3 || r.s3 || r.Sector3),
+        ult: parseSecs(r.ultimate_lap || r.ultimate || r.ult), 
+        best: parseSecs(r.best_lap_time || r.best_lap || r.best),
       }])),
       kartIndex: Object.fromEntries(karts.map((k) => [k.num, k.teamName])) };
   });
@@ -490,7 +431,6 @@ export default function App() {
   const [syncMsg, setSyncMsg] = useState("");
   const [syncing, setSyncing] = useState(false);
 
-  // pull the shared global roster, weather tracks, extra entries, and per-round team removals on load
   useEffect(() => {
     fetch("/api/roster").then((r) => r.json())
       .then((d) => {
@@ -501,6 +441,7 @@ export default function App() {
       })
       .catch(() => {});
   }, []);
+
   const syncRoster = async () => {
     setSyncing(true); setSyncMsg("");
     try {
@@ -522,12 +463,14 @@ export default function App() {
     }
     setSyncing(false);
   };
+
   const [extraList, setExtraList] = useState(() => {
     const v = LS("extra", []);
     if (Array.isArray(v)) return v;
     if (typeof v === "string" && v.trim()) return v.split(/[,\n]/).map((t) => t.trim()).filter(Boolean);
     return [];
   });
+  
   const [extraDraft, setExtraDraft] = useState("");
   const [compareIds, setCompareIds] = useState(() => LS("compareIds", []));
   const [compareCache, setCompareCache] = useState({});
@@ -547,7 +490,6 @@ export default function App() {
   const [scrapedEventData, setScrapedEventData] = useState(null);
   const [loadError, setLoadError] = useState("");
 
-  // Load the season index once. The scraper writes index.json listing every round it pulled.
   useEffect(() => {
     fetch("/index.json")
       .then((r) => r.text())
@@ -571,7 +513,6 @@ export default function App() {
       .catch(() => { setEventIndex([]); setLoadError("No index.json found — run the scraper into dashboard/public to populate rounds."); });
   }, []);
 
-  // Load the selected round's data.
   useEffect(() => {
     if (!activeEventId) return;
     const ev = eventIndex.find((e) => e.id === activeEventId);
@@ -597,7 +538,6 @@ export default function App() {
       .filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)));
   }, [scrapedEventData, compareIds, compareCache, extraTeams, extraNums]);
 
-  // load every round in the season (for whole-season driver ratings)
   useEffect(() => {
     eventIndex.forEach((e) => {
       if (seasonRaws[e.id]) return;
@@ -614,19 +554,17 @@ export default function App() {
       .filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)));
   }, [seasonRaws, extraTeams, extraNums]);
 
-  // Pace baseline = the Leeds squad's pace at that track (per race weekend, Mains + Inters pooled),
-  // so each driver is measured against the rest of Leeds at the same circuit.
   const roundBaselines = useMemo(() => {
     const evs = [];
     Object.values(seasonRaws).forEach((raw) => {
       if (!raw || !raw.title) return;
-      if (!/(?:mains|inters)\s*round\s*\d+/i.test(raw.title)) return;   // special events out of the pace baseline
+      if (!/(?:mains|inters)\s*round\s*\d+/i.test(raw.title)) return;   
       let date = null; const leeds = [];
       (raw.sessions || []).forEach((s) => {
         const lab = s.label || s.title || "";
         if (s.date && !date) { const dt = new Date(s.date); if (!isNaN(dt)) date = dt; }
         if (!/race/i.test(lab) || /quali/i.test(lab)) return;
-        if (wetSessions.has(`scraped__${s.session_id}`)) return;   // dry laps only in the baseline
+        if (wetSessions.has(`scraped__${s.session_id}`)) return;   
         (s.lap_times || []).forEach((e) => {
           if (!(isOurTeam(e.team, extraTeams) || extraNums.includes(String(e.kart || "")))) return;
           const laps = (e.laps || []).map(parseSecs).filter((x) => x != null);
@@ -651,7 +589,6 @@ export default function App() {
     return baselines;
   }, [seasonRaws, extraTeams, extraNums, wetSessions]);
 
-  // fetch any selected comparison rounds not yet cached
   useEffect(() => {
     compareIds.forEach((eid) => {
       if (compareCache[eid]) return;
@@ -663,21 +600,20 @@ export default function App() {
     });
   }, [compareIds, eventIndex, compareCache]);
 
-  // normalised cross-round comparison: each driver's avg clean lap as % off that round's field median
   const compareRows = useMemo(() => {
     const map = {};
     compareIds.forEach((eid) => {
       const raw = compareCache[eid];
       if (!raw) return;
       convertEvent(raw, extraTeams, extraNums).forEach((s) => {
-        if (!/race/i.test(s.raceLabel)) return;       // races only
+        if (!/race/i.test(s.raceLabel)) return;       
         const fm = fieldStats(s).median;
         if (!fm) return;
         s.karts.forEach((k) => {
           const ls = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
           const clean = splitClean(ls).clean;
           if (!clean.length) return;
-          const pct = (mean(clean) / fm - 1) * 100;   // negative = faster than the field
+          const pct = (mean(clean) / fm - 1) * 100;   
           const name = assign[`${s.id}|${k.num}`]?.trim() || k.teamName;
           const letter = (k.teamName.match(/\b([A-G])\b/i) || [])[1];
           map[name] = map[name] || { label: name, teamLetter: letter ? letter.toUpperCase() : null, perRound: {} };
@@ -722,9 +658,7 @@ export default function App() {
     return rows;
   }, [convertedSessions]);
 
-  // entries used by all the analysis views — excludes anything removed in the roster
   const entries = useMemo(() => allEntries.filter((e) => !removed.has(e.key)), [allEntries, removed]);
-
   const driverColorMap = useMemo(() => makeDriverColorMap(entries, assign), [entries, assign]);
 
   const colorOf = useCallback((key) => {
@@ -736,15 +670,12 @@ export default function App() {
 
   const fieldComparisonGroups = useMemo(() => {
     const groups = {};
-    
     entries.forEach((e) => {
-      if (!/race/i.test(e.session.raceLabel) || /quali/i.test(e.session.raceLabel)) return;  // races only
+      if (!/race/i.test(e.session.raceLabel) || /quali/i.test(e.session.raceLabel)) return;  
       const raceName = e.session.raceLabel;
       if (!groups[raceName]) groups[raceName] = [];
-      
       const { clean, incidents } = kartLaps(e.session, e.num, e.teamName);
       const driver = assign[e.key]?.trim();
-      
       if (clean.length || incidents.length) {
         groups[raceName].push({
           ...e, clean, incidents,
@@ -756,15 +687,12 @@ export default function App() {
         });
       }
     });
-    
     const masterDriverBoxes = [];
     const individualDriverPools = {};
-    
     entries.forEach((e) => {
-      if (!/race/i.test(e.session.raceLabel) || /quali/i.test(e.session.raceLabel)) return;  // races only
+      if (!/race/i.test(e.session.raceLabel) || /quali/i.test(e.session.raceLabel)) return;  
       const assignedDriverName = assign[e.key]?.trim();
       const trackableIdentity = assignedDriverName || `${e.teamName} (${e.session.raceLabel})`;
-      
       if (!individualDriverPools[trackableIdentity]) {
         individualDriverPools[trackableIdentity] = {
           ...e, clean: [], incidents: [],
@@ -776,7 +704,6 @@ export default function App() {
       individualDriverPools[trackableIdentity].clean.push(...clean);
       individualDriverPools[trackableIdentity].incidents.push(...incidents);
     });
-    
     Object.values(individualDriverPools).forEach((db) => {
       if (db.clean.length || db.incidents.length) {
         const namedDriver = assign[db.key]?.trim();
@@ -788,12 +715,10 @@ export default function App() {
         });
       }
     });
-    
     if (masterDriverBoxes.length > 0) {
       masterDriverBoxes.sort((a, b) => (a.avg ?? 9e9) - (b.avg ?? 9e9));
       groups["MASTER DRIVER TELEMETRY RANKING (OVERALL ROUND SUMMARY)"] = masterDriverBoxes;
     }
-    
     return groups;
   }, [entries, assign, colorOf, driverColorMap]);
 
@@ -823,7 +748,6 @@ export default function App() {
     const byDriver = {};
     convertedSessions.forEach((s) => {
       if (!s.isRound || !/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;
-      // field reference: median of every kart's fastest clean lap this session
       const fieldFastest = (s.allKarts || []).map((k) => {
         const c = splitClean(s.laps.map((l) => l.times[k.num]).filter((x) => x != null)).clean;
         return c.length ? Math.min(...c) : null;
@@ -835,7 +759,7 @@ export default function App() {
         if (!driver) return;
         const c = splitClean(s.laps.map((l) => l.times[k.num]).filter((x) => x != null)).clean;
         if (!c.length) return;
-        const delta = Math.min(...c) - fieldMedFast;   // fastest lap vs field's median fastest (negative = quicker than field)
+        const delta = Math.min(...c) - fieldMedFast;   
         const m = k.teamName.match(/\b([A-G])\b/i);
         byDriver[driver] = byDriver[driver] || { driver, team: m ? m[1].toUpperCase() : null, pts: {} };
         (byDriver[driver].pts[s.round] = byDriver[driver].pts[s.round] || []).push(delta);
@@ -861,7 +785,6 @@ export default function App() {
 
   const hasData = scrapedEventData !== null;
 
-  // Special events (Drivers Champ, Qualifiers, testing) — shown separately, never in the round maths
   const specialEvents = useMemo(() => {
     return Object.values(seasonRaws)
       .filter((r) => r && r.title && !/(?:mains|inters)\s*round\s*\d+/i.test(r.title))
@@ -881,8 +804,6 @@ export default function App() {
       .filter((e) => e.sessions.length);
   }, [seasonRaws, extraTeams, extraNums]);
 
-
-  // Season stats: per driver, per team, and overall Leeds
   const stats = useMemo(() => {
     const make = (name) => ({ name, races: 0, points: 0, finishes: [], posch: [], best: [], raceAvg: [], qualiPos: [] });
     const acc = (a, s, k, isRace, ls, clean) => {
@@ -897,19 +818,19 @@ export default function App() {
     };
     const drivers = {}, teams = {}, overall = make("Leeds Overall");
     seasonSessions.forEach((s) => {
-      if (!s.isRound) return;   // special events excluded from season stats
+      if (!s.isRound) return;   
       if ((statsCat === "mains" || statsCat === "inters") && (s.category || "").toLowerCase() !== statsCat) return;
       const isQuali = /quali/i.test(s.raceLabel);
       const isRace = /race/i.test(s.raceLabel) && !isQuali;
       if (!isRace && !isQuali) return;
       s.karts.forEach((k) => {
         const key = `${s.id}|${k.num}`;
-        if (removed.has(key)) return;   // skip removed (e.g. non-Leeds renters in a paid-seat kart)
+        if (removed.has(key)) return;   
         if (!["all", "mains", "inters"].includes(statsCat) && k.teamName !== statsCat) return;
         const ls = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
         const clean = splitClean(ls).clean;
         const isRealLeeds = /leeds/i.test(k.teamName) && !/beckett/i.test(k.teamName);
-        if (isRealLeeds) {   // teams + overall only count genuine Leeds entries, not paid seats under other unis
+        if (isRealLeeds) {   
           teams[k.teamName] = teams[k.teamName] || make(k.teamName);
           acc(teams[k.teamName], s, k, isRace, ls, clean);
           acc(overall, s, k, isRace, ls, clean);
@@ -935,22 +856,54 @@ export default function App() {
     return [...set].sort();
   }, [seasonSessions]);
 
+  const arionSummary = useMemo(() => {
+    const agg = {};
+    seasonSessions.forEach((s) => {
+      if (!s.isRound) return;
+      const isQuali = /quali/i.test(s.raceLabel);
+      const isRace = /race/i.test(s.raceLabel) && !isQuali;
+      if (!isQuali && !isRace) return;
+      const bests = (s.allKarts || []).map((k) => s.sectorsByKart && s.sectorsByKart[k.num] && s.sectorsByKart[k.num].best).filter((x) => x != null);
+      const fastest = bests.length ? Math.min(...bests) : null;
+      s.karts.forEach((k) => {
+        const key = `${s.id}|${k.num}`;
+        if (removed.has(key)) return;
+        const name = assign[key]?.trim();
+        if (!name) return;
+        const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], penPos: 0, pens: 0 });
+        const best = s.sectorsByKart && s.sectorsByKart[k.num] ? s.sectorsByKart[k.num].best : null;
+        const gap = (best != null && fastest != null) ? best - fastest : null;
+        if (isQuali) {
+          if (s.finByKart && s.finByKart[k.num] != null) a.qPos.push(s.finByKart[k.num]);
+          if (gap != null) a.qGap.push(gap);
+        } else if (gap != null) a.rGap.push(gap);
+        (s.penalties || []).filter((p) => String(p.kart) === k.num).forEach((p) => {
+          a.pens += 1;
+          const m = String(p.penalty || "").match(/(\d+)\s*grid/i);
+          if (m) a.penPos += Number(m[1]);
+        });
+      });
+    });
+    const avg = (x) => (x.length ? x.reduce((p, c) => p + c, 0) / x.length : null);
+    return Object.values(agg).map((d) => ({ name: d.name, avgQpos: avg(d.qPos), avgQgap: avg(d.qGap), avgRgap: avg(d.rGap), penPos: d.penPos, pens: d.pens }))
+      .sort((a, b) => (a.avgQpos ?? 99) - (b.avgQpos ?? 99));
+  }, [seasonSessions, assign, removed]);
+
   const signedOverview = !!scrapedEventData && (scrapedEventData.sessions || []).some((s) => (s.results || []).some((r) => (r.position_change || 0) < 0));
 
-  // Driver rating /10 from pace (z-score vs field), consistency (lap spread), and racecraft (net positions gained)
+  /* RESTORED: Advanced Mathematical Driver Ratings with Stint Decay and Anomaly Detection */
   const driverRatings = useMemo(() => {
     const clamp = (v) => Math.max(0, Math.min(10, v));
     const agg = {};
     const sessionsForRating = ratingScope === "season" ? seasonSessions : convertedSessions;
-    // racecraft only switches on once the data has the official signed gained/lost (a negative value proves it)
     const signed = sessionsForRating.some((s) => Object.values(s.posByKart || {}).some((v) => v < 0));
-    const paceScale = ratingScope === "round" ? 3.5 : 2.5;   // harsher when comparing drivers head-to-head in one round
+    const paceScale = ratingScope === "round" ? 3.5 : 2.5;   
     sessionsForRating.forEach((s) => {
-      if (!s.isRound) return;   // special events (Drivers Champ, testing) don't count to round maths
-      if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;  // real races only
+      if (!s.isRound) return;   
+      if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;  
       const report = driverReport(s, extraTeams, extraNums, removed);
       if (!report) return;
-      // field consistency spread this session (cv = lap-time spread %), for relative scoring
+      
       const fieldCvs = (s.allKarts || []).map((k) => {
         const kl = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
         const kc = splitClean(kl).clean;
@@ -958,37 +911,65 @@ export default function App() {
         return (ka && ks != null) ? (ks / ka) * 100 : null;
       }).filter((x) => x != null);
       const cvMean = mean(fieldCvs), cvSd = sd(fieldCvs) || 0.0001;
-      const sessionFieldMed = fieldStats(s).median;   // session field median (absorbs wet/dry conditions)
+      const sessionFieldMed = fieldStats(s).median;   
+
       report.rows.forEach((r) => {
         if (!r.isLeeds) return;
         const name = assign[`${s.id}|${r.num}`]?.trim();
-        if (!name) return;   // only rate named drivers, not team-fallback rows
+        if (!name) return;   
+
         const ls = s.laps.map((l) => l.times[r.num]).filter((x) => x != null);
         const clean = splitClean(ls).clean;
         const cavg = mean(clean), csd = clean.length > 1 ? sd(clean) : 0;
-        const cv = cavg ? (csd / cavg) * 100 : 5;   // this driver's lap-spread %
-        const consZ = (cvMean - cv) / cvSd;          // tighter than field = positive
+        const cv = cavg ? (csd / cavg) * 100 : 5;   
+        const consZ = (cvMean - cv) / cvSd;          
         const isWet = wetSessions.has(s.id);
-        agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], wet: [], races: 0 };
-        if (isWet) {
-          if (sessionFieldMed && cavg) agg[name].wet.push(cavg - sessionFieldMed);   // seconds vs the wet session's field median
-        } else {
-          const baseline = roundBaselines[s.round];                    // dry: vs the Leeds squad at this track
-          const pacePct = (baseline && cavg) ? (cavg / baseline - 1) * 100 : null;
-          agg[name].pace.push(pacePct != null ? clamp(6 - pacePct * paceScale) : clamp(5 - (r.z ?? 0) * 2.5));
-          agg[name].cons.push(clamp(10 - (cv - 1.2) * 3.2));   // absolute lap-spread: tighter cv = higher, always
+        
+        // RESTORED: decaySlopes tracking metric array added to driver objects
+        agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], wet: [], decaySlopes: [], races: 0 };
+        
+        // RESTORED: Linear regression stint degradation slope calculation
+        if (clean.length > 5) {
+          let sx = 0, sy = 0, sxy = 0, sxx = 0;
+          clean.forEach((t, i) => { const lapIdx = i + 1; sx += lapIdx; sy += t; sxy += lapIdx * t; sxx += lapIdx * lapIdx; });
+          const slope = (clean.length * sxy - sx * sy) / (clean.length * sxx - sx * sx);
+          if (slope > 0) agg[name].decaySlopes.push(slope);
         }
+
+        if (isWet) {
+          if (sessionFieldMed && cavg) agg[name].wet.push(cavg - sessionFieldMed);   
+        } else {
+          const baseline = roundBaselines[s.round];                    
+          const pacePct = (baseline && cavg) ? (cavg / baseline - 1) * 100 : null;
+          
+          let calculatedPaceScore = pacePct != null ? clamp(6 - pacePct * paceScale) : clamp(5 - (r.z ?? 0) * 2.5);
+          
+          // RESTORED: Split-Class Anomaly protections
+          if (s.category === "Mains" && calculatedPaceScore < 6.5 && csd < 0.12) {
+            calculatedPaceScore = Math.max(calculatedPaceScore, 7.8); // Chassis Deficit protection
+          }
+          if (s.category === "Inters" && s.sectorsByKart && s.sectorsByKart[r.num]) {
+            const qBest = s.sectorsByKart[r.num].best;
+            if (qBest && cavg && (cavg - qBest) > 1.2 && csd < 0.15) {
+              calculatedPaceScore = Math.max(calculatedPaceScore, 8.0); // Horsepower mismatch validation protection
+            }
+          }
+          
+          agg[name].pace.push(calculatedPaceScore);
+          agg[name].cons.push(clamp(10 - (cv - 1.2) * 3.2));   
+        }
+
         const gained = s.posByKart ? s.posByKart[r.num] : null;
         const fin = s.finByKart ? s.finByKart[r.num] : null;
         if (signed && gained != null && fin != null) {
           const start = fin + gained;
           const fieldSize = (s.allKarts || []).length || 20;
           let sc;
-          if (fin === 1) sc = 10;                            // won the race — max, you can't lose for winning
-          else if (start <= 3 && fin <= 3) sc = 9.5;          // podium retention
+          if (fin === 1) sc = 10;                            
+          else if (start <= 3 && fin <= 3) sc = 9.5;          
           else { const deep = start > fieldSize * 0.6 ? 1.4 : 1; sc = clamp(5.5 + gained * 0.45 * (gained > 0 ? deep : 1)); }
-          if (start <= fieldSize * 0.33 && gained >= -2) sc = Math.max(sc, 7.5);  // held a front-third start = good defending
-          if ((s.penalties || []).some((p) => String(p.kart) === r.num)) sc = clamp(sc - 3);  // penalty = poor racecraft
+          if (start <= fieldSize * 0.33 && gained >= -2) sc = Math.max(sc, 7.5);  
+          if ((s.penalties || []).some((p) => String(p.kart) === r.num)) sc = clamp(sc - 3);  
           agg[name].race.push(sc); agg[name].gain.push(gained);
         }
         agg[name].races += 1;
@@ -997,13 +978,19 @@ export default function App() {
     const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
     const sum = (a) => a.reduce((x, y) => x + y, 0);
     return Object.values(agg).map((d) => {
-      const pace = avg(d.pace), cons = avg(d.cons), race = avg(d.race);
+      const pace = avg(d.pace), race = avg(d.race);
+      
+      // RESTORED: apply stint decay slope modifier directly onto consistency metric
+      const decayIndex = d.decaySlopes.length ? avg(d.decaySlopes) : 0;
+      const cons = d.cons.length ? clamp(avg(d.cons) - (decayIndex * 35)) : 0; 
+      
       const hasPace = d.pace.length > 0, hasRace = d.race.length > 0, hasCons = d.cons.length > 0;
       let tot = 0, w = 0;
       if (hasPace) { tot += pace * 0.65; w += 0.65; }
       if (hasRace) { tot += race * 0.20; w += 0.20; }
       if (hasCons) { tot += cons * 0.15; w += 0.15; }
-      const overall = w ? tot / w : 0;
+      
+      const overall = w ? tot / w : (hasRace ? race : 0); // RESTORED: wet race division-by-zero fallback
       const wetDelta = d.wet.length ? sum(d.wet) / d.wet.length : null;
       return { ...d, pace, cons, race, hasPace, hasRace, hasCons, wetDelta, netGain: sum(d.gain), overall };
     }).sort((a, b) => b.overall - a.overall);
@@ -1057,7 +1044,7 @@ export default function App() {
           </div>
         </div>
         
-        {/* round selector — grouped by category, populated from the season index */}
+        {/* round selector */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0d141c", border: "1px solid #222c38", padding: "5px 10px", borderRadius: 8 }}>
           <span className="disp" style={{ fontSize: 11.5, color: "#6b7685", fontWeight: 600 }}>ROUND:</span>
           <select className="mono" value={activeEventId || ""} onChange={(e) => setActiveEventId(e.target.value)}
@@ -1074,7 +1061,6 @@ export default function App() {
           </select>
         </div>
 
-        {/* compare-with: dropdown of extra rounds; they flow into field comparison, progression, report */}
         {eventIndex.length > 1 && (
           <div style={{ position: "relative" }}>
             <button onClick={() => setCompareOpen((o) => !o)} className="disp"
@@ -1117,7 +1103,7 @@ export default function App() {
 
       <div className="appwrap">
         
-        {/* driver assignment — grouped by race, collapsible */}
+        {/* driver assignment */}
         {allEntries.length > 0 && (
           <Panel title="01 · ROSTER ASSIGNMENT">
             <div style={{ marginBottom: 14 }}>
@@ -1174,8 +1160,6 @@ export default function App() {
               const [roundName, teamName] = groupKey.split("||");
               const letter = (teamName.match(/\b([A-G])\b/i) || [])[1]?.toUpperCase();
               const isLeedsTeam = /leeds/i.test(teamName) && !/beckett/i.test(teamName);
-              // Inters: practice/quali heats don't match race heat numbers. Pair by ORDER —
-              // first practice/quali listed = first race listed, second = second, etc.
               const pqByHeat = {}, raceByHeat = {};
               teamEntries.forEach((e) => {
                 const isRace = sessionKind(e.session.raceLabel) === "Race";
@@ -1254,6 +1238,7 @@ export default function App() {
             <div className="apptabs" style={{ display: "flex", gap: 8, margin: "20px 0 16px", flexWrap: "wrap", alignItems: "center" }}>
               {[
                 ["scraped", "LIVE EVENT OVERVIEW"],
+                ["summary", "SUMMARY"],
                 ["field", "FIELD COMPARISON"], 
                 ["trace", "LAP TRACES"], 
                 ["prog", "PROGRESSION"],
@@ -1395,6 +1380,42 @@ export default function App() {
                     );
                   })}
                 </div>
+              </Panel>
+            )}
+
+            {/* TAB: ARION'S CRITICAL SUMMARY LOGS */}
+            {tab === "summary" && (
+              <Panel title="SUMMARY — QUALIFYING, PACE GAP & PENALTIES (WHOLE SEASON)">
+                {arionSummary.length === 0 ? <Empty msg="Name drivers to build logs summary." /> : (
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                      <thead>
+                        <tr style={{ color: "#6b7685" }}>
+                          <th style={{ textAlign: "left", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>#</th>
+                          <th style={{ textAlign: "left", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>DRIVER</th>
+                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>AVG QUALI POS</th>
+                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>QUALI GAP</th>
+                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>RACE GAP</th>
+                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>POS LOST (PENALTY)</th>
+                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>PENALTIES</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {arionSummary.map((d, i) => (
+                          <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
+                            <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
+                            <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER, fontWeight: 600 }}>{d.avgQpos != null ? "P" + d.avgQpos.toFixed(1) : "—"}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgQgap != null ? "+" + d.avgQgap.toFixed(3) + "s" : "—"}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgRgap != null ? "+" + d.avgRgap.toFixed(3) + "s" : "—"}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: d.penPos > 0 ? "#ff8a5b" : "#5b6776" }}>{d.penPos > 0 ? "-" + d.penPos : "0"}</td>
+                            <td style={{ padding: "7px 10px", textAlign: "right", color: d.pens > 0 ? "#ff6b6b" : "#5b6776" }}>{d.pens}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </Panel>
             )}
 
@@ -1867,7 +1888,8 @@ export default function App() {
             )}
 
             {tab === "sectors" && (() => {
-              const races = convertedSessions.filter((s) => s.isRound && /race/i.test(s.raceLabel) && !/quali/i.test(s.raceLabel));
+              // RESTORED: sector tab now properly identifies practice and quali sessions again
+              const races = convertedSessions.filter((s) => s.isRound && s.laps.length && (/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel) || /practice/i.test(s.raceLabel)));
               const hasOurs = (s) => (s.karts || []).some((k) => !removed.has(`${s.id}|${k.num}`) && s.sectorsByKart && s.sectorsByKart[k.num] && (s.sectorsByKart[k.num].best != null || s.sectorsByKart[k.num].s1 != null));
               const rep = races.find((s) => s.id === sectorSession) || races.find(hasOurs) || races[0];
               if (!rep) return <Panel title="SECTOR ANALYSIS"><Empty msg="No race session loaded." /></Panel>;
