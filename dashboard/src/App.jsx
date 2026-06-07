@@ -827,12 +827,17 @@ export default function App() {
       const isRace = /race/i.test(s.raceLabel) && !isQuali;
       if (!isRace && !isQuali) return;
       s.karts.forEach((k) => {
+        const key = `${s.id}|${k.num}`;
+        if (removed.has(key)) return;   // skip removed (e.g. non-Leeds renters in a paid-seat kart)
         const ls = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
         const clean = splitClean(ls).clean;
-        teams[k.teamName] = teams[k.teamName] || make(k.teamName);
-        acc(teams[k.teamName], s, k, isRace, ls, clean);
-        acc(overall, s, k, isRace, ls, clean);
-        const dr = assign[`${s.id}|${k.num}`]?.trim();
+        const isRealLeeds = /leeds/i.test(k.teamName) && !/beckett/i.test(k.teamName);
+        if (isRealLeeds) {   // teams + overall only count genuine Leeds entries, not paid seats under other unis
+          teams[k.teamName] = teams[k.teamName] || make(k.teamName);
+          acc(teams[k.teamName], s, k, isRace, ls, clean);
+          acc(overall, s, k, isRace, ls, clean);
+        }
+        const dr = assign[key]?.trim();
         if (dr) { drivers[dr] = drivers[dr] || make(dr); acc(drivers[dr], s, k, isRace, ls, clean); }
       });
     });
@@ -845,7 +850,7 @@ export default function App() {
       teams: Object.values(teams).map(derive).sort((a, b) => b.points - a.points),
       overall: derive(overall),
     };
-  }, [seasonSessions, assign]);
+  }, [seasonSessions, assign, removed]);
 
   const signedOverview = !!scrapedEventData && (scrapedEventData.sessions || []).some((s) => (s.results || []).some((r) => (r.position_change || 0) < 0));
 
@@ -1596,7 +1601,7 @@ export default function App() {
                               border: `1px solid ${statsView === k ? AMBER : "#222c38"}`, background: statsView === k ? "#1a160a" : "#0b1017", color: statsView === k ? AMBER : "#8b97a7" }}>{l}</button>
                         ))}
                         <span style={{ flex: 1 }} />
-                        {[["cards", "CARDS"], ["chart", "CHART"]].map(([k, l]) => (
+                        {[["cards", "CARDS"], ["chart", "CHART"], ["table", "TABLE"]].map(([k, l]) => (
                           <button key={k} onClick={() => setStatsMode(k)} className="disp"
                             style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
                               border: `1px solid ${statsMode === k ? "#3da9fc" : "#222c38"}`, background: statsMode === k ? "#0b2030" : "#0b1017", color: statsMode === k ? "#3da9fc" : "#8b97a7" }}>{l}</button>
@@ -1615,6 +1620,33 @@ export default function App() {
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
+                      ) : statsMode === "table" ? (
+                        <div style={{ overflowX: "auto" }}>
+                          <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 640 }}>
+                            <thead>
+                              <tr style={{ color: "#6b7685" }}>
+                                {["#", statsView === "teams" ? "TEAM" : "DRIVER", "RACES", "POINTS", "AVG FINISH", "TOTAL +/-", "BEST LAP", "RACE PACE", "BEST QUALI"].map((h, i) => (
+                                  <th key={h} style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {list.map((d, i) => (
+                                <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
+                                  <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
+                                  <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#43d977", fontWeight: 700 }}>{d.points}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgFinish != null ? d.avgFinish.toFixed(1) : "—"}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: d.totalPosCh == null ? "#5b6776" : d.totalPosCh >= 0 ? "#43d977" : "#ff8a5b" }}>{posCh(d.totalPosCh)}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER }}>{d.bestLap != null ? fmt(d.bestLap) : "—"}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.racePace != null ? fmt(d.racePace) : "—"}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.bestQualiPos != null ? "P" + d.bestQualiPos : "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
                           {list.map((d, i) => (
