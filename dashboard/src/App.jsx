@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Legend,
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, ReferenceLine, Legend, Cell,
 } from "recharts";
 
 /* ---------- theme ---------- */
@@ -417,6 +417,8 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
   return data.sessions.map((s) => {
     const raceLabel = s.label || `Race ${s.session_id}`;
     const round = data.title || "Round";
+    const isRound = /(?:mains|inters)\s*round\s*\d+/i.test(round);
+    const category = /main/i.test(round) ? "Mains" : /inter/i.test(round) ? "Inters" : "Other";
     const ours = (r) => isOurTeam(r.team, extraTeams) || extraNums.includes(String(r.kart || ""));
     const karts = (s.results || []).filter(ours).map((r) => ({ num: String(r.kart || ""), teamName: r.team })).filter((k) => k.num);
     let laps = [];
@@ -441,7 +443,7 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
     }
     const seen = new Set(); const allKarts = [];
     (s.results || []).forEach((r) => { const num = String(r.kart || ""); if (num && !seen.has(num)) { seen.add(num); allKarts.push({ num, teamName: r.team || num }); } });
-    return { id: `scraped__${s.session_id}`, name: s.label, title: s.label, round, raceLabel, karts, allKarts, laps,
+    return { id: `scraped__${s.session_id}`, name: s.label, title: s.label, round, isRound, category, raceLabel, karts, allKarts, laps,
       penalties: (s.penalties || []).filter((p) => isOurTeam(p.team, extraTeams) || extraNums.includes(String(p.kart || ""))),
       posByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position_change) || 0])),
       finByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position) || null])),
@@ -463,6 +465,7 @@ export default function App() {
   const [debriefScope, setDebriefScope] = useState("overall");
   const [debriefTime, setDebriefTime] = useState("season");
   const [statsView, setStatsView] = useState("drivers");
+  const [statsMode, setStatsMode] = useState("cards");
   const [extraInput, setExtraInput] = useState(() => LS("extra", ""));
   const [compareIds, setCompareIds] = useState(() => LS("compareIds", []));
   const [compareCache, setCompareCache] = useState({});
@@ -554,6 +557,7 @@ export default function App() {
     const evs = [];
     Object.values(seasonRaws).forEach((raw) => {
       if (!raw || !raw.title) return;
+      if (!/(?:mains|inters)\s*round\s*\d+/i.test(raw.title)) return;   // special events out of the pace baseline
       let date = null; const leeds = [];
       (raw.sessions || []).forEach((s) => {
         const lab = s.label || s.title || "";
@@ -782,6 +786,27 @@ export default function App() {
 
   const hasData = scrapedEventData !== null;
 
+  // Special events (Drivers Champ, Qualifiers, testing) — shown separately, never in the round maths
+  const specialEvents = useMemo(() => {
+    return Object.values(seasonRaws)
+      .filter((r) => r && r.title && !/(?:mains|inters)\s*round\s*\d+/i.test(r.title))
+      .map((r) => ({
+        title: r.title,
+        date: ((r.sessions || []).find((s) => s.date) || {}).date || null,
+        sessions: (r.sessions || [])
+          .filter((s) => /race/i.test(s.label || "") && !/practice/i.test(s.label || ""))
+          .map((s) => ({
+            label: tidyLabel(s.label || ""),
+            winner: ((s.results || [])[0] || {}).team || null,
+            ours: (s.results || [])
+              .filter((x) => isOurTeam(x.team, extraTeams) || extraNums.includes(String(x.kart || "")))
+              .map((x) => ({ team: x.team, kart: x.kart, pos: x.position, pts: x.points })),
+          })),
+      }))
+      .filter((e) => e.sessions.length);
+  }, [seasonRaws, extraTeams, extraNums]);
+
+
   // Season stats: per driver, per team, and overall Leeds
   const stats = useMemo(() => {
     const make = (name) => ({ name, races: 0, points: 0, finishes: [], posch: [], best: [], raceAvg: [], qualiPos: [] });
@@ -797,6 +822,7 @@ export default function App() {
     };
     const drivers = {}, teams = {}, overall = make("Leeds Overall");
     seasonSessions.forEach((s) => {
+      if (!s.isRound) return;   // special events excluded from season stats
       const isQuali = /quali/i.test(s.raceLabel);
       const isRace = /race/i.test(s.raceLabel) && !isQuali;
       if (!isRace && !isQuali) return;
@@ -832,6 +858,7 @@ export default function App() {
     const signed = sessionsForRating.some((s) => Object.values(s.posByKart || {}).some((v) => v < 0));
     const paceScale = ratingScope === "round" ? 3.5 : 2.5;   // harsher when comparing drivers head-to-head in one round
     sessionsForRating.forEach((s) => {
+      if (!s.isRound) return;   // special events (Drivers Champ, testing) don't count to round maths
       if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;  // real races only
       const report = driverReport(s, extraTeams, extraNums);
       if (!report) return;
@@ -1123,7 +1150,8 @@ export default function App() {
                 ["report", "DRIVER REPORT"],
                 ["rating", "DRIVER RATING"],
                 ["debrief", "AI DEBRIEF"],
-                ["stats", "STATS"]
+                ["stats", "STATS"],
+                ["special", "SPECIAL EVENTS"]
               ].map(([k, l]) => (
                 <button key={k} onClick={() => setTab(k)} className="disp"
                   style={{ padding: "8px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer",
@@ -1561,15 +1589,33 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
                         {[["drivers", "BY DRIVER"], ["teams", "BY TEAM"]].map(([k, l]) => (
                           <button key={k} onClick={() => setStatsView(k)} className="disp"
                             style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
                               border: `1px solid ${statsView === k ? AMBER : "#222c38"}`, background: statsView === k ? "#1a160a" : "#0b1017", color: statsView === k ? AMBER : "#8b97a7" }}>{l}</button>
                         ))}
+                        <span style={{ flex: 1 }} />
+                        {[["cards", "CARDS"], ["chart", "CHART"]].map(([k, l]) => (
+                          <button key={k} onClick={() => setStatsMode(k)} className="disp"
+                            style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+                              border: `1px solid ${statsMode === k ? "#3da9fc" : "#222c38"}`, background: statsMode === k ? "#0b2030" : "#0b1017", color: statsMode === k ? "#3da9fc" : "#8b97a7" }}>{l}</button>
+                        ))}
                       </div>
 
-                      {list.length === 0 ? <Empty msg="Name drivers in the roster to build stats." /> : (
+                      {list.length === 0 ? <Empty msg="Name drivers in the roster to build stats." /> : statsMode === "chart" ? (
+                        <ResponsiveContainer width="100%" height={Math.max(260, list.length * 34)}>
+                          <BarChart data={list} layout="vertical" margin={{ top: 4, right: 30, bottom: 4, left: 10 }}>
+                            <CartesianGrid stroke="#161d27" horizontal={false} />
+                            <XAxis type="number" stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} />
+                            <YAxis type="category" dataKey="name" width={110} stroke="#5b6776" tick={{ fontSize: 12, fontFamily: "IBM Plex Sans" }} />
+                            <Tooltip cursor={{ fill: "#ffffff08" }} contentStyle={{ background: "#0d141c", border: "1px solid #222c38", borderRadius: 8, fontFamily: "IBM Plex Mono", fontSize: 12 }} labelStyle={{ color: AMBER }} />
+                            <Bar dataKey="points" name="Points" radius={[0, 4, 4, 0]}>
+                              {list.map((e, i) => <Cell key={i} fill={i === 0 ? AMBER : "#3da9fc"} />)}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
                           {list.map((d, i) => (
                             <div key={d.name} style={{ background: "#0b1017", border: "1px solid #1b2430", borderRadius: 10, padding: "14px 16px" }}>
@@ -1598,6 +1644,39 @@ export default function App() {
                     </>
                   );
                 })()}
+              </Panel>
+            )}
+
+            {tab === "special" && (
+              <Panel title="SPECIAL EVENTS">
+                <div className="mono" style={{ fontSize: 11, color: "#5b6776", marginBottom: 16 }}>
+                  One-off events (Drivers Championship, Qualifiers, testing). Shown on their own and never counted in the round ratings or stats.
+                </div>
+                {specialEvents.length === 0 ? (
+                  <Empty msg="No special events found in the loaded season." />
+                ) : specialEvents.map((e) => (
+                  <Collapsible key={e.title} title={e.title} subtitle={`${e.sessions.length} session${e.sessions.length === 1 ? "" : "s"}`}>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {e.sessions.map((s, si) => (
+                        <div key={si} style={{ background: "#080d13", borderRadius: 7, padding: "8px 12px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                            <span className="disp" style={{ color: "#e6edf3", fontWeight: 600, fontSize: 13 }}>{s.label}</span>
+                            {s.winner && <span className="mono" style={{ fontSize: 11.5, color: "#8b97a7" }}>Winner: <span style={{ color: AMBER }}>{s.winner}</span></span>}
+                          </div>
+                          {s.ours.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+                              {s.ours.map((o, oi) => (
+                                <span key={oi} className="mono" style={{ fontSize: 11, background: "#0b1017", border: "1px solid #2a3543", borderRadius: 6, padding: "3px 8px", color: "#c2cbd6" }}>
+                                  {o.team} #{o.kart} · P{o.pos} · {o.pts || 0} pts
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </Collapsible>
+                ))}
               </Panel>
             )}
 
