@@ -161,7 +161,7 @@ function racecraftGain(session) {
   return gained;
 }
 
-function driverReport(session, leedsNums = [], extraNums = []) {
+function driverReport(session, leedsNums = [], extraNums = [], removedSet = null) {
   if (!session || !session.laps || !session.laps.length) return null;
   const fieldKarts = (session.allKarts && session.allKarts.length) ? session.allKarts : session.karts;
   const nums = fieldKarts.map((k) => k.num);
@@ -187,7 +187,8 @@ function driverReport(session, leedsNums = [], extraNums = []) {
     const zs = shown.map((x) => (lapStats[x.lap] ? (x.t - lapStats[x.lap].m) / lapStats[x.lap].s : null)).filter((z) => z != null);
     const m = k.teamName.match(/\b([A-G])\b/i);
     const isLeedsProper = /leeds/i.test(k.teamName) && !/beckett/i.test(k.teamName);
-    const isLeeds = isOurTeam(k.teamName, leedsNums) || (extraNums || []).includes(String(k.num));
+    const isRemoved = removedSet && removedSet.has(`${session.id}|${k.num}`);
+    const isLeeds = !isRemoved && (isOurTeam(k.teamName, leedsNums) || (extraNums || []).includes(String(k.num)));
     return {
       num: k.num, team: k.teamName, isLeeds, teamLetter: isLeedsProper && m ? m[1].toUpperCase() : null,
       fastest, avg: mean(times), sd: sd(times), z: zs.length ? mean(zs) : null,
@@ -207,7 +208,17 @@ function ReportTable({ report, nameOf }) {
   const ticks = Array.from({ length: 6 }, (_, i) => lo + (i / 5) * (hi - lo));
   const col = (r) => (r.isLeeds ? (TEAM_COLORS[r.teamLetter] || AMBER) : "#48566a");
   const cell = { padding: "0 8px", textAlign: "right", color: "#c2cbd6" };
-  const head = { padding: "4px 8px", textAlign: "right", color: "#6b7685", fontWeight: 500, letterSpacing: "0.5px" };
+  const head = { padding: "4px 8px", textAlign: "right", color: "#6b7685", fontWeight: 500, letterSpacing: "0.5px", cursor: "pointer", userSelect: "none" };
+  const [sort, setSort] = useState({ key: "avg", dir: "asc" });
+  const arrow = (k) => (sort.key === k ? (sort.dir === "asc" ? " ▴" : " ▾") : "");
+  const hCol = (k) => (sort.key === k ? AMBER : "#6b7685");
+  const clickSort = (k) => () => setSort((s) => ({ key: k, dir: s.key === k && s.dir === "asc" ? "desc" : "asc" }));
+  const rows = [...report.rows].sort((a, b) => {
+    const m = sort.dir === "asc" ? 1 : -1, k = sort.key;
+    if (k === "driver") return m * String(nameOf(a.num) || a.team).localeCompare(String(nameOf(b.num) || b.team));
+    const av = a[k] == null ? Infinity : a[k], bv = b[k] == null ? Infinity : b[k];
+    return m * (av - bv);
+  });
   return (
     <div style={{ overflowX: "auto" }}>
       <div style={{ minWidth: 760 }}>
@@ -215,7 +226,7 @@ function ReportTable({ report, nameOf }) {
         <div className="mono" style={{ display: "grid", gridTemplateColumns: `28px 190px ${PW}px 64px 64px 56px 52px 64px`,
           alignItems: "end", fontSize: 10.5, borderBottom: "1px solid #1e2733", paddingBottom: 4 }}>
           <div style={head}>#</div>
-          <div style={{ ...head, textAlign: "left" }}>DRIVER / KART</div>
+          <div style={{ ...head, textAlign: "left", color: hCol("driver") }} onClick={clickSort("driver")}>DRIVER / KART{arrow("driver")}</div>
           <svg width={PW} height="16" style={{ overflow: "visible" }}>
             {ticks.map((tv, i) => (
               <text key={i} x={x(tv)} y="12" textAnchor="middle" fill="#5b6776" fontSize="9.5" fontFamily="IBM Plex Mono">
@@ -223,14 +234,14 @@ function ReportTable({ report, nameOf }) {
               </text>
             ))}
           </svg>
-          <div style={head}>AVG</div>
-          <div style={head}>FAST</div>
-          <div style={head}>STD</div>
-          <div style={head}>Z</div>
-          <div style={head}>SHOWN</div>
+          <div style={{ ...head, color: hCol("avg") }} onClick={clickSort("avg")}>AVG{arrow("avg")}</div>
+          <div style={{ ...head, color: hCol("fastest") }} onClick={clickSort("fastest")}>FAST{arrow("fastest")}</div>
+          <div style={{ ...head, color: hCol("sd") }} onClick={clickSort("sd")}>STD{arrow("sd")}</div>
+          <div style={{ ...head, color: hCol("z") }} onClick={clickSort("z")}>Z{arrow("z")}</div>
+          <div style={{ ...head, color: hCol("shown") }} onClick={clickSort("shown")}>SHOWN{arrow("shown")}</div>
         </div>
         {/* rows */}
-        {report.rows.map((r, i) => {
+        {rows.map((r, i) => {
           const s = [...r.times].sort((a, b) => a - b);
           const q1 = quantile(s, 0.25), med = quantile(s, 0.5), q3 = quantile(s, 0.75);
           const c = col(r);
@@ -467,6 +478,8 @@ export default function App() {
   const [statsView, setStatsView] = useState("drivers");
   const [statsMode, setStatsMode] = useState("cards");
   const [statsCat, setStatsCat] = useState("all");
+  const [progSel, setProgSel] = useState(null);
+  const [statsSort, setStatsSort] = useState({ key: "points", dir: "desc" });
   const [adminPw, setAdminPw] = useState("");
   const [syncMsg, setSyncMsg] = useState("");
   const [syncing, setSyncing] = useState(false);
@@ -704,6 +717,7 @@ export default function App() {
     const groups = {};
     
     entries.forEach((e) => {
+      if (!/race/i.test(e.session.raceLabel) || /quali/i.test(e.session.raceLabel)) return;  // races only
       const raceName = e.session.raceLabel;
       if (!groups[raceName]) groups[raceName] = [];
       
@@ -726,6 +740,7 @@ export default function App() {
     const individualDriverPools = {};
     
     entries.forEach((e) => {
+      if (!/race/i.test(e.session.raceLabel) || /quali/i.test(e.session.raceLabel)) return;  // races only
       const assignedDriverName = assign[e.key]?.trim();
       const trackableIdentity = assignedDriverName || `${e.teamName} (${e.session.raceLabel})`;
       
@@ -862,13 +877,14 @@ export default function App() {
     const drivers = {}, teams = {}, overall = make("Leeds Overall");
     seasonSessions.forEach((s) => {
       if (!s.isRound) return;   // special events excluded from season stats
-      if (statsCat !== "all" && (s.category || "").toLowerCase() !== statsCat) return;
+      if ((statsCat === "mains" || statsCat === "inters") && (s.category || "").toLowerCase() !== statsCat) return;
       const isQuali = /quali/i.test(s.raceLabel);
       const isRace = /race/i.test(s.raceLabel) && !isQuali;
       if (!isRace && !isQuali) return;
       s.karts.forEach((k) => {
         const key = `${s.id}|${k.num}`;
         if (removed.has(key)) return;   // skip removed (e.g. non-Leeds renters in a paid-seat kart)
+        if (!["all", "mains", "inters"].includes(statsCat) && k.teamName !== statsCat) return;
         const ls = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
         const clean = splitClean(ls).clean;
         const isRealLeeds = /leeds/i.test(k.teamName) && !/beckett/i.test(k.teamName);
@@ -892,6 +908,12 @@ export default function App() {
     };
   }, [seasonSessions, assign, removed, statsCat]);
 
+  const leedsTeamNames = useMemo(() => {
+    const set = new Set();
+    seasonSessions.forEach((s) => s.karts.forEach((k) => { if (/leeds/i.test(k.teamName) && !/beckett/i.test(k.teamName)) set.add(k.teamName); }));
+    return [...set].sort();
+  }, [seasonSessions]);
+
   const signedOverview = !!scrapedEventData && (scrapedEventData.sessions || []).some((s) => (s.results || []).some((r) => (r.position_change || 0) < 0));
 
   // Driver rating /10 from pace (z-score vs field), consistency (lap spread), and racecraft (net positions gained)
@@ -905,7 +927,7 @@ export default function App() {
     sessionsForRating.forEach((s) => {
       if (!s.isRound) return;   // special events (Drivers Champ, testing) don't count to round maths
       if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;  // real races only
-      const report = driverReport(s, extraTeams, extraNums);
+      const report = driverReport(s, extraTeams, extraNums, removed);
       if (!report) return;
       // field consistency spread this session (cv = lap-time spread %), for relative scoring
       const fieldCvs = (s.allKarts || []).map((k) => {
@@ -1227,13 +1249,6 @@ export default function App() {
                   {l}
                 </button>
               ))}
-              {tab !== "scraped" && (
-                <label className="mono" style={{ marginLeft: "auto", fontSize: 12, color: "#8b97a7",
-                  display: "flex", alignItems: "center", gap: 7, cursor: "pointer" }}>
-                  <input type="checkbox" checked={cleanOnly} onChange={(e) => setCleanOnly(e.target.checked)} />
-                  exclude incident laps
-                </label>
-              )}
             </div>
 
             {/* TAB: EVENT OVERVIEW */}
@@ -1368,10 +1383,12 @@ export default function App() {
                     ⚠️ NOTIFICATION: Scraper ran without full metrics sheets. Run your dad's script layout file using <span style={{ color: "#fff" }}>--full</span> (e.g., <span style={{ color: "#fff" }}>python scraper.py --event {activeEventId} --full</span>) to download and plot distribution charts.
                   </div>
                 )}
-                {Object.entries(fieldComparisonGroups).map(([groupName, groupBoxes]) => {
+                {Object.entries(fieldComparisonGroups)
+                  .sort(([a], [b]) => (b.includes("SUMMARY") ? 1 : 0) - (a.includes("SUMMARY") ? 1 : 0))
+                  .map(([groupName, groupBoxes]) => {
                   const isSummary = groupName.includes("SUMMARY");
                   return (
-                    <Collapsible key={groupName} defaultOpen={false}
+                    <Collapsible key={groupName} defaultOpen={isSummary}
                       accent={isSummary ? AMBER : "#8b97a7"}
                       title={`${isSummary ? "🏆" : "📊"} ${tidyLabel(groupName)}`}
                       subtitle={`${groupBoxes.length} ${isSummary ? "drivers" : "entr" + (groupBoxes.length === 1 ? "y" : "ies")}`}>
@@ -1445,7 +1462,23 @@ export default function App() {
               <Panel title="DRIVER PROGRESSION — FASTEST LAP vs FIELD, BY ROUND">
                 {progression.drivers.length === 0 ? (
                   <Empty msg="Assign driver names above, and load telemetry lap sheets, to generate stats metrics charts." />
-                ) : (
+                ) : (() => {
+                  const active = progSel || progression.drivers.map((d) => d.driver);
+                  return (
+                  <>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                    {progression.drivers.map((d, di) => {
+                      const on = active.includes(d.driver); const col = DRIVER_PALETTE[di % DRIVER_PALETTE.length];
+                      return (
+                        <button key={d.driver} className="mono"
+                          onClick={() => setProgSel(on ? active.filter((x) => x !== d.driver) : [...active, d.driver])}
+                          style={{ fontSize: 11, padding: "4px 9px", borderRadius: 6, cursor: "pointer",
+                            border: `1px solid ${col}`, opacity: on ? 1 : 0.35, background: on ? `${col}1f` : "#0b1017", color: col }}>
+                          {d.driver}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <ResponsiveContainer width="100%" height={380}>
                     <LineChart data={progression.data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
                       <CartesianGrid stroke="#161d27" />
@@ -1457,24 +1490,25 @@ export default function App() {
                       <Tooltip formatter={(v) => (typeof v === "number" ? v.toFixed(2) + "s" : v)}
                         contentStyle={{ background: "#0d141c", border: "1px solid #222c38", borderRadius: 8,
                         fontFamily: "IBM Plex Mono", fontSize: 12 }} labelStyle={{ color: AMBER }} />
-                      <Legend wrapperStyle={{ fontSize: 12, fontFamily: "IBM Plex Sans" }} />
-                      {progression.drivers.map((d, di) => (
+                      {progression.drivers.map((d, di) => active.includes(d.driver) && (
                         <Line key={d.driver} dataKey={d.driver}
                           stroke={DRIVER_PALETTE[di % DRIVER_PALETTE.length]}
                           strokeWidth={2} dot={{ r: 3 }} connectNulls isAnimationActive={false} />
                       ))}
                     </LineChart>
                   </ResponsiveContainer>
-                )}
+                  </>
+                  );
+                })()}
               </Panel>
             )}
 
             {tab === "report" && (() => {
-              const races = convertedSessions.filter((s) => s.laps.length);
+              const races = convertedSessions.filter((s) => s.laps.length && !/practice/i.test(s.raceLabel));
               const rep = races.find((s) => s.id === reportSession)
                 || races.find((s) => /race/i.test(s.raceLabel)) || races[0];
               if (!rep) return <Panel title="DRIVER REPORT"><Empty msg="No session with lap data loaded." /></Panel>;
-              const report = driverReport(rep, extraTeams, extraNums);
+              const report = driverReport(rep, extraTeams, extraNums, removed);
               const nameOf = (num) => assign[`${rep.id}|${num}`]?.trim();
               return (
                 <Panel title="DRIVER REPORT — FASTEST 50% OF LAPS">
@@ -1585,10 +1619,11 @@ export default function App() {
                     const byDriver = {};
                     sessions.forEach((s) => {
                       if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel) || !inScope(s.round)) return;
-                      const rep = driverReport(s, extraTeams, extraNums); if (!rep) return;
+                      const rep = driverReport(s, extraTeams, extraNums, removed); if (!rep) return;
                       rep.rows.forEach((r) => {
                         if (!r.isLeeds) return;
-                        const name = assign[`${s.id}|${r.num}`]?.trim() || r.team;
+                        const name = assign[`${s.id}|${r.num}`]?.trim();
+                        if (!name) return;   // only named Leeds drivers, never team-name fallbacks
                         const d = byDriver[name] || (byDriver[name] = { name, avg: [], sd: [], z: [], gain: 0, races: 0 });
                         if (r.avg) d.avg.push(r.avg); if (r.sd != null) d.sd.push(r.sd); if (r.z != null) d.z.push(r.z);
                         if (s.posByKart && s.posByKart[r.num] != null) d.gain += s.posByKart[r.num];
@@ -1663,7 +1698,7 @@ export default function App() {
                               border: `1px solid ${statsView === k ? AMBER : "#222c38"}`, background: statsView === k ? "#1a160a" : "#0b1017", color: statsView === k ? AMBER : "#8b97a7" }}>{l}</button>
                         ))}
                         <span style={{ width: 14 }} />
-                        {[["all", "ALL"], ["mains", "MAINS"], ["inters", "INTERS"]].map(([k, l]) => (
+                        {[["all", "ALL"], ["mains", "MAINS"], ["inters", "INTERS"], ...leedsTeamNames.map((t) => [t, t.toUpperCase()])].map(([k, l]) => (
                           <button key={k} onClick={() => setStatsCat(k)} className="disp"
                             style={{ padding: "6px 12px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
                               border: `1px solid ${statsCat === k ? "#b06bff" : "#222c38"}`, background: statsCat === k ? "#1a0f2a" : "#0b1017", color: statsCat === k ? "#b06bff" : "#8b97a7" }}>{l}</button>
@@ -1690,16 +1725,29 @@ export default function App() {
                         </ResponsiveContainer>
                       ) : statsMode === "table" ? (
                         <div style={{ overflowX: "auto" }}>
+                          {(() => {
+                            const cols = [["#", null], [statsView === "teams" ? "TEAM" : "DRIVER", "name"], ["RACES", "races"], ["POINTS", "points"], ["AVG FINISH", "avgFinish"], ["TOTAL +/-", "totalPosCh"], ["BEST LAP", "bestLap"], ["RACE PACE", "racePace"], ["BEST QUALI", "bestQualiPos"]];
+                            const clickSort = (key) => { if (!key) return; setStatsSort((s) => ({ key, dir: s.key === key && s.dir === "desc" ? "asc" : "desc" })); };
+                            const sorted = [...list].sort((a, b) => {
+                              const k = statsSort.key, m = statsSort.dir === "asc" ? 1 : -1;
+                              if (k === "name") return m * String(a.name).localeCompare(String(b.name));
+                              const av = a[k] == null ? Infinity : a[k], bv = b[k] == null ? Infinity : b[k];
+                              return m * (av - bv);
+                            });
+                            return (
                           <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 640 }}>
                             <thead>
                               <tr style={{ color: "#6b7685" }}>
-                                {["#", statsView === "teams" ? "TEAM" : "DRIVER", "RACES", "POINTS", "AVG FINISH", "TOTAL +/-", "BEST LAP", "RACE PACE", "BEST QUALI"].map((h, i) => (
-                                  <th key={h} style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
+                                {cols.map(([h, key], i) => (
+                                  <th key={h} onClick={() => clickSort(key)} style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733",
+                                    fontWeight: 500, cursor: key ? "pointer" : "default", color: statsSort.key === key ? AMBER : "#6b7685", userSelect: "none" }}>
+                                    {h}{statsSort.key === key ? (statsSort.dir === "desc" ? " ▾" : " ▴") : ""}
+                                  </th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody>
-                              {list.map((d, i) => (
+                              {sorted.map((d, i) => (
                                 <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
                                   <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
                                   <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
@@ -1714,6 +1762,8 @@ export default function App() {
                               ))}
                             </tbody>
                           </table>
+                            );
+                          })()}
                         </div>
                       ) : (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
