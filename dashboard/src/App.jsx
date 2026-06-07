@@ -13,7 +13,8 @@ const DRIVER_PALETTE = [
 ];
 const AMBER = "#ffce3a";
 
-/* display-only: tidy an over-grabbed session label for grouping/headers. */
+/* display-only: tidy an over-grabbed session label for grouping/headers.
+   Mirrors the scraper's clean_label so existing JSON renders cleanly too. */
 const tidyLabel = (s) =>
   (String(s || "")
     .split(/\s+(?:Confirmed|Live|Provisional|Unconfirmed|Result)\b|\s+[·\u00b7]\s+|\s+\d{1,2}:\d{2}\b|\s+Winner:/)[0]
@@ -31,8 +32,12 @@ const raceToken = (s) => {
   if (/quali/.test(s)) return "qualifying";
   return s.replace(/[^a-z0-9]/g, "");
 };
-
+/* the heat number a session belongs to (works for "Race 4" and "Race 1: ... Qualifying").
+   Inters: practice/quali/race of the same heat share one driver, so this unifies them. */
 const sessionHeat = (label) => {
+  // strip "Round N" first so the round number is never mistaken for the heat,
+  // then take the Practice/Race/Qualifying/Heat number. Practice 3, Quali 3 and
+  // Race 3 all resolve to heat 3 so one driver name covers them.
   let s = String(label || "").replace(/round\s*\d+/i, "");
   const m = s.match(/(?:race|practice|heat|qualifying|quali)\s*0*(\d+)/i) || s.match(/^\s*0*(\d+)\b/);
   return m ? Number(m[1]) : null;
@@ -50,7 +55,7 @@ function parseLineupCsv(text) {
     const parts = (line.includes(",") ? line.split(",") : line.split(/\s*-\s*/)).map((p) => p.trim());
     if (parts.length < 3) return;
     const [team, race, driver] = parts;
-    if (/^team$/i.test(team)) return; 
+    if (/^team$/i.test(team)) return; // skip header row
     if (team && race && driver) rows.push({ team, race, driver });
   });
   return rows;
@@ -129,6 +134,12 @@ function fieldStats(session) {
   return { median: quantile(sorted, 0.5), best: sorted[0] ?? null, n: pooled.length };
 }
 
+/* ---------- B Pillar style driver report ---------- */
+/* Ranks every kart in a session on the fastest 50% of its clean laps.
+   Clean = lap 1 dropped, within 110% of class fastest AND 105% of own fastest.
+   Z-score = average per-lap standardised pace vs the field (negative = faster). */
+// Reconstruct net positions gained (signed) per kart from lap times alone:
+// rank by (laps completed, then cumulative time) at the first lap vs the finish.
 function racecraftGain(session) {
   const karts = (session.allKarts || []).map((k) => k.num);
   if (!session.laps || !session.laps.length || karts.length < 2) return {};
@@ -211,6 +222,7 @@ function ReportTable({ report, nameOf }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <div style={{ minWidth: 760 }}>
+        {/* header */}
         <div className="mono" style={{ display: "grid", gridTemplateColumns: `28px 190px ${PW}px 64px 64px 56px 52px 64px`,
           alignItems: "end", fontSize: 10.5, borderBottom: "1px solid #1e2733", paddingBottom: 4 }}>
           <div style={head}>#</div>
@@ -228,6 +240,7 @@ function ReportTable({ report, nameOf }) {
           <div style={{ ...head, color: hCol("z") }} onClick={clickSort("z")}>Z{arrow("z")}</div>
           <div style={{ ...head, color: hCol("shown") }} onClick={clickSort("shown")}>SHOWN{arrow("shown")}</div>
         </div>
+        {/* rows */}
         {rows.map((r, i) => {
           const s = [...r.times].sort((a, b) => a - b);
           const q1 = quantile(s, 0.25), med = quantile(s, 0.5), q3 = quantile(s, 0.75);
@@ -262,31 +275,52 @@ function ReportTable({ report, nameOf }) {
           );
         })}
       </div>
+      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
+        Ranked on the fastest 50% of laps, excluding lap 1, within 110% of class fastest and 105% of the driver's own fastest.
+        Z-score is average per-lap pace vs the field (negative = faster). Clear-air % and overtakes aren't shown — BUKC timing data doesn't expose traffic position per lap.
+      </div>
     </div>
   );
 }
 
+/* ---------- box plot ---------- */
 function BoxPlot({ boxes, fieldMedian }) {
   const allClean = boxes.flatMap((b) => b.clean).filter((x) => x != null && !isNaN(x));
   if (!allClean.length) return <Empty msg="No clean lap sheets data found to visualize." />;
 
   const sortedLaps = [...allClean].sort((a, b) => a - b);
+  
   let lo = quantile(sortedLaps, 0.01);
   let hi = quantile(sortedLaps, 0.99);
   
-  if (hi - lo < 0.5) { lo -= 1; hi += 1; } 
-  else { const paddingMultiplier = (hi - lo) * 0.20; lo = Math.max(0, lo - paddingMultiplier); hi = hi + paddingMultiplier; }
+  if (hi - lo < 0.5) {
+    lo -= 1;
+    hi += 1;
+  } else {
+    const paddingMultiplier = (hi - lo) * 0.20;
+    lo = Math.max(0, lo - paddingMultiplier);
+    hi = hi + paddingMultiplier;
+  }
 
   const W = Math.max(800, boxes.length * 115 + 140), H = 500;
   const padL = 70, padR = 40, padT = 40, padB = 120;
+
   const y = (v) => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
   const bw = (W - padL - padR) / boxes.length;
+
   const delta = hi - lo;
-  let gapInterval = delta > 60 ? 10 : delta > 40 ? 5 : delta > 20 ? 2 : delta > 8 ? 1 : 0.5;
+  let gapInterval = 1;
+  if (delta > 60) gapInterval = 10;
+  else if (delta > 40) gapInterval = 5;
+  else if (delta > 20) gapInterval = 2;
+  else if (delta > 8) gapInterval = 1;
+  else gapInterval = 0.5;
 
   const initialTick = Math.ceil(lo / gapInterval) * gapInterval;
   const customGridTicks = [];
-  for (let tick = initialTick; tick <= hi; tick += gapInterval) { customGridTicks.push(tick); }
+  for (let tick = initialTick; tick <= hi; tick += gapInterval) {
+    customGridTicks.push(tick);
+  }
 
   return (
     <div style={{ overflowX: "auto", background: "#0a0e14", borderRadius: 8, padding: "8px" }}>
@@ -294,50 +328,83 @@ function BoxPlot({ boxes, fieldMedian }) {
         {customGridTicks.map((tv, i) => (
           <g key={i}>
             <line x1={padL} x2={W - padR} y1={y(tv)} y2={y(tv)} stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
-            <text x={padL - 12} y={y(tv) + 4} textAnchor="end" fill="#64748b" fontSize="11" fontFamily="IBM Plex Mono">{tv.toFixed(1)}s</text>
+            <text x={padL - 12} y={y(tv) + 4} textAnchor="end" fill="#64748b"
+              fontSize="11" fontFamily="IBM Plex Mono, monospace">{tv.toFixed(1)}s</text>
           </g>
         ))}
+        
         {fieldMedian != null && y(fieldMedian) >= padT && y(fieldMedian) <= H - padB && (
           <g>
-            <line x1={padL} x2={W - padR} y1={y(fieldMedian)} y2={y(fieldMedian)} stroke={AMBER} strokeWidth="2" strokeDasharray="6 4" opacity="0.9" />
-            <text x={W - padR - 6} y={y(fieldMedian) - 8} textAnchor="end" fill={AMBER} fontSize="11" fontWeight="600" fontFamily="IBM Plex Mono">FIELD MEDIAN {fieldMedian.toFixed(3)}s</text>
+            <line x1={padL} x2={W - padR} y1={y(fieldMedian)} y2={y(fieldMedian)}
+              stroke={AMBER} strokeWidth="2" strokeDasharray="6 4" opacity="0.9" />
+            <text x={W - padR - 6} y={y(fieldMedian) - 8} textAnchor="end" fill={AMBER}
+              fontSize="11" fontWeight="600" fontFamily="IBM Plex Mono, monospace" letterSpacing="0.5">
+              FIELD MEDIAN {fieldMedian.toFixed(3)}s
+            </text>
           </g>
         )}
+
         {boxes.map((b, i) => {
           const cx = padL + bw * (i + 0.5);
           const halfBoxWidth = Math.min(35, bw * 0.35);
           const s = [...b.clean].sort((a, x) => a - x);
           if (!s.length) return null;
+
           const q1 = quantile(s, 0.25), med = quantile(s, 0.5), q3 = quantile(s, 0.75);
           const mn = s[0], mx = s[s.length - 1], mu = mean(s);
           const col = b.color;
+
           const safetyClampY = (val) => Math.max(padT, Math.min(H - padB, y(val)));
+
           return (
             <g key={i}>
               <line x1={cx} x2={cx} y1={safetyClampY(mx)} y2={safetyClampY(q3)} stroke={col} strokeWidth="1.5" />
               <line x1={cx} x2={cx} y1={safetyClampY(q1)} y2={safetyClampY(mn)} stroke={col} strokeWidth="1.5" />
-              {y(mx) >= padT && y(mx) <= H - padB && ( <line x1={cx - halfBoxWidth * 0.5} x2={cx + halfBoxWidth * 0.5} y1={y(mx)} y2={y(mx)} stroke={col} strokeWidth="1.5" /> )}
-              {y(mn) >= padT && y(mn) <= H - padB && ( <line x1={cx - halfBoxWidth * 0.5} x2={cx + halfBoxWidth * 0.5} y1={y(mn)} y2={y(mn)} stroke={col} strokeWidth="1.5" /> )}
-              <rect x={cx - halfBoxWidth} y={safetyClampY(q3)} width={halfBoxWidth * 2} height={Math.max(3, safetyClampY(q1) - safetyClampY(q3))} fill={col} fillOpacity="0.16" stroke={col} strokeWidth="1.8" rx="3" />
+              
+              {y(mx) >= padT && y(mx) <= H - padB && (
+                <line x1={cx - halfBoxWidth * 0.5} x2={cx + halfBoxWidth * 0.5} y1={y(mx)} y2={y(mx)} stroke={col} strokeWidth="1.5" />
+              )}
+              {y(mn) >= padT && y(mn) <= H - padB && (
+                <line x1={cx - halfBoxWidth * 0.5} x2={cx + halfBoxWidth * 0.5} y1={y(mn)} y2={y(mn)} stroke={col} strokeWidth="1.5" />
+              )}
+
+              <rect x={cx - halfBoxWidth} y={safetyClampY(q3)} width={halfBoxWidth * 2} height={Math.max(3, safetyClampY(q1) - safetyClampY(q3))}
+                fill={col} fillOpacity="0.16" stroke={col} strokeWidth="1.8" rx="3" />
+              
               <line x1={cx - halfBoxWidth} x2={halfBoxWidth + cx} y1={safetyClampY(med)} y2={safetyClampY(med)} stroke={col} strokeWidth="3" />
-              <line x1={cx - halfBoxWidth} x2={halfBoxWidth + cx} y1={safetyClampY(mu)} y2={safetyClampY(mu)} stroke="#cbd5e1" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.65" />
+              
+              <line x1={cx - halfBoxWidth} x2={halfBoxWidth + cx} y1={safetyClampY(mu)} y2={safetyClampY(mu)} stroke="#cbd5e1"
+                strokeWidth="1.2" strokeDasharray="3 3" opacity="0.65" />
+
               {b.incidents.map((iv, j) => {
                 const outlierY = y(iv);
-                if (outlierY < padT || outlierY > H - padB) return null;
-                return ( <circle key={j} cx={cx} cy={outlierY} r="3.5" fill="none" stroke={col} strokeOpacity="0.55" strokeWidth="1.2" /> );
+                if (outlierY < padT || outlierY > H - padB) return null; 
+                return (
+                  <circle key={j} cx={cx} cy={outlierY} r="3.5" fill="none" stroke={col} strokeOpacity="0.55" strokeWidth="1.2" />
+                );
               })}
-              <text x={cx} y={H - padB + 24} textAnchor="end" fill="#e2e8f0" fontSize="12" fontWeight="500" transform={`rotate(-32 ${cx} ${H - padB + 24})`}>{b.label}</text>
-              <text x={cx} y={H - padB + 42} textAnchor="end" fill="#475569" fontSize="10.5" transform={`rotate(-32 ${cx} ${H - padB + 42})`}>{b.sub}</text>
+
+              <text x={cx} y={H - padB + 24} textAnchor="end" fill="#e2e8f0" fontSize="12"
+                fontWeight="500" fontFamily="IBM Plex Sans, sans-serif" transform={`rotate(-32 ${cx} ${H - padB + 24})`}>
+                {b.label}
+              </text>
+              <text x={cx} y={H - padB + 42} textAnchor="end" fill="#475569" fontSize="10.5"
+                fontFamily="IBM Plex Mono, monospace" transform={`rotate(-32 ${cx} ${H - padB + 42})`}>
+                {b.sub}
+              </text>
             </g>
           );
         })}
+        <text x={14} y={(H - padB) / 2} fill="#475569" fontSize="11" fontFamily="IBM Plex Sans"
+          transform={`rotate(-90 14 ${(H - padB) / 2})`} textAnchor="middle">LAP TIME (s)</text>
       </svg>
     </div>
   );
 }
 
 const Empty = ({ msg }) => (
-  <div style={{ padding: "48px 20px", textAlign: "center", color: "#5b6776", fontSize: 14 }}>{msg}</div>
+  <div style={{ padding: "48px 20px", textAlign: "center", color: "#5b6776",
+    fontFamily: "IBM Plex Sans", fontSize: 14 }}>{msg}</div>
 );
 
 /* ---------- app ---------- */
@@ -348,6 +415,7 @@ const parseSecs = (v) => {
   return (!isNaN(s) && s > 0) ? Math.round(s * 1000) / 1000 : null;
 };
 
+// persistence — saves roster/extras between visits on this device
 const LS = (k, fallback) => { try { const v = localStorage.getItem("pitwall_" + k); return v != null ? JSON.parse(v) : fallback; } catch { return fallback; } };
 const saveLS = (k, v) => { try { localStorage.setItem("pitwall_" + k, JSON.stringify(v)); } catch {} };
 const isOurTeam = (teamName, extraTeams = []) => {
@@ -355,7 +423,6 @@ const isOurTeam = (teamName, extraTeams = []) => {
   if (t.includes("leeds") && !t.includes("beckett")) return true;
   return extraTeams.some((x) => x && t.includes(x.toLowerCase()));
 };
-
 function convertEvent(data, extraTeams = [], extraNums = []) {
   if (!data || !data.sessions) return [];
   return data.sessions.map((s) => {
@@ -393,11 +460,8 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
       finByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position) || null])),
       ptsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.points) || 0])),
       sectorsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), {
-        s1: parseSecs(r.sector_1 || r.sector1 || r.s1 || r.Sector1), 
-        s2: parseSecs(r.sector_2 || r.sector2 || r.s2 || r.Sector2), 
-        s3: parseSecs(r.sector_3 || r.sector3 || r.s3 || r.Sector3),
-        ult: parseSecs(r.ultimate_lap || r.ultimate || r.ult), 
-        best: parseSecs(r.best_lap_time || r.best_lap || r.best),
+        s1: parseSecs(r.sector_1), s2: parseSecs(r.sector_2), s3: parseSecs(r.sector_3),
+        ult: parseSecs(r.ultimate_lap), best: parseSecs(r.best_lap_time),
       }])),
       kartIndex: Object.fromEntries(karts.map((k) => [k.num, k.teamName])) };
   });
@@ -425,7 +489,45 @@ export default function App() {
   const [adminPw, setAdminPw] = useState("");
   const [syncMsg, setSyncMsg] = useState("");
   const [syncing, setSyncing] = useState(false);
-  const [extraList, setExtraList] = useState(() => LS("extra", []));
+
+  // pull the shared global roster, weather tracks, extra entries, and per-round team removals on load
+  useEffect(() => {
+    fetch("/api/roster").then((r) => r.json())
+      .then((d) => {
+        if (d && d.roster && Object.keys(d.roster).length) setAssign((prev) => ({ ...prev, ...d.roster }));
+        if (d && Array.isArray(d.wetSessions) && d.wetSessions.length) setWetSessions(new Set(d.wetSessions));
+        if (d && Array.isArray(d.extraList) && d.extraList.length) setExtraList(d.extraList);
+        if (d && Array.isArray(d.removed) && d.removed.length) setRemoved(new Set(d.removed));
+      })
+      .catch(() => {});
+  }, []);
+  const syncRoster = async () => {
+    setSyncing(true); setSyncMsg("");
+    try {
+      const res = await fetch("/api/roster", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          roster: assign,
+          wetSessions: [...wetSessions],
+          extraList: extraList,
+          removed: [...removed],
+          adminPassword: adminPw,
+        }),
+      });
+      const d = await res.json();
+      setSyncMsg(res.ok && d.ok ? "✓ Synced roster, weather, extra entries & team removals." : (d.error || "Sync failed."));
+    } catch {
+      setSyncMsg("Couldn't reach the sync service (only works on the live site).");
+    }
+    setSyncing(false);
+  };
+  const [extraList, setExtraList] = useState(() => {
+    const v = LS("extra", []);
+    if (Array.isArray(v)) return v;
+    if (typeof v === "string" && v.trim()) return v.split(/[,\n]/).map((t) => t.trim()).filter(Boolean);
+    return [];
+  });
   const [extraDraft, setExtraDraft] = useState("");
   const [compareIds, setCompareIds] = useState(() => LS("compareIds", []));
   const [compareCache, setCompareCache] = useState({});
@@ -433,38 +535,8 @@ export default function App() {
   const [removed, setRemoved] = useState(() => new Set(LS("removed", [])));
   const [compareOpen, setCompareOpen] = useState(false);
   const [wetSessions, setWetSessions] = useState(() => new Set(LS("wet", [])));
-
-  // pull shared network states on mount
-  useEffect(() => {
-    fetch("/api/roster").then((r) => r.json())
-      .then((d) => { 
-        if (d && d.roster && Object.keys(d.roster).length) setAssign((prev) => ({ ...prev, ...d.roster }));
-        if (d && d.wetSessions && Array.isArray(d.wetSessions)) setWetSessions(new Set(d.wetSessions));
-        if (d && d.extraList && Array.isArray(d.extraList)) setExtraList(d.extraList);
-      })
-      .catch(() => {});
-  }, []);
-
-  const syncRoster = async () => {
-    setSyncing(true); setSyncMsg("");
-    try {
-      const res = await fetch("/api/roster", { 
-        method: "POST", 
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ 
-          roster: assign, 
-          wetSessions: [...wetSessions], 
-          extraList: extraList, 
-          adminPassword: adminPw 
-        }) 
-      });
-      const d = await res.json();
-      setSyncMsg(res.ok && d.ok ? `✓ Synced global roster, weather toggles, and extra entries.` : (d.error || "Sync failed."));
-    } catch { setSyncMsg("Couldn't reach sync server (only works live)."); }
-    setSyncing(false);
-  };
-
   useEffect(() => { saveLS("wet", [...wetSessions]); }, [wetSessions]);
+
   useEffect(() => { saveLS("assign", assign); }, [assign]);
   useEffect(() => { saveLS("extra", extraList); }, [extraList]);
   useEffect(() => { saveLS("compareIds", compareIds); }, [compareIds]);
@@ -475,6 +547,7 @@ export default function App() {
   const [scrapedEventData, setScrapedEventData] = useState(null);
   const [loadError, setLoadError] = useState("");
 
+  // Load the season index once. The scraper writes index.json listing every round it pulled.
   useEffect(() => {
     fetch("/index.json")
       .then((r) => r.text())
@@ -495,9 +568,10 @@ export default function App() {
         const firstReal = evs.find((e) => e.category === "Mains" || e.category === "Inters") || evs[0];
         setActiveEventId((cur) => cur || (firstReal && firstReal.id) || null);
       })
-      .catch(() => { setEventIndex([]); setLoadError("No index.json found."); });
+      .catch(() => { setEventIndex([]); setLoadError("No index.json found — run the scraper into dashboard/public to populate rounds."); });
   }, []);
 
+  // Load the selected round's data.
   useEffect(() => {
     if (!activeEventId) return;
     const ev = eventIndex.find((e) => e.id === activeEventId);
@@ -510,8 +584,8 @@ export default function App() {
   }, [activeEventId, eventIndex]);
 
   const { extraTeams, extraNums } = useMemo(() => {
-    const tokens = extraList.map((t) => t.trim()).filter(Boolean);
-    return { extraTeams: tokens.filter((t) => !/^\d+$/.test(t)), extraNums: tokens.filter((t) => /^\d+$/.test(t)) };
+    const toks = extraList.map((t) => t.trim()).filter(Boolean);
+    return { extraTeams: toks.filter((t) => !/^\d+$/.test(t)), extraNums: toks.filter((t) => /^\d+$/.test(t)) };
   }, [extraList]);
   const addExtra = () => { const t = extraDraft.trim(); if (t && !extraList.includes(t)) setExtraList((p) => [...p, t]); setExtraDraft(""); };
 
@@ -523,6 +597,7 @@ export default function App() {
       .filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)));
   }, [scrapedEventData, compareIds, compareCache, extraTeams, extraNums]);
 
+  // load every round in the season (for whole-season driver ratings)
   useEffect(() => {
     eventIndex.forEach((e) => {
       if (seasonRaws[e.id]) return;
@@ -539,17 +614,19 @@ export default function App() {
       .filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)));
   }, [seasonRaws, extraTeams, extraNums]);
 
+  // Pace baseline = the Leeds squad's pace at that track (per race weekend, Mains + Inters pooled),
+  // so each driver is measured against the rest of Leeds at the same circuit.
   const roundBaselines = useMemo(() => {
     const evs = [];
     Object.values(seasonRaws).forEach((raw) => {
       if (!raw || !raw.title) return;
-      if (!/(?:mains|inters)\s*round\s*\d+/i.test(raw.title)) return;
+      if (!/(?:mains|inters)\s*round\s*\d+/i.test(raw.title)) return;   // special events out of the pace baseline
       let date = null; const leeds = [];
       (raw.sessions || []).forEach((s) => {
         const lab = s.label || s.title || "";
         if (s.date && !date) { const dt = new Date(s.date); if (!isNaN(dt)) date = dt; }
         if (!/race/i.test(lab) || /quali/i.test(lab)) return;
-        if (wetSessions.has(`scraped__${s.session_id}`)) return;
+        if (wetSessions.has(`scraped__${s.session_id}`)) return;   // dry laps only in the baseline
         (s.lap_times || []).forEach((e) => {
           if (!(isOurTeam(e.team, extraTeams) || extraNums.includes(String(e.kart || "")))) return;
           const laps = (e.laps || []).map(parseSecs).filter((x) => x != null);
@@ -574,6 +651,7 @@ export default function App() {
     return baselines;
   }, [seasonRaws, extraTeams, extraNums, wetSessions]);
 
+  // fetch any selected comparison rounds not yet cached
   useEffect(() => {
     compareIds.forEach((eid) => {
       if (compareCache[eid]) return;
@@ -585,20 +663,21 @@ export default function App() {
     });
   }, [compareIds, eventIndex, compareCache]);
 
+  // normalised cross-round comparison: each driver's avg clean lap as % off that round's field median
   const compareRows = useMemo(() => {
     const map = {};
     compareIds.forEach((eid) => {
       const raw = compareCache[eid];
       if (!raw) return;
       convertEvent(raw, extraTeams, extraNums).forEach((s) => {
-        if (!/race/i.test(s.raceLabel)) return;
+        if (!/race/i.test(s.raceLabel)) return;       // races only
         const fm = fieldStats(s).median;
         if (!fm) return;
         s.karts.forEach((k) => {
           const ls = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
           const clean = splitClean(ls).clean;
           if (!clean.length) return;
-          const pct = (mean(clean) / fm - 1) * 100;
+          const pct = (mean(clean) / fm - 1) * 100;   // negative = faster than the field
           const name = assign[`${s.id}|${k.num}`]?.trim() || k.teamName;
           const letter = (k.teamName.match(/\b([A-G])\b/i) || [])[1];
           map[name] = map[name] || { label: name, teamLetter: letter ? letter.toUpperCase() : null, perRound: {} };
@@ -631,15 +710,23 @@ export default function App() {
         const match = k.teamName.match(/\b([A-G])\b/i);
         const teamLetter = match ? match[1].toUpperCase() : "?";
         rows.push({
-          sid: s.id, session: s, num: k.num, teamLetter, teamName: k.teamName, key: `${s.id}|${k.num}`,
+          sid: s.id,
+          session: s,
+          num: k.num,
+          teamLetter,
+          teamName: k.teamName,
+          key: `${s.id}|${k.num}`,
         });
       });
     });
     return rows;
   }, [convertedSessions]);
 
+  // entries used by all the analysis views — excludes anything removed in the roster
   const entries = useMemo(() => allEntries.filter((e) => !removed.has(e.key)), [allEntries, removed]);
+
   const driverColorMap = useMemo(() => makeDriverColorMap(entries, assign), [entries, assign]);
+
   const colorOf = useCallback((key) => {
     const entry = entries.find((e) => e.key === key);
     if (!entry) return "#8b97a7";
@@ -649,47 +736,64 @@ export default function App() {
 
   const fieldComparisonGroups = useMemo(() => {
     const groups = {};
+    
     entries.forEach((e) => {
-      if (!/race/i.test(e.session.raceLabel) || /quali/i.test(e.session.raceLabel)) return;
+      if (!/race/i.test(e.session.raceLabel) || /quali/i.test(e.session.raceLabel)) return;  // races only
       const raceName = e.session.raceLabel;
       if (!groups[raceName]) groups[raceName] = [];
+      
       const { clean, incidents } = kartLaps(e.session, e.num, e.teamName);
       const driver = assign[e.key]?.trim();
+      
       if (clean.length || incidents.length) {
         groups[raceName].push({
-          ...e, clean, incidents, color: colorOf(e.key), label: driver || `${e.teamName}`, sub: `#${e.num}`,
-          best: clean.length ? Math.min(...clean) : null, avg: mean(clean), cons: sd(clean), inc: incidents.length,
+          ...e, clean, incidents,
+          color: colorOf(e.key),
+          label: driver || `${e.teamName}`,
+          sub: `#${e.num}`,
+          best: clean.length ? Math.min(...clean) : null,
+          avg: mean(clean), cons: sd(clean), inc: incidents.length,
         });
       }
     });
+    
     const masterDriverBoxes = [];
     const individualDriverPools = {};
+    
     entries.forEach((e) => {
-      if (!/race/i.test(e.session.raceLabel) || /quali/i.test(e.session.raceLabel)) return;
+      if (!/race/i.test(e.session.raceLabel) || /quali/i.test(e.session.raceLabel)) return;  // races only
       const assignedDriverName = assign[e.key]?.trim();
       const trackableIdentity = assignedDriverName || `${e.teamName} (${e.session.raceLabel})`;
+      
       if (!individualDriverPools[trackableIdentity]) {
         individualDriverPools[trackableIdentity] = {
-          ...e, clean: [], incidents: [], label: trackableIdentity, sub: assignedDriverName ? `Leeds ${e.teamLetter} Overall` : "Stint pooled"
+          ...e, clean: [], incidents: [],
+          label: trackableIdentity, 
+          sub: assignedDriverName ? `Leeds ${e.teamLetter} Overall` : "Stint pooled"
         };
       }
       const { clean, incidents } = kartLaps(e.session, e.num, e.teamName);
       individualDriverPools[trackableIdentity].clean.push(...clean);
       individualDriverPools[trackableIdentity].incidents.push(...incidents);
     });
+    
     Object.values(individualDriverPools).forEach((db) => {
       if (db.clean.length || db.incidents.length) {
         const namedDriver = assign[db.key]?.trim();
         masterDriverBoxes.push({
-          ...db, color: namedDriver ? (driverColorMap[namedDriver] || "#fff") : (TEAM_COLORS[db.teamLetter] || "#8b97a7"),
-          best: db.clean.length ? Math.min(...db.clean) : null, avg: mean(db.clean), cons: sd(db.clean), inc: db.incidents.length,
+          ...db,
+          color: namedDriver ? (driverColorMap[namedDriver] || "#fff") : (TEAM_COLORS[db.teamLetter] || "#8b97a7"),
+          best: db.clean.length ? Math.min(...db.clean) : null,
+          avg: mean(db.clean), cons: sd(db.clean), inc: db.incidents.length,
         });
       }
     });
+    
     if (masterDriverBoxes.length > 0) {
       masterDriverBoxes.sort((a, b) => (a.avg ?? 9e9) - (b.avg ?? 9e9));
       groups["MASTER DRIVER TELEMETRY RANKING (OVERALL ROUND SUMMARY)"] = masterDriverBoxes;
     }
+    
     return groups;
   }, [entries, assign, colorOf, driverColorMap]);
 
@@ -719,6 +823,7 @@ export default function App() {
     const byDriver = {};
     convertedSessions.forEach((s) => {
       if (!s.isRound || !/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;
+      // field reference: median of every kart's fastest clean lap this session
       const fieldFastest = (s.allKarts || []).map((k) => {
         const c = splitClean(s.laps.map((l) => l.times[k.num]).filter((x) => x != null)).clean;
         return c.length ? Math.min(...c) : null;
@@ -730,7 +835,7 @@ export default function App() {
         if (!driver) return;
         const c = splitClean(s.laps.map((l) => l.times[k.num]).filter((x) => x != null)).clean;
         if (!c.length) return;
-        const delta = Math.min(...c) - fieldMedFast;
+        const delta = Math.min(...c) - fieldMedFast;   // fastest lap vs field's median fastest (negative = quicker than field)
         const m = k.teamName.match(/\b([A-G])\b/i);
         byDriver[driver] = byDriver[driver] || { driver, team: m ? m[1].toUpperCase() : null, pts: {} };
         (byDriver[driver].pts[s.round] = byDriver[driver].pts[s.round] || []).push(delta);
@@ -756,6 +861,7 @@ export default function App() {
 
   const hasData = scrapedEventData !== null;
 
+  // Special events (Drivers Champ, Qualifiers, testing) — shown separately, never in the round maths
   const specialEvents = useMemo(() => {
     return Object.values(seasonRaws)
       .filter((r) => r && r.title && !/(?:mains|inters)\s*round\s*\d+/i.test(r.title))
@@ -775,6 +881,8 @@ export default function App() {
       .filter((e) => e.sessions.length);
   }, [seasonRaws, extraTeams, extraNums]);
 
+
+  // Season stats: per driver, per team, and overall Leeds
   const stats = useMemo(() => {
     const make = (name) => ({ name, races: 0, points: 0, finishes: [], posch: [], best: [], raceAvg: [], qualiPos: [] });
     const acc = (a, s, k, isRace, ls, clean) => {
@@ -789,19 +897,19 @@ export default function App() {
     };
     const drivers = {}, teams = {}, overall = make("Leeds Overall");
     seasonSessions.forEach((s) => {
-      if (!s.isRound) return;
+      if (!s.isRound) return;   // special events excluded from season stats
       if ((statsCat === "mains" || statsCat === "inters") && (s.category || "").toLowerCase() !== statsCat) return;
       const isQuali = /quali/i.test(s.raceLabel);
       const isRace = /race/i.test(s.raceLabel) && !isQuali;
       if (!isRace && !isQuali) return;
       s.karts.forEach((k) => {
         const key = `${s.id}|${k.num}`;
-        if (removed.has(key)) return;
+        if (removed.has(key)) return;   // skip removed (e.g. non-Leeds renters in a paid-seat kart)
         if (!["all", "mains", "inters"].includes(statsCat) && k.teamName !== statsCat) return;
         const ls = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
         const clean = splitClean(ls).clean;
         const isRealLeeds = /leeds/i.test(k.teamName) && !/beckett/i.test(k.teamName);
-        if (isRealLeeds) {
+        if (isRealLeeds) {   // teams + overall only count genuine Leeds entries, not paid seats under other unis
           teams[k.teamName] = teams[k.teamName] || make(k.teamName);
           acc(teams[k.teamName], s, k, isRace, ls, clean);
           acc(overall, s, k, isRace, ls, clean);
@@ -827,110 +935,60 @@ export default function App() {
     return [...set].sort();
   }, [seasonSessions]);
 
-  const arionSummary = useMemo(() => {
-    const agg = {};
-    seasonSessions.forEach((s) => {
-      if (!s.isRound) return;
-      const isQuali = /quali/i.test(s.raceLabel);
-      const isRace = /race/i.test(s.raceLabel) && !isQuali;
-      if (!isQuali && !isRace) return;
-      const bests = (s.allKarts || []).map((k) => s.sectorsByKart && s.sectorsByKart[k.num] && s.sectorsByKart[k.num].best).filter((x) => x != null);
-      const fastest = bests.length ? Math.min(...bests) : null;
-      s.karts.forEach((k) => {
-        const key = `${s.id}|${k.num}`;
-        if (removed.has(key)) return;
-        const name = assign[key]?.trim();
-        if (!name) return;
-        const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], penPos: 0, pens: 0 });
-        const best = s.sectorsByKart && s.sectorsByKart[k.num] ? s.sectorsByKart[k.num].best : null;
-        const gap = (best != null && fastest != null) ? best - fastest : null;
-        if (isQuali) {
-          if (s.finByKart && s.finByKart[k.num] != null) a.qPos.push(s.finByKart[k.num]);
-          if (gap != null) a.qGap.push(gap);
-        } else if (gap != null) a.rGap.push(gap);
-        (s.penalties || []).filter((p) => String(p.kart) === k.num).forEach((p) => {
-          a.pens += 1;
-          const m = String(p.penalty || "").match(/(\d+)\s*grid/i);
-          if (m) a.penPos += Number(m[1]);
-        });
-      });
-    });
-    const avg = (x) => (x.length ? x.reduce((p, c) => p + c, 0) / x.length : null);
-    return Object.values(agg).map((d) => ({ name: d.name, avgQpos: avg(d.qPos), avgQgap: avg(d.qGap), avgRgap: avg(d.rGap), penPos: d.penPos, pens: d.pens }))
-      .sort((a, b) => (a.avgQpos ?? 99) - (b.avgQpos ?? 99));
-  }, [seasonSessions, assign, removed]);
-
   const signedOverview = !!scrapedEventData && (scrapedEventData.sessions || []).some((s) => (s.results || []).some((r) => (r.position_change || 0) < 0));
 
-  /* ---------- Driver rating /10 from pace, consistency, and racecraft ---------- */
+  // Driver rating /10 from pace (z-score vs field), consistency (lap spread), and racecraft (net positions gained)
   const driverRatings = useMemo(() => {
     const clamp = (v) => Math.max(0, Math.min(10, v));
     const agg = {};
     const sessionsForRating = ratingScope === "season" ? seasonSessions : convertedSessions;
+    // racecraft only switches on once the data has the official signed gained/lost (a negative value proves it)
     const signed = sessionsForRating.some((s) => Object.values(s.posByKart || {}).some((v) => v < 0));
-    const paceScale = ratingScope === "round" ? 3.5 : 2.5;
-    
+    const paceScale = ratingScope === "round" ? 3.5 : 2.5;   // harsher when comparing drivers head-to-head in one round
     sessionsForRating.forEach((s) => {
-      if (!s.isRound) return;
-      if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;
+      if (!s.isRound) return;   // special events (Drivers Champ, testing) don't count to round maths
+      if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;  // real races only
       const report = driverReport(s, extraTeams, extraNums, removed);
       if (!report) return;
-
+      // field consistency spread this session (cv = lap-time spread %), for relative scoring
+      const fieldCvs = (s.allKarts || []).map((k) => {
+        const kl = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
+        const kc = splitClean(kl).clean;
+        const ka = mean(kc), ks = kc.length > 1 ? sd(kc) : null;
+        return (ka && ks != null) ? (ks / ka) * 100 : null;
+      }).filter((x) => x != null);
+      const cvMean = mean(fieldCvs), cvSd = sd(fieldCvs) || 0.0001;
+      const sessionFieldMed = fieldStats(s).median;   // session field median (absorbs wet/dry conditions)
       report.rows.forEach((r) => {
         if (!r.isLeeds) return;
         const name = assign[`${s.id}|${r.num}`]?.trim();
-        if (!name) return;
-        
+        if (!name) return;   // only rate named drivers, not team-fallback rows
         const ls = s.laps.map((l) => l.times[r.num]).filter((x) => x != null);
         const clean = splitClean(ls).clean;
         const cavg = mean(clean), csd = clean.length > 1 ? sd(clean) : 0;
-        const cv = cavg ? (csd / cavg) * 100 : 5;
+        const cv = cavg ? (csd / cavg) * 100 : 5;   // this driver's lap-spread %
+        const consZ = (cvMean - cv) / cvSd;          // tighter than field = positive
         const isWet = wetSessions.has(s.id);
-        
-        agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], wet: [], decaySlopes: [], races: 0 };
-        
-        // Linear regression stint degradation slope calculation
-        if (clean.length > 5) {
-          let sx = 0, sy = 0, sxy = 0, sxx = 0;
-          clean.forEach((t, i) => { const lapIdx = i + 1; sx += lapIdx; sy += t; sxy += lapIdx * t; sxx += lapIdx * lapIdx; });
-          const slope = (clean.length * sxy - sx * sy) / (clean.length * sxx - sx * sx);
-          if (slope > 0) agg[name].decaySlopes.push(slope);
-        }
-
+        agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], wet: [], races: 0 };
         if (isWet) {
-          const sessionFieldMed = fieldStats(s).median;
-          if (sessionFieldMed && cavg) agg[name].wet.push(cavg - sessionFieldMed);
+          if (sessionFieldMed && cavg) agg[name].wet.push(cavg - sessionFieldMed);   // seconds vs the wet session's field median
         } else {
-          const baseline = roundBaselines[s.round];
+          const baseline = roundBaselines[s.round];                    // dry: vs the Leeds squad at this track
           const pacePct = (baseline && cavg) ? (cavg / baseline - 1) * 100 : null;
-          let calculatedPaceScore = pacePct != null ? clamp(6 - pacePct * paceScale) : clamp(5 - (r.z ?? 0) * 2.5);
-          
-          // Split-Class Anomaly protections
-          if (s.category === "Mains" && calculatedPaceScore < 6.5 && csd < 0.12) {
-            calculatedPaceScore = Math.max(calculatedPaceScore, 7.8); // Chassis Deficit protection
-          }
-          if (s.category === "Inters" && s.sectorsByKart && s.sectorsByKart[r.num]) {
-            const qBest = s.sectorsByKart[r.num].best;
-            if (qBest && cavg && (cavg - qBest) > 1.2 && csd < 0.15) {
-              calculatedPaceScore = Math.max(calculatedPaceScore, 8.0); // Horsepower mismatch validation protection
-            }
-          }
-          
-          agg[name].pace.push(calculatedPaceScore);
-          agg[name].cons.push(clamp(10 - (cv - 1.2) * 3.2));
+          agg[name].pace.push(pacePct != null ? clamp(6 - pacePct * paceScale) : clamp(5 - (r.z ?? 0) * 2.5));
+          agg[name].cons.push(clamp(10 - (cv - 1.2) * 3.2));   // absolute lap-spread: tighter cv = higher, always
         }
-
         const gained = s.posByKart ? s.posByKart[r.num] : null;
         const fin = s.finByKart ? s.finByKart[r.num] : null;
         if (signed && gained != null && fin != null) {
           const start = fin + gained;
           const fieldSize = (s.allKarts || []).length || 20;
           let sc;
-          if (fin === 1) sc = 10;
-          else if (start <= 3 && fin <= 3) sc = 9.5; // Unbiased podium retention
+          if (fin === 1) sc = 10;                            // won the race — max, you can't lose for winning
+          else if (start <= 3 && fin <= 3) sc = 9.5;          // podium retention
           else { const deep = start > fieldSize * 0.6 ? 1.4 : 1; sc = clamp(5.5 + gained * 0.45 * (gained > 0 ? deep : 1)); }
-          if (start <= fieldSize * 0.33 && gained >= -2) sc = Math.max(sc, 7.5);
-          if ((s.penalties || []).some((p) => String(p.kart) === r.num)) sc = clamp(sc - 3);
+          if (start <= fieldSize * 0.33 && gained >= -2) sc = Math.max(sc, 7.5);  // held a front-third start = good defending
+          if ((s.penalties || []).some((p) => String(p.kart) === r.num)) sc = clamp(sc - 3);  // penalty = poor racecraft
           agg[name].race.push(sc); agg[name].gain.push(gained);
         }
         agg[name].races += 1;
@@ -939,18 +997,13 @@ export default function App() {
     const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
     const sum = (a) => a.reduce((x, y) => x + y, 0);
     return Object.values(agg).map((d) => {
-      const pace = avg(d.pace), race = avg(d.race);
-      const decayIndex = d.decaySlopes.length ? avg(d.decaySlopes) : 0;
-      const cons = d.cons.length ? clamp(avg(d.cons) - (decayIndex * 35)) : 0; // apply stint decay slope modifier directly onto consistency metric
-      
+      const pace = avg(d.pace), cons = avg(d.cons), race = avg(d.race);
       const hasPace = d.pace.length > 0, hasRace = d.race.length > 0, hasCons = d.cons.length > 0;
       let tot = 0, w = 0;
       if (hasPace) { tot += pace * 0.65; w += 0.65; }
       if (hasRace) { tot += race * 0.20; w += 0.20; }
       if (hasCons) { tot += cons * 0.15; w += 0.15; }
-      
-      // If round is completely wet, gracefully switch to 100% racecraft weight metric logic fallback
-      const overall = w ? tot / w : (hasRace ? race : 0);
+      const overall = w ? tot / w : 0;
       const wetDelta = d.wet.length ? sum(d.wet) / d.wet.length : null;
       return { ...d, pace, cons, race, hasPace, hasRace, hasCons, wetDelta, netGain: sum(d.gain), overall };
     }).sort((a, b) => b.overall - a.overall);
@@ -964,13 +1017,16 @@ export default function App() {
       const filled = Object.keys(assignments).length;
       setAssign((p) => ({ ...p, ...assignments }));
       setImportMsg(filled
-        ? `Imported ${filled} names from ${rows.length} rows.`
-        : `Read ${rows.length} rows but matched none.`);
-    } catch (e) { setImportMsg(`Error: ${e.message}`); }
+        ? `Imported ${filled} name${filled === 1 ? "" : "s"} from ${rows.length} row${rows.length === 1 ? "" : "s"}.`
+        : `Read ${rows.length} rows but matched none — check the team/race names line up with the loaded event.`);
+    } catch (e) {
+      setImportMsg(`Couldn't read that file: ${e.message}`);
+    }
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#07090d", color: "#e6edf3", zoom: 1.18, fontFamily: "IBM Plex Sans, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#07090d", color: "#e6edf3", zoom: 1.18,
+      fontFamily: "IBM Plex Sans, system-ui, sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
         html, body, #root { margin: 0 !important; padding: 0 !important; max-width: none !important; width: 100% !important; display: block !important; place-items: initial !important; text-align: left !important; background: #07090d; }
@@ -980,11 +1036,17 @@ export default function App() {
         ::-webkit-scrollbar { height: 8px; width: 8px; }
         ::-webkit-scrollbar-thumb { background:#1e2733; border-radius: 4px; }
         .appwrap { padding: 24px 28px; max-width: 1380px; margin: 0 auto; }
-        .apphead { padding: 16px 28px; max-width: 1380px; margin: 0 auto; display: flex; alignItems: center; gap: 16px; background: linear-gradient(180deg,#0b0f15,#07090d); border-bottom: 1px solid #161d27; }
+        .apphead { padding: 16px 28px; max-width: 1380px; margin: 0 auto; }
+        @media (max-width: 680px) {
+          .appwrap { padding: 12px 12px; }
+          .apphead { padding: 12px 14px; flex-wrap: wrap; gap: 10px; }
+          .apptabs button { font-size: 12px !important; padding: 7px 11px !important; }
+        }
       `}</style>
 
       {/* header */}
-      <div className="apphead">
+      <div className="apphead" style={{ borderBottom: "1px solid #161d27",
+        display: "flex", alignItems: "center", gap: 16, background: "linear-gradient(180deg,#0b0f15,#07090d)" }}>
         <div style={{ width: 10, height: 30, background: AMBER, borderRadius: 2 }} />
         <div style={{ flex: 1 }}>
           <div className="disp" style={{ fontSize: 23, fontWeight: 700, lineHeight: 1 }}>
@@ -995,10 +1057,12 @@ export default function App() {
           </div>
         </div>
         
+        {/* round selector — grouped by category, populated from the season index */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0d141c", border: "1px solid #222c38", padding: "5px 10px", borderRadius: 8 }}>
           <span className="disp" style={{ fontSize: 11.5, color: "#6b7685", fontWeight: 600 }}>ROUND:</span>
           <select className="mono" value={activeEventId || ""} onChange={(e) => setActiveEventId(e.target.value)}
-            style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 6, color: "#e6edf3", padding: "5px 8px", fontSize: 12.5, minWidth: 180, cursor: "pointer" }}>
+            style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 6, color: "#e6edf3",
+              padding: "5px 8px", fontSize: 12.5, fontFamily: "IBM Plex Mono, monospace", minWidth: 180, cursor: "pointer" }}>
             {eventIndex.length === 0 && <option value="">no rounds — run scraper</option>}
             {["Mains", "Inters", "Other"].filter((cat) => eventIndex.some((e) => e.category === cat)).map((cat) => (
               <optgroup key={cat} label={cat === "Other" ? "Special Events" : cat}>
@@ -1010,29 +1074,41 @@ export default function App() {
           </select>
         </div>
 
+        {/* compare-with: dropdown of extra rounds; they flow into field comparison, progression, report */}
         {eventIndex.length > 1 && (
           <div style={{ position: "relative" }}>
             <button onClick={() => setCompareOpen((o) => !o)} className="disp"
-              style={{ display: "flex", alignItems: "center", gap: 8, background: "#0d141c", border: `1px solid ${compareIds.length ? AMBER : "#222c38"}`, padding: "6px 12px", borderRadius: 8, cursor: "pointer", color: compareIds.length ? AMBER : "#8b97a7", fontSize: 12, fontWeight: 600 }}>
+              style={{ display: "flex", alignItems: "center", gap: 8, background: "#0d141c",
+                border: `1px solid ${compareIds.length ? AMBER : "#222c38"}`, padding: "6px 12px", borderRadius: 8,
+                cursor: "pointer", color: compareIds.length ? AMBER : "#8b97a7", fontSize: 12, fontWeight: 600 }}>
               + COMPARE{compareIds.length ? ` (${compareIds.length})` : ""} ▾
             </button>
             {compareOpen && (
-              <div style={{ position: "absolute", top: "112%", left: 0, zIndex: 50, background: "#0d141c", border: "1px solid #222c38", borderRadius: 8, padding: 10, minWidth: 210, maxHeight: 300, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+              <div style={{ position: "absolute", top: "112%", left: 0, zIndex: 50, background: "#0d141c",
+                border: "1px solid #222c38", borderRadius: 8, padding: 10, minWidth: 210, maxHeight: 300,
+                overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
                 {["Mains", "Inters"].filter((cat) => eventIndex.some((e) => e.category === cat && e.id !== activeEventId)).map((cat) => (
                   <div key={cat} style={{ marginBottom: 8 }}>
                     <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginBottom: 4 }}>{cat.toUpperCase()}</div>
                     {eventIndex.filter((e) => e.category === cat && e.id !== activeEventId).sort((a, b) => a.round - b.round).map((e) => {
                       const on = compareIds.includes(e.id);
                       return (
-                        <label key={e.id} className="mono" style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 12, color: on ? AMBER : "#c2cbd6", cursor: "pointer" }}>
-                          <input type="checkbox" checked={on} onChange={() => setCompareIds((p) => on ? p.filter((x) => x !== e.id) : [...p, e.id])} />
+                        <label key={e.id} className="mono" style={{ display: "flex", alignItems: "center", gap: 8,
+                          padding: "3px 0", fontSize: 12, color: on ? AMBER : "#c2cbd6", cursor: "pointer" }}>
+                          <input type="checkbox" checked={on}
+                            onChange={() => setCompareIds((p) => on ? p.filter((x) => x !== e.id) : [...p, e.id])} />
                           {e.category} Round {e.round === 999 ? "?" : e.round}
                         </label>
                       );
                     })}
                   </div>
                 ))}
-                {compareIds.length > 0 && ( <button onClick={() => setCompareIds([])} className="mono" style={{ marginTop: 2, fontSize: 11, color: "#ff8a5b", background: "none", border: "none", cursor: "pointer", padding: 0 }}>clear all</button> )}
+                {compareIds.length > 0 && (
+                  <button onClick={() => setCompareIds([])} className="mono"
+                    style={{ marginTop: 2, fontSize: 11, color: "#ff8a5b", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                    clear all
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1040,38 +1116,66 @@ export default function App() {
       </div>
 
       <div className="appwrap">
-        {/* PANEL 1: ROSTER */}
+        
+        {/* driver assignment — grouped by race, collapsible */}
         {allEntries.length > 0 && (
           <Panel title="01 · ROSTER ASSIGNMENT">
             <div style={{ marginBottom: 14 }}>
-              <Label>EXTRA ENTRIES <span style={{ color: "#5b6776" }}>(paid seats under another uni)</span></Label>
+              <Label>EXTRA ENTRIES <span style={{ color: "#5b6776" }}>(paid seats under another uni — type a kart number or team, press Enter)</span></Label>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <input value={extraDraft} onChange={(e) => setExtraDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addExtra(); } }} placeholder="e.g. Lancaster B  ↵" style={{ ...inp(220) }} />
+                <input value={extraDraft} onChange={(e) => setExtraDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addExtra(); } }}
+                  placeholder="e.g. Lancaster B  ↵"
+                  style={{ ...inp(220) }} />
                 {extraList.map((t) => (
-                  <span key={t} className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, background: "#11233a", border: "1px solid #3da9fc55", borderRadius: 6, padding: "4px 6px 4px 9px", color: "#cfe3ff" }}>
-                    {t} <button onClick={() => setExtraList((p) => p.filter((x) => x !== t))} style={{ background: "none", border: "none", color: "#ff8a5b", cursor: "pointer", fontSize: 13, padding: 0 }}>✕</button>
+                  <span key={t} className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5,
+                    background: "#11233a", border: "1px solid #3da9fc55", borderRadius: 6, padding: "4px 6px 4px 9px", color: "#cfe3ff" }}>
+                    {t}
+                    <button onClick={() => setExtraList((p) => p.filter((x) => x !== t))}
+                      style={{ background: "none", border: "none", color: "#ff8a5b", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: 0 }}>✕</button>
                   </span>
                 ))}
               </div>
             </div>
-            <Label>TEAM LINEUPS</Label>
+            <Label>TEAM LINEUPS <span style={{ color: "#5b6776" }}>(name a driver once per heat — quali and race fill together)</span></Label>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-              <button onClick={() => csvRef.current?.click()} className="disp" style={{ background: "#11233a", color: AMBER, border: `1px solid ${AMBER}55`, borderRadius: 7, padding: "7px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>⬆ IMPORT LINEUP CSV</button>
-              <input ref={csvRef} type="file" accept=".csv,.txt" hidden onChange={(ev) => onLineupCsv(ev.target.files?.[0])} />
-              {importMsg && <span className="mono" style={{ fontSize: 11.5, color: "#43d977" }}>{importMsg}</span>}
+              <button onClick={() => csvRef.current?.click()} className="disp"
+                style={{ background: "#11233a", color: AMBER, border: `1px solid ${AMBER}55`, borderRadius: 7,
+                  padding: "7px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                ⬆ IMPORT LINEUP CSV
+              </button>
+              <span className="mono" style={{ fontSize: 11, color: "#5b6776" }}>
+                columns: team, race, driver &nbsp;(e.g. Leeds A, Race 1, Sam)
+              </span>
+              <input ref={csvRef} type="file" accept=".csv,.txt" hidden
+                onChange={(ev) => onLineupCsv(ev.target.files?.[0])} />
+              {importMsg && <span className="mono" style={{ fontSize: 11.5, color: importMsg.includes("matched none") || importMsg.includes("Couldn't") ? "#ff8a5b" : "#43d977" }}>{importMsg}</span>}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-              <input type="password" value={adminPw} onChange={(e) => setAdminPw(e.target.value)} placeholder="admin password" style={{ ...inp(150), fontFamily: "IBM Plex Sans" }} />
-              <button onClick={syncRoster} disabled={syncing} className="disp" style={{ background: "#11233a", color: "#3da9fc", border: "1px solid #3da9fc55", borderRadius: 7, padding: "7px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>{syncing ? "SYNCING…" : "💾 SYNC GLOBAL ROSTER"}</button>
+              <input type="password" value={adminPw} onChange={(e) => setAdminPw(e.target.value)} placeholder="admin password"
+                style={{ ...inp(150), fontFamily: "IBM Plex Sans, sans-serif" }} />
+              <button onClick={syncRoster} disabled={syncing} className="disp"
+                style={{ background: "#11233a", color: "#3da9fc", border: "1px solid #3da9fc55", borderRadius: 7,
+                  padding: "7px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                {syncing ? "SYNCING…" : "💾 SYNC GLOBAL ROSTER"}
+              </button>
+              <span className="mono" style={{ fontSize: 11, color: "#5b6776" }}>pushes this roster to everyone (admin only)</span>
               {syncMsg && <span className="mono" style={{ fontSize: 11.5, color: syncMsg.startsWith("✓") ? "#43d977" : "#ff8a5b" }}>{syncMsg}</span>}
             </div>
             <datalist id="driverNames">
               {[...new Set(Object.values(assign).map((v) => v && v.trim()).filter(Boolean))].map((n) => <option key={n} value={n} />)}
             </datalist>
-            {Object.entries( allEntries.reduce((acc, e) => { const g = `${e.session.round}||${e.teamName}`; (acc[g] = acc[g] || []).push(e); return acc; }, {}) ).sort(([a], [b]) => a.localeCompare(b)).map(([groupKey, teamEntries]) => {
+            {Object.entries(
+              allEntries.reduce((acc, e) => {
+                const g = `${e.session.round}||${e.teamName}`;
+                (acc[g] = acc[g] || []).push(e); return acc;
+              }, {})
+            ).sort(([a], [b]) => a.localeCompare(b)).map(([groupKey, teamEntries]) => {
               const [roundName, teamName] = groupKey.split("||");
               const letter = (teamName.match(/\b([A-G])\b/i) || [])[1]?.toUpperCase();
               const isLeedsTeam = /leeds/i.test(teamName) && !/beckett/i.test(teamName);
+              // Inters: practice/quali heats don't match race heat numbers. Pair by ORDER —
+              // first practice/quali listed = first race listed, second = second, etc.
               const pqByHeat = {}, raceByHeat = {};
               teamEntries.forEach((e) => {
                 const isRace = sessionKind(e.session.raceLabel) === "Race";
@@ -1095,15 +1199,49 @@ export default function App() {
               const named = drivers.filter((d) => assign[d.rows[0].key]?.trim()).length;
               const col = (isLeedsTeam && letter) ? TEAM_COLORS[letter] : AMBER;
               return (
-                <Collapsible key={groupKey} accent={col} title={`${roundName} · ${teamName}`} subtitle={`#${teamEntries[0].num} · ${named}/${drivers.length} named`}>
-                  <button onClick={() => setRemoved((p) => { const n = new Set(p); const allRem = teamEntries.every((e) => p.has(e.key)); teamEntries.forEach((e) => allRem ? n.delete(e.key) : n.add(e.key)); return n; })} className="mono" style={{ marginBottom: 8, fontSize: 10.5, cursor: "pointer", background: "none", border: "1px solid #3a2530", borderRadius: 5, padding: "3px 9px", color: "#ff8a5b" }}>Toggle Active State</button>
+                <Collapsible key={groupKey} accent={col}
+                  title={`${roundName} · ${teamName}`}
+                  subtitle={`#${teamEntries[0].num} · ${named}/${drivers.length} drivers named`}>
+                  {(() => {
+                    const allRemoved = teamEntries.every((e) => removed.has(e.key));
+                    return (
+                      <button onClick={() => setRemoved((prev) => { const n = new Set(prev); teamEntries.forEach((e) => allRemoved ? n.delete(e.key) : n.add(e.key)); return n; })}
+                        className="mono" style={{ marginBottom: 8, fontSize: 10.5, cursor: "pointer", background: "none",
+                          border: `1px solid ${allRemoved ? "#43d977" : "#3a2530"}`, borderRadius: 5, padding: "3px 9px", color: allRemoved ? "#43d977" : "#ff8a5b" }}>
+                        {allRemoved ? "↺ restore this team this round" : "✕ not our team this round (remove)"}
+                      </button>
+                    );
+                  })()}
                   <div style={{ display: "grid", gap: 6 }}>
-                    {drivers.map((d, di) => (
-                      <div key={di} style={{ display: "flex", alignItems: "center", gap: 10, background: "#080d13", borderRadius: 7, padding: "6px 10px", borderLeft: `3px solid ${col}` }}>
-                        <span className="disp" style={{ color: col, fontWeight: 700, width: 64 }}>{d.label}</span>
-                        <input list="driverNames" placeholder="driver name…" value={assign[d.rows[0].key] || ""} onChange={(ev) => { const v = ev.target.value; setAssign((p) => { const n = { ...p }; d.rows.forEach((r) => { n[r.key] = v; }); return n; }); }} style={{ ...inp(180), flex: 1 }} />
-                      </div>
-                    ))}
+                    {drivers.map((d, di) => {
+                      const rows = d.rows;
+                      const isRemoved = rows.every((r) => removed.has(r.key));
+                      return (
+                        <div key={di} style={{ display: "flex", alignItems: "center", gap: 10,
+                          background: "#080d13", borderRadius: 7, padding: "6px 10px", borderLeft: `3px solid ${col}`,
+                          opacity: isRemoved ? 0.4 : 1 }}>
+                          <span className="disp" style={{ color: col, fontWeight: 700, width: 64 }}>{d.label}</span>
+                          <span className="mono" style={{ color: "#6b7685", fontSize: 10.5, width: 130 }}>{d.sub}</span>
+                          <input list="driverNames" placeholder="driver name…" disabled={isRemoved}
+                            value={assign[rows[0].key] || ""}
+                            onChange={(ev) => {
+                              const v = ev.target.value;
+                              setAssign((p) => { const n = { ...p }; rows.forEach((r) => { n[r.key] = v; }); return n; });
+                            }}
+                            style={{ ...inp(180), flex: 1 }} />
+                          <button title={isRemoved ? "restore" : "remove this driver's races"}
+                            onClick={() => setRemoved((prev) => {
+                              const n = new Set(prev);
+                              rows.forEach((r) => (isRemoved ? n.delete(r.key) : n.add(r.key)));
+                              return n;
+                            })}
+                            className="mono" style={{ background: "none", border: "none", cursor: "pointer",
+                              color: isRemoved ? "#43d977" : "#ff6b6b", fontSize: 14, padding: "0 4px" }}>
+                            {isRemoved ? "↺" : "✕"}
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </Collapsible>
               );
@@ -1111,31 +1249,49 @@ export default function App() {
           </Panel>
         )}
 
-        {/* TAB MATRIX CONTROL PANELS */}
         {hasData && (
           <>
             <div className="apptabs" style={{ display: "flex", gap: 8, margin: "20px 0 16px", flexWrap: "wrap", alignItems: "center" }}>
               {[
-                ["scraped", "LIVE EVENT OVERVIEW"], ["summary", "SUMMARY"], ["field", "FIELD COMPARISON"], 
-                ["trace", "LAP TRACES"], ["prog", "PROGRESSION"], ["report", "DRIVER REPORT"],
-                ["rating", "DRIVER RATING"], ["debrief", "AI DEBRIEF"], ["stats", "STATS"],
-                ["special", "SPECIAL EVENTS"], ["sectors", "SECTORS"]
+                ["scraped", "LIVE EVENT OVERVIEW"],
+                ["field", "FIELD COMPARISON"], 
+                ["trace", "LAP TRACES"], 
+                ["prog", "PROGRESSION"],
+                ["report", "DRIVER REPORT"],
+                ["rating", "DRIVER RATING"],
+                ["debrief", "AI DEBRIEF"],
+                ["stats", "STATS"],
+                ["special", "SPECIAL EVENTS"],
+                ["sectors", "SECTORS"],
+                ["lineup", "LINEUP"]
               ].map(([k, l]) => (
-                <button key={k} onClick={() => setTab(k)} className="disp" style={{ padding: "8px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer", border: "1px solid", borderColor: tab === k ? AMBER : "#222c38", background: tab === k ? "#1a160a" : "#0b1017", color: tab === k ? AMBER : "#8b97a7" }}>{l}</button>
+                <button key={k} onClick={() => setTab(k)} className="disp"
+                  style={{ padding: "8px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer",
+                    border: "1px solid", borderColor: tab === k ? AMBER : "#222c38",
+                    background: tab === k ? "#1a160a" : "#0b1017", color: tab === k ? AMBER : "#8b97a7" }}>
+                  {l}
+                </button>
               ))}
             </div>
 
-            {/* TAB: EVENT OVERVIEW (F1 Race Priority Sorting Layout Active) */}
+            {/* TAB: EVENT OVERVIEW */}
             {tab === "scraped" && (
               <Panel title={`EVENT METRICS — ${scrapedEventData.title.toUpperCase()}`}>
                 <div style={{ display: "grid", gap: 24 }}>
+                  
                   {leedsOverallStandings.length > 0 && (
                     <div style={{ background: "linear-gradient(135deg, #0f172a, #0b1017)", borderRadius: 10, padding: "16px", border: "1px solid #334155" }}>
-                      <div className="disp" style={{ color: AMBER, fontSize: 15, fontWeight: 700, marginBottom: 10 }}>🏆 OVERALL CHAMPIONSHIP ROUND STANDINGS</div>
+                      <div className="disp" style={{ color: AMBER, fontSize: 15, fontWeight: 700, marginBottom: 10, letterSpacing: "1px" }}>
+                        🏆 OVERALL CHAMPIONSHIP ROUND STANDINGS
+                      </div>
                       <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                         <thead>
                           <tr style={{ color: "#6b7685", textAlign: "left" }}>
-                            <th style={{ padding: "6px 8px" }}>POS</th><th style={{ padding: "6px 8px" }}>TEAM</th><th style={{ padding: "6px 8px" }}>KART</th><th style={{ padding: "6px 8px" }}>POINTS</th>
+                            <th style={{ padding: "6px 8px", borderBottom: "1px solid #1e2733" }}>POS</th>
+                            <th style={{ padding: "6px 8px", borderBottom: "1px solid #1e2733" }}>TEAM</th>
+                            <th style={{ padding: "6px 8px", borderBottom: "1px solid #1e2733" }}>KART</th>
+                            <th style={{ padding: "6px 8px", borderBottom: "1px solid #1e2733" }}>TOTAL LAPS</th>
+                            <th style={{ padding: "6px 8px", borderBottom: "1px solid #1e2733" }}>POINTS</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1144,6 +1300,7 @@ export default function App() {
                               <td style={{ padding: "8px", color: AMBER, fontWeight: "700" }}>{row.position}</td>
                               <td style={{ padding: "8px", color: "#fff", fontWeight: "600" }}>{row.team}</td>
                               <td style={{ padding: "8px", color: "#6b7685" }}>#{row.kart || "—"}</td>
+                              <td style={{ padding: "8px", color: "#c2cbd6" }}>{row.total_laps}</td>
                               <td style={{ padding: "8px", color: "#43d977", fontWeight: "700" }}>{row.total_points || "—"} pts</td>
                             </tr>
                           ))}
@@ -1153,39 +1310,87 @@ export default function App() {
                   )}
 
                   {[...scrapedEventData.sessions].sort((a, b) => {
-                    // Sorting absolute priorities: Race (0) -> Quali (1) -> Practice (2)
                     const rank = (s) => { const l = (s.label || s.title || "").toLowerCase(); return /quali/.test(l) ? 1 : /practice/.test(l) ? 2 : 0; };
                     return rank(a) - rank(b);
                   }).map((session) => {
-                    const leedsSessionRows = session.results.filter(row => row.team && row.team.toLowerCase().includes("leeds") && !row.team.toLowerCase().includes("beckett"));
+                    const leedsSessionRows = session.results.filter(row => 
+                      row.team && row.team.toLowerCase().includes("leeds") && !row.team.toLowerCase().includes("beckett")
+                    );
+
                     if (leedsSessionRows.length === 0) return null;
-                    const sid = `scraped__${session.session_id}`;
-                    const wet = wetSessions.has(sid);
+
                     return (
                       <div key={session.session_id} style={{ background: "#0b1017", borderRadius: 10, padding: "18px", border: "1px solid #161d27" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                          <div className="disp" style={{ color: AMBER, fontSize: 14.5, fontWeight: 700 }}>🏁 {session.label.toUpperCase()}</div>
-                          <button onClick={() => setWetSessions((p) => { const n = new Set(p); wet ? n.delete(sid) : n.add(sid); return n; })} style={{ cursor: "pointer", borderRadius: 5, padding: "3px 8px", fontSize: 10.5, border: `1px solid ${wet ? "#3da9fc" : "#2a3543"}`, background: wet ? "#0b2030" : "#0b1017", color: wet ? "#3da9fc" : "#5b6776" }}>{wet ? "🌧 WET" : "DRY"}</button>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, borderBottom: "1px solid #1e2733", paddingBottom: 6 }}>
+                          <div className="disp" style={{ color: AMBER, fontSize: 14.5, fontWeight: 700 }}>
+                            🏁 {session.label.toUpperCase()}
+                          </div>
+                          <div className="mono" style={{ fontSize: 11, color: "#5b6776", display: "flex", alignItems: "center", gap: 10 }}>
+                            START: {session.start_time || "—"} · LAPS: {session.total_laps || "—"}
+                            {(() => { const sid = `scraped__${session.session_id}`; const wet = wetSessions.has(sid); return (
+                              <button onClick={() => setWetSessions((prev) => { const n = new Set(prev); wet ? n.delete(sid) : n.add(sid); return n; })}
+                                style={{ cursor: "pointer", borderRadius: 5, padding: "3px 8px", fontSize: 10.5, fontWeight: 600,
+                                  border: `1px solid ${wet ? "#3da9fc" : "#2a3543"}`, background: wet ? "#0b2030" : "#0b1017", color: wet ? "#3da9fc" : "#5b6776" }}>
+                                {wet ? "🌧 WET" : "DRY"}
+                              </button>
+                            ); })()}
+                          </div>
                         </div>
-                        <table className="mono" style={{ width: "100%", fontSize: 12.5 }}>
-                          <thead>
-                            <tr style={{ color: "#6b7685", textAlign: "left" }}>
-                              <th>POS</th>{signedOverview && <th>+/-</th>}<th>TEAM</th><th>KART</th><th>BEST LAP</th><th>POINTS</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {leedsSessionRows.map((row, rIdx) => (
-                              <tr key={rIdx} style={{ borderBottom: "1px solid #11171f" }}>
-                                <td style={{ padding: "6px 0", color: AMBER, fontWeight: 700 }}>{row.position || "—"}</td>
-                                {signedOverview && <td style={{ color: row.position_change > 0 ? "#43d977" : row.position_change < 0 ? "#ff3355" : "#4b5563" }}>{row.position_change}</td>}
-                                <td style={{ color: "#fff", fontWeight: 600 }}>{row.team}</td>
-                                <td style={{ color: "#6b7685" }}>#{row.kart}</td>
-                                <td>{row.best_lap_time}s</td>
-                                <td style={{ color: "#43d977" }}>{row.points || "0"} pts</td>
+                        <div style={{ overflowX: "auto" }}>
+                          <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                            <thead>
+                              <tr style={{ color: "#6b7685", textAlign: "left" }}>
+                                <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>POS</th>
+                                {signedOverview && <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>+/-</th>}
+                                <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>TEAM</th>
+                                <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>KART</th>
+                                <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>BEST LAP</th>
+                                <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>TOTAL TIME</th>
+                                <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>POINTS</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {leedsSessionRows.map((row, rIdx) => {
+                                return (
+                                  <tr key={rIdx} style={{ borderBottom: "1px solid #11171f" }}>
+                                    <td style={{ padding: "8px", color: AMBER, fontWeight: "700" }}>{row.position || "—"}</td>
+                                    {signedOverview && (
+                                      <td style={{ padding: "8px", fontWeight: "600", color: row.position_change > 0 ? "#43d977" : row.position_change < 0 ? "#ff3355" : "#4b5563" }}>
+                                        {row.position_change > 0 ? `+${row.position_change}` : row.position_change < 0 ? row.position_change : row.position_change === 0 ? "0" : "—"}
+                                      </td>
+                                    )}
+                                    <td style={{ padding: "8px", color: "#fff", fontWeight: "600" }}>
+                                      {row.team} {row.penalty && <span style={{ color: "#ff3355", fontSize: 10, marginLeft: 6 }}>[+PENALTY]</span>}
+                                    </td>
+                                    <td style={{ padding: "8px", color: "#6b7685" }}>#{row.kart || "—"}</td>
+                                    <td style={{ padding: "8px", color: "#c2cbd6" }}>{row.best_lap_time ? `${row.best_lap_time}s` : "—"} <span style={{ fontSize: 10, color: "#5b6776" }}>{row.best_lap_number ? `(L${row.best_lap_number})` : ""}</span></td>
+                                    <td style={{ padding: "8px", color: "#c2cbd6" }}>{row.total_time || "—"}</td>
+                                    <td style={{ padding: "8px", color: "#43d977", fontWeight: "600" }}>{row.points || "0"} pts</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        {(() => {
+                          const sp = (session.penalties || []).filter((p) => {
+                            const t = (p.team || "").toLowerCase();
+                            return t.includes("leeds") && !t.includes("beckett");
+                          });
+                          if (!sp.length) return null;
+                          return (
+                            <div style={{ marginTop: 10, borderTop: "1px solid #11171f", paddingTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              <span className="disp" style={{ fontSize: 11, color: "#ff6b6b", fontWeight: 600, letterSpacing: "0.5px", alignSelf: "center" }}>⚑</span>
+                              {sp.map((p, pi) => (
+                                <span key={pi} className="mono" style={{ background: "#1a0f12", border: "1px solid #ff335530", borderRadius: 6, padding: "4px 8px", fontSize: 11 }}>
+                                  <span style={{ color: "#e6edf3", fontWeight: 600 }}>#{p.kart}</span>
+                                  <span style={{ color: "#ff8a5b" }}> {p.penalty}</span>
+                                  <span style={{ color: "#6b7685" }}> · {String(p.reason || "").replace(/^\s*\d+\w*\.\s*/, "")}</span>
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })}
@@ -1193,49 +1398,23 @@ export default function App() {
               </Panel>
             )}
 
-            {/* TAB: ARION'S CRITICAL SUMMARY LOGS */}
-            {tab === "summary" && (
-              <Panel title="SUMMARY — QUALIFYING, PACE GAP & PENALTIES (WHOLE SEASON)">
-                {arionSummary.length === 0 ? <Empty msg="Name drivers to build logs summary." /> : (
-                  <div style={{ overflowX: "auto" }}>
-                    <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-                      <thead>
-                        <tr style={{ color: "#6b7685" }}>
-                          <th style={{ textAlign: "left", padding: "6px 10px" }}>#</th>
-                          <th style={{ textAlign: "left", padding: "6px 10px" }}>DRIVER</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px" }}>AVG QUALI POS</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px" }}>QUALI GAP</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px" }}>RACE GAP</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px" }}>POS LOST (PENALTY)</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px" }}>PENALTIES</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {arionSummary.map((d, i) => (
-                          <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
-                            <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
-                            <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER }}>{d.avgQpos != null ? "P" + d.avgQpos.toFixed(1) : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right" }}>{d.avgQgap != null ? "+" + d.avgQgap.toFixed(3) + "s" : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right" }}>{d.avgRgap != null ? "+" + d.avgRgap.toFixed(3) + "s" : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: d.penPos > 0 ? "#ff8a5b" : "#5b6776" }}>{d.penPos > 0 ? "-" + d.penPos : "0"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: d.pens > 0 ? "#ff6b6b" : "#5b6776" }}>{d.pens}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+            {/* TAB: SEGMENTED RACE PACK GROUPINGS */}
+            {tab === "field" && (
+              <Panel title="RACE PACE — SEGMENTED HEATS + ROUND SUMMARY INDIVIDUAL LEADERBOARD">
+                {scrapedEventData?.sessions?.[0] && !("lap_times" in scrapedEventData.sessions[0]) && (
+                  <div style={{ background: "#1e1b10", border: "1px solid #ffce3a40", color: AMBER, padding: "10px 14px", borderRadius: 8, fontSize: 12, marginBottom: 20 }} className="mono">
+                    ⚠️ NOTIFICATION: Scraper ran without full metrics sheets. Run your dad's script layout file using <span style={{ color: "#fff" }}>--full</span> (e.g., <span style={{ color: "#fff" }}>python scraper.py --event {activeEventId} --full</span>) to download and plot distribution charts.
                   </div>
                 )}
-              </Panel>
-            )}
-
-            {/* TAB: FIELD COMPARISONS */}
-            {tab === "field" && (
-              <Panel title="RACE PACE — DISTRIBUTION AND HEATS SUMMARY">
-                {Object.entries(fieldComparisonGroups).sort(([a], [b]) => (b.includes("SUMMARY") ? 1 : 0) - (a.includes("SUMMARY") ? 1 : 0)).map(([groupName, groupBoxes]) => {
+                {Object.entries(fieldComparisonGroups)
+                  .sort(([a], [b]) => (b.includes("SUMMARY") ? 1 : 0) - (a.includes("SUMMARY") ? 1 : 0))
+                  .map(([groupName, groupBoxes]) => {
                   const isSummary = groupName.includes("SUMMARY");
                   return (
-                    <Collapsible key={groupName} defaultOpen={isSummary} accent={isSummary ? AMBER : "#8b97a7"} title={`${isSummary ? "🏆" : "📊"} ${tidyLabel(groupName)}`} subtitle={`${groupBoxes.length} drivers`}>
+                    <Collapsible key={groupName} defaultOpen={isSummary}
+                      accent={isSummary ? AMBER : "#8b97a7"}
+                      title={`${isSummary ? "🏆" : "📊"} ${tidyLabel(groupName)}`}
+                      subtitle={`${groupBoxes.length} ${isSummary ? "drivers" : "entr" + (groupBoxes.length === 1 ? "y" : "ies")}`}>
                       <BoxPlot boxes={groupBoxes} fieldMedian={cleanOnly ? fieldMed : null} />
                       <StatsTable boxes={groupBoxes} fieldMed={fieldMed} />
                     </Collapsible>
@@ -1244,211 +1423,623 @@ export default function App() {
               </Panel>
             )}
 
-            {/* TAB: LAP TRACES */}
             {tab === "trace" && (
               <Panel title="LAP-BY-LAP TRACE">
-                <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                  {["all", "race", "quali", "practice"].map((k) => ( <button key={k} onClick={() => setTraceType(k)} style={{ padding: "6px 14px", border: `1px solid ${traceType === k ? AMBER : "#222c38"}`, background: traceType === k ? "#1a160a" : "#0b1017", color: traceType === k ? AMBER : "#8b97a7" }}>{k.toUpperCase()}</button> ))}
+                <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                  {[["all", "ALL"], ["race", "RACE"], ["quali", "QUALI"], ["practice", "PRACTICE"]].map(([k, l]) => (
+                    <button key={k} onClick={() => setTraceType(k)} className="disp"
+                      style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+                        border: `1px solid ${traceType === k ? AMBER : "#222c38"}`, background: traceType === k ? "#1a160a" : "#0b1017", color: traceType === k ? AMBER : "#8b97a7" }}>{l}</button>
+                  ))}
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  {Object.entries(
+                    entries.filter((e) => {
+                      const lab = e.session.raceLabel || "";
+                      if (traceType === "quali") return /quali/i.test(lab);
+                      if (traceType === "practice") return /practice/i.test(lab);
+                      if (traceType === "race") return /race/i.test(lab) && !/quali/i.test(lab);
+                      return true;
+                    }).reduce((acc, e) => {
+                      const g = tidyLabel(e.session.raceLabel);
+                      (acc[g] = acc[g] || []).push(e);
+                      return acc;
+                    }, {})
+                  ).map(([race, rows]) => {
+                    const shown = rows.filter((r) => activeTrace.includes(r.key)).length;
+                    return (
+                      <Collapsible key={race} title={race} subtitle={`${shown}/${rows.length} shown`}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {rows.map((e) => {
+                            const on = activeTrace.includes(e.key);
+                            const col = colorOf(e.key);
+                            return (
+                              <button key={e.key} onClick={() => setTraceKeys(
+                                on ? activeTrace.filter((k) => k !== e.key) : [...activeTrace, e.key])}
+                                className="mono" style={{ fontSize: 11.5, padding: "5px 10px", borderRadius: 6, cursor: "pointer",
+                                  border: `1px solid ${col}`, opacity: on ? 1 : 0.35,
+                                  background: on ? `${col}1f` : "#0b1017", color: col }}>
+                                {(assign[e.key]?.trim() || `${e.teamName}`)} · #{e.num}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </Collapsible>
+                    );
+                  })}
                 </div>
                 <ResponsiveContainer width="100%" height={400}>
-                  <LineChart data={traceData}>
+                  <LineChart data={traceData} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
                     <CartesianGrid stroke="#161d27" />
-                    <XAxis dataKey="lap" stroke="#5b6776" />
-                    <YAxis stroke="#5b6776" domain={["dataMin - 0.5", "dataMax + 0.5"]} width={52} />
-                    <Tooltip contentStyle={{ background: "#0d141c" }} />
-                    {entries.filter((e) => activeTrace.includes(e.key)).map((e) => ( <Line key={e.key} dataKey={e.key} name={assign[e.key] || e.teamName} stroke={colorOf(e.key)} dot={{ r: 2 }} connectNulls isAnimationActive={false} /> ))}
+                    <XAxis dataKey="lap" stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }}
+                      label={{ value: "LAP", position: "insideBottom", offset: -2, fill: "#5b6776", fontSize: 11 }} />
+                    <YAxis stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }}
+                      domain={["dataMin - 0.5", "dataMax + 0.5"]} width={52}
+                      allowDecimals={false} interval={0} tickFormatter={(v) => v.toFixed(1)}
+                      ticks={(() => { const all = traceData.flatMap((r) => Object.entries(r).filter(([k]) => k !== "lap").map(([, v]) => v)).filter((v) => typeof v === "number"); if (!all.length) return undefined; const lo = Math.floor(Math.min(...all) * 2) / 2, hi = Math.ceil(Math.max(...all) * 2) / 2; const t = []; for (let v = lo; v <= hi + 0.001; v += 0.5) t.push(Math.round(v * 2) / 2); return t; })()} />
+                    <Tooltip formatter={(v) => (typeof v === "number" ? v.toFixed(3) + "s" : v)}
+                      contentStyle={{ background: "#0d141c", border: "1px solid #222c38", borderRadius: 8,
+                      fontFamily: "IBM Plex Mono", fontSize: 12 }} labelStyle={{ color: AMBER }} />
+                    {fieldMed != null && (
+                      <ReferenceLine y={fieldMed} stroke={AMBER} strokeDasharray="6 5"
+                        label={{ value: "field median", fill: AMBER, fontSize: 10, position: "insideTopRight" }} />
+                    )}
+                    {entries.filter((e) => activeTrace.includes(e.key)).map((e) => (
+                      <Line key={e.key} dataKey={e.key} name={(assign[e.key]?.trim() || `${e.teamName}`)}
+                        stroke={colorOf(e.key)} strokeWidth={2} dot={{ r: 2.5 }} connectNulls
+                        isAnimationActive={false} />
+                    ))}
                   </LineChart>
                 </ResponsiveContainer>
               </Panel>
             )}
 
-            {/* TAB: PROGRESSION */}
             {tab === "prog" && (
-              <Panel title="DRIVER PROGRESSION">
-                <ResponsiveContainer width="100%" height={380}>
-                  <LineChart data={progression.data}>
-                    <CartesianGrid stroke="#161d27" />
-                    <XAxis dataKey="round" stroke="#5b6776" />
-                    <YAxis stroke="#5b6776" width={52} />
-                    <Tooltip contentStyle={{ background: "#0d141c" }} />
-                    {progression.drivers.map((d, di) => ( <Line key={d.driver} dataKey={d.driver} stroke={DRIVER_PALETTE[di % DRIVER_PALETTE.length]} dot={{ r: 3 }} connectNulls isAnimationActive={false} /> ))}
-                  </LineChart>
-                </ResponsiveContainer>
+              <Panel title="DRIVER PROGRESSION — FASTEST LAP vs FIELD, BY ROUND">
+                {progression.drivers.length === 0 ? (
+                  <Empty msg="Assign driver names above, and load telemetry lap sheets, to generate stats metrics charts." />
+                ) : (() => {
+                  const active = progSel || progression.drivers.map((d) => d.driver);
+                  return (
+                  <>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                    {progression.drivers.map((d, di) => {
+                      const on = active.includes(d.driver); const col = DRIVER_PALETTE[di % DRIVER_PALETTE.length];
+                      return (
+                        <button key={d.driver} className="mono"
+                          onClick={() => setProgSel(on ? active.filter((x) => x !== d.driver) : [...active, d.driver])}
+                          style={{ fontSize: 11, padding: "4px 9px", borderRadius: 6, cursor: "pointer",
+                            border: `1px solid ${col}`, opacity: on ? 1 : 0.35, background: on ? `${col}1f` : "#0b1017", color: col }}>
+                          {d.driver}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <ResponsiveContainer width="100%" height={380}>
+                    <LineChart data={progression.data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
+                      <CartesianGrid stroke="#161d27" />
+                      <XAxis dataKey="round" stroke="#5b6776" tick={{ fontSize: 10, fontFamily: "IBM Plex Mono" }} />
+                      <YAxis stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }}
+                        domain={["dataMin - 0.3", "dataMax + 0.3"]} width={52} tickFormatter={(v) => v.toFixed(1)}
+                        ticks={(() => { const all = progression.data.flatMap((r) => Object.entries(r).filter(([k]) => k !== "round").map(([, v]) => v)).filter((v) => typeof v === "number"); if (!all.length) return undefined; const lo = Math.floor(Math.min(...all) * 2) / 2, hi = Math.ceil(Math.max(...all) * 2) / 2; const t = []; for (let v = lo; v <= hi + 0.001; v += 0.5) t.push(Math.round(v * 2) / 2); return t; })()}
+                        label={{ value: "fastest lap vs field (s) — lower is better", angle: -90, position: "insideLeft", fill: "#5b6776", fontSize: 10 }} />
+                      <Tooltip formatter={(v) => (typeof v === "number" ? v.toFixed(2) + "s" : v)}
+                        contentStyle={{ background: "#0d141c", border: "1px solid #222c38", borderRadius: 8,
+                        fontFamily: "IBM Plex Mono", fontSize: 12 }} labelStyle={{ color: AMBER }} />
+                      {progression.drivers.map((d, di) => active.includes(d.driver) && (
+                        <Line key={d.driver} dataKey={d.driver}
+                          stroke={DRIVER_PALETTE[di % DRIVER_PALETTE.length]}
+                          strokeWidth={2} dot={{ r: 3 }} connectNulls isAnimationActive={false} />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                  </>
+                  );
+                })()}
               </Panel>
             )}
 
-            {/* TAB: DRIVER REPORT */}
             {tab === "report" && (() => {
               const races = convertedSessions.filter((s) => s.laps.length && !/practice/i.test(s.raceLabel));
-              const rep = races.find((s) => s.id === reportSession) || races[0];
-              if (!rep) return <Panel title="DRIVER REPORT"><Empty msg="No data loaded." /></Panel>;
+              const rep = races.find((s) => s.id === reportSession)
+                || races.find((s) => /race/i.test(s.raceLabel)) || races[0];
+              if (!rep) return <Panel title="DRIVER REPORT"><Empty msg="No session with lap data loaded." /></Panel>;
+              const report = driverReport(rep, extraTeams, extraNums, removed);
+              const nameOf = (num) => assign[`${rep.id}|${num}`]?.trim();
               return (
-                <Panel title="DRIVER REPORT — STATISTICS MATRIX">
-                  <select value={rep.id} onChange={(e) => setReportSession(e.target.value)} style={{ ...inp(280), marginBottom: 16 }}>{races.map((s) => <option key={s.id} value={s.id}>{tidyLabel(s.raceLabel)}</option>)}</select>
-                  <ReportTable report={driverReport(rep, extraTeams, extraNums, removed)} nameOf={(num) => assign[`${rep.id}|${num}`]} />
+                <Panel title="DRIVER REPORT — FASTEST 50% OF LAPS">
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                    <span className="mono" style={{ fontSize: 11, color: "#6b7685" }}>SESSION</span>
+                    <select value={rep.id} onChange={(e) => setReportSession(e.target.value)}
+                      style={{ ...inp(280), flex: "0 1 320px" }}>
+                      {races.map((s) => <option key={s.id} value={s.id}>{tidyLabel(s.raceLabel)}</option>)}
+                    </select>
+                  </div>
+                  {report ? <ReportTable report={report} nameOf={nameOf} /> : <Empty msg="No lap data in this session." />}
                 </Panel>
               );
             })()}
 
-            {/* TAB: INTERACTIVE DRIVER RATINGS */}
             {tab === "rating" && (
-              <Panel title="DRIVER RATINGS LEADERBOARD">
+              <Panel title={`DRIVER RATING — ${ratingScope === "season" ? "WHOLE SEASON" : "SELECTED ROUND(S)"}, OUT OF 10`}>
                 <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                  {["round", "season"].map((k) => ( <button key={k} onClick={() => setRatingScope(k)} style={{ padding: "6px 14px", border: `1px solid ${ratingScope === k ? AMBER : "#222c38"}`, background: ratingScope === k ? "#1a160a" : "#0b1017", color: ratingScope === k ? AMBER : "#8b97a7" }}>{k === "round" ? "THIS ROUND" : "WHOLE SEASON"}</button> ))}
+                  {[["round", "THIS ROUND"], ["season", "WHOLE SEASON"]].map(([k, l]) => (
+                    <button key={k} onClick={() => setRatingScope(k)} className="disp"
+                      style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+                        border: `1px solid ${ratingScope === k ? AMBER : "#222c38"}`,
+                        background: ratingScope === k ? "#1a160a" : "#0b1017", color: ratingScope === k ? AMBER : "#8b97a7" }}>
+                      {l}
+                    </button>
+                  ))}
                 </div>
-                <table className="mono" style={{ width: "100%" }}>
-                  <thead>
-                    <tr style={{ color: "#6b7685" }}>
-                      {/* Active column buttons sorting hooks */}
-                      { [["#", null], ["DRIVER", "name"], ["RACES", "races"], ["PACE", "pace"], ["CONSISTENCY", "cons"], ["RACECRAFT", "race"], ["RATING", "overall"] ].map(([h, k]) => (
-                        <th key={h} onClick={() => k && setRatingSort((s) => ({ key: k, dir: s.key === k && s.dir === "desc" ? "asc" : "desc" }))} style={{ cursor: k ? "pointer" : "default", color: ratingSort.key === k ? AMBER : "#6b7685", textAlign: k === "name" || !k ? "left" : "right" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...driverRatings].sort((a, b) => { const k = ratingSort.key, m = ratingSort.dir === "asc" ? 1 : -1; if (k === "name") return m * String(a.name).localeCompare(b.name); return m * ((a[k] ?? 0) - (b[k] ?? 0)); }).map((d, i) => (
-                      <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
-                        <td style={{ padding: "6px 0", color: "#5b6776" }}>{i + 1}</td>
-                        <td style={{ fontWeight: 600, color: "#fff" }}>{d.name}</td>
-                        <td style={{ textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
-                        <td style={{ textAlign: "right", color: "#43d977" }}>{d.hasPace ? d.pace.toFixed(2) : "—"}</td>
-                        <td style={{ textAlign: "right", color: "#ffce3a" }}>{d.hasCons ? d.cons.toFixed(2) : "—"}</td>
-                        <td style={{ textAlign: "right", color: "#3da9fc" }}>{d.hasRace ? d.race.toFixed(2) : "—"}</td>
-                        <td style={{ textAlign: "right", fontWeight: 700, fontSize: 14, color: AMBER }}>{d.overall.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {driverRatings.length === 0 ? (
+                  <Empty msg="Name drivers in the roster to rate them. 'This round' rates the round you've selected (plus any compare rounds); 'Whole season' combines everything." />
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    {(() => {
+                      const showRace = driverRatings.some((d) => d.hasRace);
+                      const cols = [["#", null], ["DRIVER", "name"], ["RACES", "races"], ["PACE", "pace"], ["CONSISTENCY", "cons"], ...(showRace ? [["RACECRAFT", "race"]] : []), ["RATING", "overall"]];
+                      const clickSort = (key) => { if (!key) return; setRatingSort((s) => ({ key, dir: s.key === key && s.dir === "desc" ? "asc" : "desc" })); };
+                      const sorted = [...driverRatings].sort((a, b) => {
+                        const k = ratingSort.key, m = ratingSort.dir === "asc" ? 1 : -1;
+                        if (k === "name") return m * String(a.name).localeCompare(String(b.name));
+                        return m * ((a[k] ?? 0) - (b[k] ?? 0));
+                      });
+                      return (
+                    <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 420 }}>
+                      <thead>
+                        <tr style={{ color: "#6b7685" }}>
+                          {cols.map(([h, key], i) => (
+                            <th key={h} onClick={() => clickSort(key)}
+                              style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733",
+                                fontWeight: 500, cursor: key ? "pointer" : "default", color: ratingSort.key === key ? AMBER : "#6b7685", userSelect: "none" }}>
+                              {h}{ratingSort.key === key ? (ratingSort.dir === "desc" ? " ▾" : " ▴") : ""}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sorted.map((d, i) => {
+                          const rc = (v) => v >= 7 ? "#43d977" : v >= 4.5 ? "#ffce3a" : "#ff8a5b";
+                          const bar = (v) => (<span style={{ color: rc(v) }}>{v.toFixed(2)}</span>);
+                          return (
+                            <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
+                              <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
+                              <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
+                              <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
+                              <td style={{ padding: "7px 10px", textAlign: "right" }}>
+                                {d.hasPace ? bar(d.pace) : <span style={{ color: "#3a4655" }}>—</span>}
+                                {d.wetDelta != null && <span style={{ color: "#3da9fc", fontSize: 10.5 }}> ({d.wetDelta <= 0 ? "" : "+"}{d.wetDelta.toFixed(2)})</span>}
+                              </td>
+                              <td style={{ padding: "7px 10px", textAlign: "right" }}>{d.hasCons ? bar(d.cons) : <span style={{ color: "#3a4655" }}>—</span>}</td>
+                              {showRace && (
+                                <td style={{ padding: "7px 10px", textAlign: "right" }}>
+                                  {d.hasRace ? (
+                                    <>{bar(d.race)} <span style={{ color: d.netGain >= 0 ? "#43d977" : "#ff8a5b", fontSize: 10.5 }}>({d.netGain >= 0 ? "+" : ""}{d.netGain})</span></>
+                                  ) : <span style={{ color: "#3a4655" }}>—</span>}
+                                </td>
+                              )}
+                              <td style={{ padding: "7px 10px", textAlign: "right", color: rc(d.overall), fontWeight: 700, fontSize: 14 }}>{d.overall.toFixed(2)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    ); })()}
+                    <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
+                      Pace (dry races) is measured against the rest of the Leeds squad at the same track. Wet races are pulled out of
+                      the pace score; the blue bracket shows seconds vs the wet field median (negative = faster than the wet field).
+                      Consistency is your own clean-lap spread (sd vs lap average) — tighter is always a higher score, matching the field comparison. (dry only)
+                    </div>
+                  </div>
+                )}
               </Panel>
             )}
 
-            {/* TAB: STANDALONE AI DEBRIEF MODULE */}
             {tab === "debrief" && (
-              <Panel title="AI DEBRIEF ENGINE">
-                <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "flex-end" }}>
-                  <select value={debriefScope} onChange={(e) => setDebriefScope(e.target.value)} style={{ ...inp(180) }}>
-                    <option value="overall">Overall Team Summary</option>
-                    <option value="mains">Mains Only</option>
-                    <option value="inters">Inters Only</option>
-                  </select>
-                  <select value={debriefTime} onChange={(e) => setDebriefTime(e.target.value)} style={{ ...inp(140) }}>
-                    <option value="round">This Round</option>
-                    <option value="season">Whole Season</option>
-                  </select>
-                  <button onClick={async () => {
+              <Panel title="AI DEBRIEF — KAI ASKEY, DRIVER COACH">
+                {(() => {
+                  const sel = (label, val, set, opts) => (
+                    <label className="mono" style={{ fontSize: 11, color: "#6b7685", display: "flex", flexDirection: "column", gap: 4 }}>
+                      {label}
+                      <select value={val} onChange={(e) => set(e.target.value)}
+                        style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 6, color: "#e6edf3", padding: "6px 8px", fontSize: 12.5, fontFamily: "IBM Plex Mono, monospace" }}>
+                        {opts.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+                      </select>
+                    </label>
+                  );
+                  const runDebrief = async () => {
                     setDebriefLoading(true); setDebrief("");
                     const sessions = debriefTime === "season" ? seasonSessions : convertedSessions;
+                    const inScope = (round) => debriefScope === "overall" ? true : debriefScope === "mains" ? /main/i.test(round) : /inter/i.test(round);
                     const byDriver = {};
                     sessions.forEach((s) => {
-                      if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;
+                      if (!/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel) || !inScope(s.round)) return;
                       const rep = driverReport(s, extraTeams, extraNums, removed); if (!rep) return;
                       rep.rows.forEach((r) => {
                         if (!r.isLeeds) return;
-                        const n = assign[`${s.id}|${r.num}`]?.trim(); if (!n) return;
-                        const d = byDriver[n] || (byDriver[n] = { name: n, avg: [], sd: [], z: [], gain: 0, races: 0 });
+                        const name = assign[`${s.id}|${r.num}`]?.trim();
+                        if (!name) return;   // only named Leeds drivers, never team-name fallbacks
+                        const d = byDriver[name] || (byDriver[name] = { name, avg: [], sd: [], z: [], gain: 0, races: 0 });
                         if (r.avg) d.avg.push(r.avg); if (r.sd != null) d.sd.push(r.sd); if (r.z != null) d.z.push(r.z);
                         if (s.posByKart && s.posByKart[r.num] != null) d.gain += s.posByKart[r.num];
                         d.races += 1;
                       });
                     });
-                    const lines = Object.values(byDriver).map((d) => `${d.name}: avg lap ${fmt(mean(d.avg))}s, spread sd ±${(mean(d.sd) || 0).toFixed(3)}s, z-score ${(mean(d.z) ?? 0).toFixed(2)}, net positions ${d.gain} across ${d.races} races`).join("\n");
+                    const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+                    const drivers = Object.values(byDriver);
+                    if (!drivers.length) { setDebrief("No named drivers in this scope. Name drivers in the roster first."); setDebriefLoading(false); return; }
+                    const lines = drivers.map((d) => `${d.name}: avg lap ${fmt(mean(d.avg))}s, lap-spread sd ±${(mean(d.sd) || 0).toFixed(3)}s, field z-score ${(mean(d.z) ?? 0).toFixed(2)}, net positions ${d.gain >= 0 ? "+" + d.gain : d.gain} across ${d.races} race(s)`).join("\n");
+                    const scopeName = debriefScope === "overall" ? "the whole team" : debriefScope === "mains" ? "the Mains drivers" : "the Inters drivers";
+                    const prompt = `Debrief ${scopeName}, ${debriefTime === "season" ? "across the whole season" : "for the selected round"}. Negative z-score = faster than the field; lower sd = more consistent. Drivers:\n${lines}`;
                     try {
-                      const res = await fetch("/api/debrief", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt: `Debriefing profile inputs:\n${lines}` }) });
-                      const j = await res.json(); setDebrief(j.text || j.error || "No response.");
-                    } catch { setDebrief("Endpoint error. Check Cloudflare Secrets configuration."); }
+                      const res = await fetch("/api/debrief", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt }) });
+                      const j = await res.json();
+                      setDebrief(j.text || j.error || "No response.");
+                    } catch { setDebrief("Couldn't reach the debrief service (works on the live site with the API key set)."); }
                     setDebriefLoading(false);
-                  }} style={{ background: AMBER, color: "#000", padding: "8px 16px", borderRadius: 6, fontWeight: 700, cursor: "pointer" }}>{debriefLoading ? "ANALYSING STINTS…" : "✦ GENERATE DEBRIEF"}</button>
-                </div>
-                {debrief && ( <div style={{ borderLeft: `3px solid ${AMBER}`, background: "#0b0f15", border: "1px solid #222c38", padding: 18, whiteSpace: "pre-wrap", fontSize: 13.5, color: "#dbe2ea", borderRadius: 8 }}>{debrief}</div> )}
+                  };
+                  return (
+                    <>
+                      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+                        {sel("SCOPE", debriefScope, setDebriefScope, [["overall", "Overall Team Summary"], ["mains", "Mains Only"], ["inters", "Inters Only"]])}
+                        {sel("TIMELINE", debriefTime, setDebriefTime, [["round", "This Round"], ["season", "Whole Season"]])}
+                        <button onClick={runDebrief} disabled={debriefLoading} className="disp"
+                          style={{ background: AMBER, color: "#000", border: "none", borderRadius: 7, padding: "9px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                          {debriefLoading ? "ANALYSING…" : "✦ GENERATE DEBRIEF"}
+                        </button>
+                      </div>
+                      {debrief && (
+                        <div style={{ background: "#0b0f15", borderLeft: `3px solid ${AMBER}`, border: "1px solid #222c38", borderRadius: 8, padding: "18px 20px", whiteSpace: "pre-wrap", fontSize: 13.5, lineHeight: 1.7, color: "#dbe2ea" }}>
+                          {debrief}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </Panel>
             )}
 
-            {/* TAB: STATS */}
             {tab === "stats" && (
               <Panel title="SEASON STATS">
-                <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                  {["drivers", "teams"].map((k) => ( <button key={k} onClick={() => setStatsView(k)} style={{ padding: "6px 14px", border: `1px solid ${statsView === k ? AMBER : "#222c38"}`, background: statsView === k ? "#1a160a" : "#0b1017", color: statsView === k ? AMBER : "#8b97a7" }}>{k.toUpperCase()}</button> ))}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-                  {(statsView === "teams" ? stats.teams : stats.drivers).map((d, i) => (
-                    <div key={d.name} style={{ background: "#0b1017", border: "1px solid #1b2430", padding: 16, borderRadius: 10 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontWeight: 700 }}>{i + 1}. {d.name}</span><span style={{ color: "#43d977", fontWeight: 700 }}>{d.points} pts</span></div>
-                      <div style={{ fontSize: 11.5, color: "#8b97a7" }}>Races: {d.races} · Avg Finish: {d.avgFinish?.toFixed(1) || "—"} · Best Lap: {fmt(d.bestLap)}</div>
+                {(() => {
+                  const list = statsView === "teams" ? stats.teams : stats.drivers;
+                  const o = stats.overall;
+                  const Stat = ({ label, value, color }) => (
+                    <div style={{ flex: "1 1 0", minWidth: 92 }}>
+                      <div className="mono" style={{ fontSize: 9.5, color: "#5b6776", letterSpacing: "0.5px" }}>{label}</div>
+                      <div className="mono" style={{ fontSize: 17, fontWeight: 600, color: color || "#e6edf3", marginTop: 2 }}>{value}</div>
                     </div>
-                  ))}
-                </div>
+                  );
+                  const posCh = (v) => v == null ? "—" : (v >= 0 ? "+" : "") + v;
+                  return (
+                    <>
+                      {/* OVERALL LEEDS hero */}
+                      <div style={{ background: "linear-gradient(135deg,#11160f,#0b1017)", border: `1px solid ${AMBER}40`, borderRadius: 12, padding: "16px 20px", marginBottom: 18 }}>
+                        <div className="disp" style={{ fontSize: 14, color: AMBER, fontWeight: 700, letterSpacing: "1px", marginBottom: 12 }}>🦁 LEEDS OVERALL — SEASON</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+                          <Stat label="POINTS" value={o.points} color="#43d977" />
+                          <Stat label="RACES" value={o.races} />
+                          <Stat label="AVG FINISH" value={o.avgFinish != null ? o.avgFinish.toFixed(1) : "—"} />
+                          <Stat label="NET +/-" value={posCh(o.totalPosCh)} color={o.totalPosCh >= 0 ? "#43d977" : "#ff8a5b"} />
+                          <Stat label="BEST LAP" value={o.bestLap != null ? fmt(o.bestLap) : "—"} color={AMBER} />
+                          <Stat label="RACE PACE" value={o.racePace != null ? fmt(o.racePace) : "—"} />
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                        {[["drivers", "BY DRIVER"], ["teams", "BY TEAM"]].map(([k, l]) => (
+                          <button key={k} onClick={() => setStatsView(k)} className="disp"
+                            style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+                              border: `1px solid ${statsView === k ? AMBER : "#222c38"}`, background: statsView === k ? "#1a160a" : "#0b1017", color: statsView === k ? AMBER : "#8b97a7" }}>{l}</button>
+                        ))}
+                        <span style={{ width: 14 }} />
+                        {[["all", "ALL"], ["mains", "MAINS"], ["inters", "INTERS"], ...leedsTeamNames.map((t) => [t, t.toUpperCase()])].map(([k, l]) => (
+                          <button key={k} onClick={() => setStatsCat(k)} className="disp"
+                            style={{ padding: "6px 12px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+                              border: `1px solid ${statsCat === k ? "#b06bff" : "#222c38"}`, background: statsCat === k ? "#1a0f2a" : "#0b1017", color: statsCat === k ? "#b06bff" : "#8b97a7" }}>{l}</button>
+                        ))}
+                        <span style={{ flex: 1 }} />
+                        {[["cards", "CARDS"], ["chart", "CHART"], ["table", "TABLE"]].map(([k, l]) => (
+                          <button key={k} onClick={() => setStatsMode(k)} className="disp"
+                            style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+                              border: `1px solid ${statsMode === k ? "#3da9fc" : "#222c38"}`, background: statsMode === k ? "#0b2030" : "#0b1017", color: statsMode === k ? "#3da9fc" : "#8b97a7" }}>{l}</button>
+                        ))}
+                      </div>
+
+                      {list.length === 0 ? <Empty msg="Name drivers in the roster to build stats." /> : statsMode === "chart" ? (
+                        <ResponsiveContainer width="100%" height={Math.max(260, list.length * 34)}>
+                          <BarChart data={list} layout="vertical" margin={{ top: 4, right: 30, bottom: 4, left: 10 }}>
+                            <CartesianGrid stroke="#161d27" horizontal={false} />
+                            <XAxis type="number" stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} />
+                            <YAxis type="category" dataKey="name" width={110} stroke="#5b6776" tick={{ fontSize: 12, fontFamily: "IBM Plex Sans" }} />
+                            <Tooltip cursor={{ fill: "#ffffff08" }} contentStyle={{ background: "#0d141c", border: "1px solid #222c38", borderRadius: 8, fontFamily: "IBM Plex Mono", fontSize: 12 }} labelStyle={{ color: AMBER }} />
+                            <Bar dataKey="points" name="Points" radius={[0, 4, 4, 0]}>
+                              {list.map((e, i) => <Cell key={i} fill={i === 0 ? AMBER : "#3da9fc"} />)}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : statsMode === "table" ? (
+                        <div style={{ overflowX: "auto" }}>
+                          {(() => {
+                            const cols = [["#", null], [statsView === "teams" ? "TEAM" : "DRIVER", "name"], ["RACES", "races"], ["POINTS", "points"], ["AVG FINISH", "avgFinish"], ["TOTAL +/-", "totalPosCh"], ["BEST LAP", "bestLap"], ["RACE PACE", "racePace"], ["BEST QUALI", "bestQualiPos"]];
+                            const clickSort = (key) => { if (!key) return; setStatsSort((s) => ({ key, dir: s.key === key && s.dir === "desc" ? "asc" : "desc" })); };
+                            const sorted = [...list].sort((a, b) => {
+                              const k = statsSort.key, m = statsSort.dir === "asc" ? 1 : -1;
+                              if (k === "name") return m * String(a.name).localeCompare(String(b.name));
+                              const av = a[k] == null ? Infinity : a[k], bv = b[k] == null ? Infinity : b[k];
+                              return m * (av - bv);
+                            });
+                            return (
+                          <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 640 }}>
+                            <thead>
+                              <tr style={{ color: "#6b7685" }}>
+                                {cols.map(([h, key], i) => (
+                                  <th key={h} onClick={() => clickSort(key)} style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733",
+                                    fontWeight: 500, cursor: key ? "pointer" : "default", color: statsSort.key === key ? AMBER : "#6b7685", userSelect: "none" }}>
+                                    {h}{statsSort.key === key ? (statsSort.dir === "desc" ? " ▾" : " ▴") : ""}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sorted.map((d, i) => (
+                                <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
+                                  <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
+                                  <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#43d977", fontWeight: 700 }}>{d.points}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgFinish != null ? d.avgFinish.toFixed(1) : "—"}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: d.totalPosCh == null ? "#5b6776" : d.totalPosCh >= 0 ? "#43d977" : "#ff8a5b" }}>{posCh(d.totalPosCh)}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER }}>{d.bestLap != null ? fmt(d.bestLap) : "—"}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.racePace != null ? fmt(d.racePace) : "—"}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.bestQualiPos != null ? "P" + d.bestQualiPos : "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                            );
+                          })()}
+                        </div>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
+                          {list.map((d, i) => (
+                            <div key={d.name} style={{ background: "#0b1017", border: "1px solid #1b2430", borderRadius: 10, padding: "14px 16px" }}>
+                              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+                                <span className="disp" style={{ fontSize: 17, fontWeight: 700, color: "#e6edf3" }}>
+                                  <span style={{ color: "#5b6776", fontSize: 13 }}>{i + 1}. </span>{d.name}
+                                </span>
+                                <span className="mono" style={{ fontSize: 19, fontWeight: 700, color: "#43d977" }}>{d.points}<span style={{ fontSize: 11, color: "#5b6776" }}> pts</span></span>
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                                <Stat label="RACES" value={d.races} />
+                                <Stat label="AVG FINISH" value={d.avgFinish != null ? d.avgFinish.toFixed(1) : "—"} />
+                                <Stat label="NET +/-" value={posCh(d.totalPosCh)} color={d.totalPosCh == null ? "#5b6776" : d.totalPosCh >= 0 ? "#43d977" : "#ff8a5b"} />
+                                <Stat label="BEST LAP" value={d.bestLap != null ? fmt(d.bestLap) : "—"} color={AMBER} />
+                                <Stat label="RACE PACE" value={d.racePace != null ? fmt(d.racePace) : "—"} />
+                                <Stat label="BEST QUALI" value={d.bestQualiPos != null ? "P" + d.bestQualiPos : "—"} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 14, lineHeight: 1.5 }}>
+                        Whole season, races only. Points and finishes from results; net +/- is total positions gained/lost; best lap and race pace are clean laps;
+                        best quali is the driver's best qualifying finishing position (Inters). By driver counts named drivers; by team sums each Leeds entry.
+                      </div>
+                    </>
+                  );
+                })()}
               </Panel>
             )}
 
-            {/* TAB: SECTORS (Quali & Practice parsing enabled with key-sniffing fallback mappings) */}
-            {tab === "sectors" && (() => {
-              const races = convertedSessions.filter((s) => s.isRound && s.laps.length && (/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel) || /practice/i.test(s.raceLabel)));
-              const rep = races.find((s) => s.id === sectorSession) || races[0];
-              if (!rep) return <Panel title="SECTOR ANALYSIS"><Empty msg="No telemetry sector maps found." /></Panel>;
-              const sb = rep.sectorsByKart || {};
-              const ours = rep.karts.filter((k) => !removed.has(`${rep.id}|${k.num}`)).map((k) => ({ num: k.num, name: assign[`${rep.id}|${k.num}`] || k.teamName, ...(sb[k.num] || {}) })).filter((o) => o.best != null || o.s1 != null);
-              return (
-                <Panel title="SECTOR TIMING RECORD MATRIX">
-                  <select value={rep.id} onChange={(e) => setSectorSession(e.target.value)} style={{ ...inp(300), marginBottom: 16 }}>{races.map((s) => <option key={s.id} value={s.id}>{tidyLabel(s.raceLabel)}</option>)}</select>
-                  <table className="mono" style={{ width: "100%" }}>
-                    <thead>
-                      <tr style={{ color: "#6b7685", borderBottom: "1px solid #1e2733" }}><th>DRIVER</th><th style={{ textAlign: "right" }}>S1</th><th style={{ textAlign: "right" }}>S2</th><th style={{ textAlign: "right" }}>S3</th><th style={{ textAlign: "right" }}>THEORETICAL</th><th style={{ textAlign: "right" }}>BEST LAP</th></tr>
-                    </thead>
-                    <tbody>
-                      {ours.map((o) => (
-                        <tr key={o.num} style={{ borderBottom: "1px solid #11171f" }}>
-                          <td style={{ padding: "6px 0", color: "#fff", fontWeight: 600 }}>{o.name} <span style={{ color: "#5b6776" }}>#{o.num}</span></td>
-                          <td style={{ textAlign: "right" }}>{fmt(o.s1)}</td><td style={{ textAlign: "right" }}>{fmt(o.s2)}</td><td style={{ textAlign: "right" }}>{fmt(o.s3)}</td>
-                          <td style={{ textAlign: "right", color: "#8b97a7" }}>{o.ult ? o.ult.toFixed(3) : "—"}</td>
-                          <td style={{ textAlign: "right", color: AMBER }}>{o.best ? o.best.toFixed(3) : "—"}</td>
-                        </tr>
+            {tab === "special" && (
+              <Panel title="SPECIAL EVENTS">
+                <div className="mono" style={{ fontSize: 11, color: "#5b6776", marginBottom: 16 }}>
+                  One-off events (Drivers Championship, Qualifiers, testing). Shown on their own and never counted in the round ratings or stats.
+                </div>
+                {specialEvents.length === 0 ? (
+                  <Empty msg="No special events found in the loaded season." />
+                ) : specialEvents.map((e) => (
+                  <Collapsible key={e.title} title={e.title} subtitle={`${e.sessions.length} session${e.sessions.length === 1 ? "" : "s"}`}>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {e.sessions.map((s, si) => (
+                        <div key={si} style={{ background: "#080d13", borderRadius: 7, padding: "8px 12px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                            <span className="disp" style={{ color: "#e6edf3", fontWeight: 600, fontSize: 13 }}>{s.label}</span>
+                            {s.winner && <span className="mono" style={{ fontSize: 11.5, color: "#8b97a7" }}>Winner: <span style={{ color: AMBER }}>{s.winner}</span></span>}
+                          </div>
+                          {s.ours.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+                              {s.ours.map((o, oi) => (
+                                <span key={oi} className="mono" style={{ fontSize: 11, background: "#0b1017", border: "1px solid #2a3543", borderRadius: 6, padding: "3px 8px", color: "#c2cbd6" }}>
+                                  {o.team} #{o.kart} · P{o.pos} · {o.pts || 0} pts
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  </Collapsible>
+                ))}
+              </Panel>
+            )}
+
+            {tab === "sectors" && (() => {
+              const races = convertedSessions.filter((s) => s.isRound && /race/i.test(s.raceLabel) && !/quali/i.test(s.raceLabel));
+              const hasOurs = (s) => (s.karts || []).some((k) => !removed.has(`${s.id}|${k.num}`) && s.sectorsByKart && s.sectorsByKart[k.num] && (s.sectorsByKart[k.num].best != null || s.sectorsByKart[k.num].s1 != null));
+              const rep = races.find((s) => s.id === sectorSession) || races.find(hasOurs) || races[0];
+              if (!rep) return <Panel title="SECTOR ANALYSIS"><Empty msg="No race session loaded." /></Panel>;
+              const sb = rep.sectorsByKart || {};
+              const allK = (rep.allKarts || []).map((k) => k.num);
+              const fieldBest = (sec) => { const v = allK.map((n) => sb[n] && sb[n][sec]).filter((x) => x != null); return v.length ? Math.min(...v) : null; };
+              const fb = { s1: fieldBest("s1"), s2: fieldBest("s2"), s3: fieldBest("s3") };
+              const ours = rep.karts.filter((k) => !removed.has(`${rep.id}|${k.num}`))
+                .map((k) => ({ num: k.num, name: assign[`${rep.id}|${k.num}`]?.trim() || k.teamName, ...(sb[k.num] || {}) }))
+                .filter((o) => o.best != null || o.s1 != null);
+              const dCell = (v, best) => v == null ? <span style={{ color: "#3a4655" }}>—</span> :
+                <span style={{ color: best != null && v <= best + 0.001 ? "#b06bff" : "#c2cbd6" }}>{v.toFixed(3)}{best != null && v > best + 0.001 ? <span style={{ color: "#5b6776", fontSize: 10 }}> +{(v - best).toFixed(2)}</span> : ""}</span>;
+              return (
+                <Panel title="SECTOR ANALYSIS — BEST SECTORS & ULTIMATE-LAP GAP">
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                    <span className="mono" style={{ fontSize: 11, color: "#6b7685" }}>SESSION</span>
+                    <select value={rep.id} onChange={(e) => setSectorSession(e.target.value)} style={{ ...inp(300) }}>
+                      {races.map((s) => <option key={s.id} value={s.id}>{tidyLabel(s.raceLabel)}</option>)}
+                    </select>
+                  </div>
+                  {ours.length === 0 ? <Empty msg="No Leeds sector data in this race." /> : (
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 560 }}>
+                        <thead><tr style={{ color: "#6b7685" }}>
+                          {["DRIVER", "S1", "S2", "S3", "THEORETICAL", "BEST LAP", "GAP"].map((h, i) => (
+                            <th key={h} style={{ padding: "6px 10px", textAlign: i === 0 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
+                          ))}
+                        </tr></thead>
+                        <tbody>
+                          {ours.sort((a, b) => (a.best ?? 9e9) - (b.best ?? 9e9)).map((o) => {
+                            const gap = (o.best != null && o.ult != null) ? o.best - o.ult : null;
+                            return (
+                              <tr key={o.num} style={{ borderBottom: "1px solid #11171f" }}>
+                                <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{o.name} <span style={{ color: "#5b6776" }}>#{o.num}</span></td>
+                                <td style={{ padding: "7px 10px", textAlign: "right" }}>{dCell(o.s1, fb.s1)}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right" }}>{dCell(o.s2, fb.s2)}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right" }}>{dCell(o.s3, fb.s3)}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{o.ult != null ? fmt(o.ult) : "—"}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER }}>{o.best != null ? fmt(o.best) : "—"}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: gap == null ? "#5b6776" : gap > 0.3 ? "#ff8a5b" : "#43d977" }}>{gap == null ? "—" : "+" + gap.toFixed(3)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
+                        Purple = matched the field's best sector. THEORETICAL is their ultimate lap (sum of their own best sectors); GAP is best lap minus theoretical —
+                        how much they left on the table by not stringing the sectors together. A big gap = the speed's there, the lap isn't.
+                      </div>
+                    </div>
+                  )}
+                </Panel>
+              );
+            })()}
+
+            {tab === "lineup" && (() => {
+              const cat = {};
+              seasonSessions.forEach((s) => {
+                if (!s.isRound || !/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel)) return;
+                s.karts.forEach((k) => { const n = assign[`${s.id}|${k.num}`]?.trim(); if (!n) return; cat[n] = cat[n] || { Mains: 0, Inters: 0 }; cat[n][s.category] = (cat[n][s.category] || 0) + 1; });
+              });
+              const catOf = (n) => { const c = cat[n]; if (!c) return "?"; return (c.Mains || 0) >= (c.Inters || 0) ? "M" : "I"; };
+              const ranked = driverRatings;
+              const mainsScores = ranked.filter((d) => catOf(d.name) === "M").map((d) => d.overall);
+              const lowestMains = mainsScores.length ? Math.min(...mainsScores) : 0;
+              return (
+                <Panel title="LINEUP OPTIMISER — RANKED, WITH PROMOTION FLAGS">
+                  {ranked.length === 0 ? <Empty msg="Name drivers to build the lineup." /> : (
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {ranked.map((d, i) => {
+                        const c = catOf(d.name);
+                        const promote = c === "I" && d.overall > lowestMains && mainsScores.length > 0;
+                        return (
+                          <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 12, background: "#0b1017", border: `1px solid ${promote ? "#43d97755" : "#1b2430"}`, borderRadius: 8, padding: "8px 12px" }}>
+                            <span className="mono" style={{ color: "#5b6776", width: 24 }}>{i + 1}</span>
+                            <span className="disp" style={{ fontWeight: 700, color: "#e6edf3", flex: 1 }}>{d.name}</span>
+                            <span className="mono" style={{ fontSize: 10.5, padding: "2px 7px", borderRadius: 5, border: "1px solid #2a3543", color: c === "M" ? AMBER : "#3da9fc" }}>{c === "M" ? "MAINS" : c === "I" ? "INTERS" : "—"}</span>
+                            {promote && <span className="mono" style={{ fontSize: 10.5, padding: "2px 7px", borderRadius: 5, background: "#0e2018", border: "1px solid #43d97755", color: "#43d977" }}>↑ PROMOTE</span>}
+                            <span className="mono" style={{ fontSize: 15, fontWeight: 700, color: d.overall >= 7 ? "#43d977" : d.overall >= 4.5 ? "#ffce3a" : "#ff8a5b", width: 48, textAlign: "right" }}>{d.overall.toFixed(2)}</span>
+                          </div>
+                        );
+                      })}
+                      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 8, lineHeight: 1.5 }}>
+                        Ranked on overall rating (follows the rating tab's round/season scope). Drivers tagged by the category they race most.
+                        An Inters driver flagged ↑ PROMOTE is rated above your weakest Mains driver — a case to move them up.
+                      </div>
+                    </div>
+                  )}
                 </Panel>
               );
             })()}
 
           </>
         )}
+
+        {!hasData && (
+          <div className="mono" style={{ color: "#5b6776", fontSize: 13, textAlign: "center", padding: "40px 0" }}>
+            Type an event identifier at the top and select load to populate dashboard layout
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
+/* ---------- stats table ---------- */
 function StatsTable({ boxes, fieldMed }) {
   if (!boxes || !boxes.length) return null;
+  const ranked = [...boxes].sort((a, b) => (a.avg ?? 9e9) - (b.avg ?? 9e9));
   return (
-    <table className="mono" style={{ width: "100%", fontSize: 12, marginTop: 12 }}>
-      <thead>
-        <tr style={{ color: "#6b7685" }}><th style={{ textAlign: "left" }}>DRIVER/TEAM</th><th style={{ textAlign: "right" }}>BEST LAP</th><th style={{ textAlign: "right" }}>CLEAN AVG</th><th style={{ textAlign: "right" }}>CONSISTENCY</th><th style={{ textAlign: "right" }}>VS FIELD</th></tr>
-      </thead>
-      <tbody>
-        {[...boxes].sort((a, b) => (a.avg ?? 9e9) - (b.avg ?? 9e9)).map((b, idx) => {
-          const gap = fieldMed != null && b.avg != null ? b.avg - fieldMed : null;
-          return (
-            <tr key={idx} style={{ borderBottom: "1px solid #11171f" }}>
-              <td style={{ color: b.color, fontWeight: 600 }}>{b.label}</td>
-              <td style={{ textAlign: "right" }}>{fmt(b.best)}</td><td style={{ textAlign: "right" }}>{fmt(b.avg)}</td><td style={{ textAlign: "right" }}>{fmt(b.cons)}</td>
-              <td style={{ textAlign: "right", color: gap <= 0 ? "#43d977" : "#ff3355" }}>{gap == null ? "—" : gap <= 0 ? `${gap.toFixed(3)}s` : `+${gap.toFixed(3)}s`}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div style={{ marginTop: 12, overflowX: "auto" }}>
+      <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr style={{ color: "#6b7685", textAlign: "right" }}>
+            {["DRIVER/TEAM", "BEST LAP", "CLEAN AVG", "CONSISTENCY", "INCIDENTS", "VS FIELD"].map((h, i) => (
+              <th key={h} style={{ padding: "6px 10px", textAlign: i === 0 ? "left" : "right",
+                borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {ranked.map((b, idx) => {
+            const gap = fieldMed != null && b.avg != null ? b.avg - fieldMed : null;
+            return (
+              <tr key={idx} style={{ borderBottom: "1px solid #11171f" }}>
+                <td style={{ padding: "6px 10px", color: b.color, fontWeight: 600, textAlign: "left" }}>{b.label}</td>
+                <td style={td}>{fmt(b.best)}</td>
+                <td style={td}>{fmt(b.avg)}</td>
+                <td style={td}>{fmt(b.cons)}</td>
+                <td style={td}>{b.inc}</td>
+                <td style={{ padding: "6px 10px", textAlign: "right", color: gap == null ? "#5b6776" : gap <= 0 ? "#43d977" : "#ff3355" }}>
+                  {gap == null ? "—" : gap <= 0 ? `${gap.toFixed(3)}s` : `+${gap.toFixed(3)}s`}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
-const inp = (w) => ({ background: "#11171f", border: "1px solid #222c38", borderRadius: 6, color: "#e6edf3", padding: "5px 8px", fontSize: 12.5, width: w, fontFamily: "IBM Plex Mono" });
-const Label = ({ children }) => ( <div className="disp" style={{ fontSize: 12.5, color: "#8b97a7", fontWeight: 600, marginBottom: 9 }}>{children}</div> );
-function Panel({ title, children }) { return ( <div style={{ background: "#0a0f16", border: "1px solid #161d27", borderRadius: 12, padding: 18, marginBottom: 14 }}> <div className="disp" style={{ fontSize: 13, color: AMBER, fontWeight: 600, marginBottom: 14 }}>{title}</div> {children} </div> ); }
+/* ---------- small ui ---------- */
+const td = { padding: "6px 10px", textAlign: "right", color: "#c2cbd6" };
+const inp = (w) => ({ background: "#11171f", border: "1px solid #222c38", borderRadius: 6,
+  color: "#e6edf3", padding: "5px 8px", fontSize: 12.5, width: w, fontFamily: "IBM Plex Mono, monospace" });
+const Label = ({ children }) => (
+  <div className="disp" style={{ fontSize: 12.5, color: "#8b97a7", letterSpacing: "1px",
+    fontWeight: 600, marginBottom: 9, textTransform: "uppercase" }}>{children}</div>
+);
+function Panel({ title, children }) {
+  return (
+    <div style={{ background: "#0a0f16", border: "1px solid #161d27", borderRadius: 12, padding: 18, marginBottom: 14 }}>
+      <div className="disp" style={{ fontSize: 13, color: AMBER, letterSpacing: "1.5px",
+        fontWeight: 600, marginBottom: 14 }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
 function Collapsible({ title, subtitle, defaultOpen = false, accent = AMBER, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ border: "1px solid #161d27", borderRadius: 10, marginBottom: 10, background: "#0b1017", overflow: "hidden" }}>
-      <button onClick={() => setOpen(!open)} style={{ width: "100%", display: "flex", padding: "11px 14px", background: open ? "#0d141c" : "none", border: "none", cursor: "pointer" }}>
-        <span style={{ color: accent, fontWeight: 700, marginRight: 8, transform: open ? "rotate(90deg)" : "none", display: "inline-block" }}>▸</span>
-        <span style={{ color: "#e6edf3", fontWeight: 600, flex: 1, textAlign: "left" }}>{title}</span>
+    <div style={{ border: "1px solid #161d27", borderRadius: 10, marginBottom: 10,
+      overflow: "hidden", background: "#0b1017" }}>
+      <button onClick={() => setOpen((o) => !o)}
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
+          background: open ? "#0d141c" : "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+        <span className="disp" style={{ color: accent, fontWeight: 700, fontSize: 13,
+          display: "inline-block", transition: "transform .15s", transform: open ? "rotate(90deg)" : "none" }}>▸</span>
+        <span className="disp" style={{ color: "#e6edf3", fontWeight: 600, fontSize: 14,
+          letterSpacing: "0.5px", flex: 1 }}>{title}</span>
         {subtitle && <span className="mono" style={{ color: "#5b6776", fontSize: 11 }}>{subtitle}</span>}
       </button>
       {open && <div style={{ padding: "6px 14px 16px" }}>{children}</div>}
