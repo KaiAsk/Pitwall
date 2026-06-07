@@ -480,6 +480,7 @@ export default function App() {
   const [statsCat, setStatsCat] = useState("all");
   const [progSel, setProgSel] = useState(null);
   const [statsSort, setStatsSort] = useState({ key: "points", dir: "desc" });
+  const [traceType, setTraceType] = useState("all");
   const [adminPw, setAdminPw] = useState("");
   const [syncMsg, setSyncMsg] = useState("");
   const [syncing, setSyncing] = useState(false);
@@ -1043,10 +1044,10 @@ export default function App() {
             style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 6, color: "#e6edf3",
               padding: "5px 8px", fontSize: 12.5, fontFamily: "IBM Plex Mono, monospace", minWidth: 180, cursor: "pointer" }}>
             {eventIndex.length === 0 && <option value="">no rounds — run scraper</option>}
-            {["Mains", "Inters"].filter((cat) => eventIndex.some((e) => e.category === cat)).map((cat) => (
-              <optgroup key={cat} label={cat}>
+            {["Mains", "Inters", "Other"].filter((cat) => eventIndex.some((e) => e.category === cat)).map((cat) => (
+              <optgroup key={cat} label={cat === "Other" ? "Special Events" : cat}>
                 {eventIndex.filter((e) => e.category === cat).sort((a, b) => a.round - b.round).map((e) => (
-                  <option key={e.id} value={e.id}>{e.category} Round {e.round === 999 ? "?" : e.round}</option>
+                  <option key={e.id} value={e.id}>{cat === "Other" ? e.title : `${e.category} Round ${e.round === 999 ? "?" : e.round}`}</option>
                 ))}
               </optgroup>
             ))}
@@ -1402,9 +1403,22 @@ export default function App() {
 
             {tab === "trace" && (
               <Panel title="LAP-BY-LAP TRACE">
+                <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                  {[["all", "ALL"], ["race", "RACE"], ["quali", "QUALI"], ["practice", "PRACTICE"]].map(([k, l]) => (
+                    <button key={k} onClick={() => setTraceType(k)} className="disp"
+                      style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+                        border: `1px solid ${traceType === k ? AMBER : "#222c38"}`, background: traceType === k ? "#1a160a" : "#0b1017", color: traceType === k ? AMBER : "#8b97a7" }}>{l}</button>
+                  ))}
+                </div>
                 <div style={{ marginBottom: 14 }}>
                   {Object.entries(
-                    entries.reduce((acc, e) => {
+                    entries.filter((e) => {
+                      const lab = e.session.raceLabel || "";
+                      if (traceType === "quali") return /quali/i.test(lab);
+                      if (traceType === "practice") return /practice/i.test(lab);
+                      if (traceType === "race") return /race/i.test(lab) && !/quali/i.test(lab);
+                      return true;
+                    }).reduce((acc, e) => {
                       const g = tidyLabel(e.session.raceLabel);
                       (acc[g] = acc[g] || []).push(e);
                       return acc;
