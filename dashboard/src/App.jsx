@@ -391,7 +391,11 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
     const seen = new Set(); const allKarts = [];
     (s.results || []).forEach((r) => { const num = String(r.kart || ""); if (num && !seen.has(num)) { seen.add(num); allKarts.push({ num, teamName: r.team || num }); } });
     return { id: `scraped__${s.session_id}`, name: s.label, title: s.label, round, isRound, category, raceLabel, karts, allKarts, laps,
-      penalties: (s.penalties || []).filter((p) => isOurTeam(p.team, extraTeams) || extraNums.includes(String(p.kart || ""))),
+      penalties: (s.penalties || []).filter((p) => 
+        isOurTeam(p.team, extraTeams) || 
+        extraNums.includes(String(p.kart || "")) || 
+        karts.some(k => k.num === String(p.kart || ""))
+      ),
       posByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position_change) || 0])),
       finByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position) || null])),
       ptsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.points) || 0])),
@@ -859,10 +863,34 @@ export default function App() {
   const arionSummary = useMemo(() => {
     const agg = {};
     seasonSessions.forEach((s) => {
+      
+      // 1. Process all penalties robustly by Kart Number
+      (s.penalties || []).forEach((p) => {
+        const pKart = String(p.kart || "");
+        const kartObj = s.karts.find(k => 
+          (pKart && k.num === pKart) || 
+          (p.team && k.teamName.toLowerCase() === (p.team || "").toLowerCase())
+        );
+        if (!kartObj) return;
+
+        const key = `${s.id}|${kartObj.num}`;
+        if (removed.has(key)) return;
+        const name = assign[key]?.trim();
+        if (!name) return;
+
+        const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], penPos: 0, pens: 0 });
+        a.pens += 1;
+        
+        // Catch all wording: "+5 places", "-2 positions", "5 grid penalty"
+        const m = String(p.penalty || "").match(/(\d+)\s*(grid|place|pos)/i);
+        if (m) a.penPos += Number(m[1]);
+      });
+
       if (!s.isRound) return;
       const isQuali = /quali/i.test(s.raceLabel);
       const isRace = /race/i.test(s.raceLabel) && !isQuali;
       if (!isQuali && !isRace) return;
+
       const bests = (s.allKarts || []).map((k) => s.sectorsByKart && s.sectorsByKart[k.num] && s.sectorsByKart[k.num].best).filter((x) => x != null);
       const fastest = bests.length ? Math.min(...bests) : null;
       s.karts.forEach((k) => {
@@ -877,13 +905,9 @@ export default function App() {
           if (s.finByKart && s.finByKart[k.num] != null) a.qPos.push(s.finByKart[k.num]);
           if (gap != null) a.qGap.push(gap);
         } else if (gap != null) a.rGap.push(gap);
-        (s.penalties || []).filter((p) => String(p.kart) === k.num).forEach((p) => {
-          a.pens += 1;
-          const m = String(p.penalty || "").match(/(\d+)\s*grid/i);
-          if (m) a.penPos += Number(m[1]);
-        });
       });
     });
+    
     const avg = (x) => (x.length ? x.reduce((p, c) => p + c, 0) / x.length : null);
     return Object.values(agg).map((d) => ({ name: d.name, avgQpos: avg(d.qPos), avgQgap: avg(d.qGap), avgRgap: avg(d.rGap), penPos: d.penPos, pens: d.pens }))
       .sort((a, b) => (a.avgQpos ?? 99) - (b.avgQpos ?? 99));
@@ -1360,7 +1384,10 @@ export default function App() {
                         {(() => {
                           const sp = (session.penalties || []).filter((p) => {
                             const t = (p.team || "").toLowerCase();
-                            return t.includes("leeds") && !t.includes("beckett");
+                            const pKart = String(p.kart || "");
+                            // Show penalty if the team says leeds, OR if the kart number matches our row
+                            return (t.includes("leeds") && !t.includes("beckett")) || 
+                                   leedsSessionRows.some(r => String(r.kart) === pKart);
                           });
                           if (!sp.length) return null;
                           return (
