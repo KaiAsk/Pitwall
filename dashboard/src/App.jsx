@@ -466,7 +466,34 @@ export default function App() {
   const [debriefTime, setDebriefTime] = useState("season");
   const [statsView, setStatsView] = useState("drivers");
   const [statsMode, setStatsMode] = useState("cards");
-  const [extraInput, setExtraInput] = useState(() => LS("extra", ""));
+  const [adminPw, setAdminPw] = useState("");
+  const [syncMsg, setSyncMsg] = useState("");
+  const [syncing, setSyncing] = useState(false);
+
+  // pull the shared global roster on load (network is the team source of truth, local is fallback)
+  useEffect(() => {
+    fetch("/api/roster").then((r) => r.json())
+      .then((d) => { if (d && d.roster && Object.keys(d.roster).length) setAssign((prev) => ({ ...prev, ...d.roster })); })
+      .catch(() => {});
+  }, []);
+
+  const syncRoster = async () => {
+    setSyncing(true); setSyncMsg("");
+    try {
+      const res = await fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ roster: assign, adminPassword: adminPw }) });
+      const d = await res.json();
+      setSyncMsg(res.ok && d.ok ? `✓ Synced ${d.count} names to the global roster.` : (d.error || "Sync failed."));
+    } catch { setSyncMsg("Couldn't reach the sync service (only works on the live site)."); }
+    setSyncing(false);
+  };
+  const [extraList, setExtraList] = useState(() => {
+    const v = LS("extra", []);
+    if (Array.isArray(v)) return v;
+    if (typeof v === "string" && v.trim()) return v.split(/[,\n]/).map((t) => t.trim()).filter(Boolean);
+    return [];
+  });
+  const [extraDraft, setExtraDraft] = useState("");
   const [compareIds, setCompareIds] = useState(() => LS("compareIds", []));
   const [compareCache, setCompareCache] = useState({});
   const [seasonRaws, setSeasonRaws] = useState({});
@@ -476,7 +503,7 @@ export default function App() {
   useEffect(() => { saveLS("wet", [...wetSessions]); }, [wetSessions]);
 
   useEffect(() => { saveLS("assign", assign); }, [assign]);
-  useEffect(() => { saveLS("extra", extraInput); }, [extraInput]);
+  useEffect(() => { saveLS("extra", extraList); }, [extraList]);
   useEffect(() => { saveLS("compareIds", compareIds); }, [compareIds]);
   useEffect(() => { saveLS("removed", [...removed]); }, [removed]);
   
@@ -522,9 +549,10 @@ export default function App() {
   }, [activeEventId, eventIndex]);
 
   const { extraTeams, extraNums } = useMemo(() => {
-    const toks = extraInput.split(/[,\n]/).map((t) => t.trim()).filter(Boolean);
+    const toks = extraList.map((t) => t.trim()).filter(Boolean);
     return { extraTeams: toks.filter((t) => !/^\d+$/.test(t)), extraNums: toks.filter((t) => /^\d+$/.test(t)) };
-  }, [extraInput]);
+  }, [extraList]);
+  const addExtra = () => { const t = extraDraft.trim(); if (t && !extraList.includes(t)) setExtraList((p) => [...p, t]); setExtraDraft(""); };
 
   const convertedSessions = useMemo(() => {
     const raws = [scrapedEventData, ...compareIds.map((id) => compareCache[id])].filter(Boolean);
@@ -1038,10 +1066,21 @@ export default function App() {
         {allEntries.length > 0 && (
           <Panel title="01 · ROSTER ASSIGNMENT">
             <div style={{ marginBottom: 14 }}>
-              <Label>EXTRA ENTRIES <span style={{ color: "#5b6776" }}>(paid seats under another uni — add kart numbers or team names, comma-separated)</span></Label>
-              <input value={extraInput} onChange={(e) => setExtraInput(e.target.value)}
-                placeholder="e.g. 93, Lancaster B"
-                style={{ ...inp(280), width: "100%", maxWidth: 420 }} />
+              <Label>EXTRA ENTRIES <span style={{ color: "#5b6776" }}>(paid seats under another uni — type a kart number or team, press Enter)</span></Label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <input value={extraDraft} onChange={(e) => setExtraDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addExtra(); } }}
+                  placeholder="e.g. Lancaster B  ↵"
+                  style={{ ...inp(220) }} />
+                {extraList.map((t) => (
+                  <span key={t} className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5,
+                    background: "#11233a", border: "1px solid #3da9fc55", borderRadius: 6, padding: "4px 6px 4px 9px", color: "#cfe3ff" }}>
+                    {t}
+                    <button onClick={() => setExtraList((p) => p.filter((x) => x !== t))}
+                      style={{ background: "none", border: "none", color: "#ff8a5b", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: 0 }}>✕</button>
+                  </span>
+                ))}
+              </div>
             </div>
             <Label>TEAM LINEUPS <span style={{ color: "#5b6776" }}>(name a driver once per heat — quali and race fill together)</span></Label>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
@@ -1056,6 +1095,17 @@ export default function App() {
               <input ref={csvRef} type="file" accept=".csv,.txt" hidden
                 onChange={(ev) => onLineupCsv(ev.target.files?.[0])} />
               {importMsg && <span className="mono" style={{ fontSize: 11.5, color: importMsg.includes("matched none") || importMsg.includes("Couldn't") ? "#ff8a5b" : "#43d977" }}>{importMsg}</span>}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+              <input type="password" value={adminPw} onChange={(e) => setAdminPw(e.target.value)} placeholder="admin password"
+                style={{ ...inp(150), fontFamily: "IBM Plex Sans, sans-serif" }} />
+              <button onClick={syncRoster} disabled={syncing} className="disp"
+                style={{ background: "#11233a", color: "#3da9fc", border: "1px solid #3da9fc55", borderRadius: 7,
+                  padding: "7px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                {syncing ? "SYNCING…" : "💾 SYNC GLOBAL ROSTER"}
+              </button>
+              <span className="mono" style={{ fontSize: 11, color: "#5b6776" }}>pushes this roster to everyone (admin only)</span>
+              {syncMsg && <span className="mono" style={{ fontSize: 11.5, color: syncMsg.startsWith("✓") ? "#43d977" : "#ff8a5b" }}>{syncMsg}</span>}
             </div>
             <datalist id="driverNames">
               {[...new Set(Object.values(assign).map((v) => v && v.trim()).filter(Boolean))].map((n) => <option key={n} value={n} />)}
