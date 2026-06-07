@@ -490,7 +490,7 @@ export default function App() {
   const [syncMsg, setSyncMsg] = useState("");
   const [syncing, setSyncing] = useState(false);
 
-  // pull the shared global roster and weather tracks on load
+  // pull the shared global roster, weather tracks, and extra entries on load
   useEffect(() => {
     fetch("/api/roster").then((r) => r.json())
       .then((d) => { 
@@ -500,10 +500,12 @@ export default function App() {
         if (d && d.wetSessions && Array.isArray(d.wetSessions)) {
           setWetSessions(new Set(d.wetSessions));
         }
+        if (d && d.extraList && Array.isArray(d.extraList)) {
+          setExtraList(d.extraList);
+        }
       })
       .catch(() => {});
   }, []);
-
   const syncRoster = async () => {
     setSyncing(true); setSyncMsg("");
     try {
@@ -513,11 +515,12 @@ export default function App() {
         body: JSON.stringify({ 
           roster: assign, 
           wetSessions: [...wetSessions], 
+          extraList: extraList, 
           adminPassword: adminPw 
         }) 
       });
       const d = await res.json();
-      setSyncMsg(res.ok && d.ok ? `✓ Synced global roster and weather configurations.` : (d.error || "Sync failed."));
+      setSyncMsg(res.ok && d.ok ? `✓ Synced global roster, weather, and extra entries.` : (d.error || "Sync failed."));
     } catch { 
       setSyncMsg("Couldn't reach the sync service (only works on the live site)."); 
     }
