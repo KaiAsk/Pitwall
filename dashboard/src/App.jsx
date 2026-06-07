@@ -390,14 +390,21 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
     }
     const seen = new Set(); const allKarts = [];
     (s.results || []).forEach((r) => { const num = String(r.kart || ""); if (num && !seen.has(num)) { seen.add(num); allKarts.push({ num, teamName: r.team || num }); } });
+    
     return { id: `scraped__${s.session_id}`, name: s.label, title: s.label, round, isRound, category, raceLabel, karts, allKarts, laps,
+      // Penalties: Keep it if it targets our team name OR if the targeted kart matches one of our karts
       penalties: (s.penalties || []).filter((p) => 
         isOurTeam(p.team, extraTeams) || 
         extraNums.includes(String(p.kart || "")) || 
         karts.some(k => k.num === String(p.kart || ""))
       ),
-      posByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position_change) || 0])),
-      finByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position) || null])),
+      // Automatically pull negative drops explicitly from parsing (works on EX drops)
+      posByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), parseInt(r.position_change, 10) || 0])),
+      // If position is "EX", drop them to the index length (the back)
+      finByKart: Object.fromEntries((s.results || []).map((r, i) => {
+        let p = Number(r.position);
+        return [String(r.kart), isNaN(p) || p === 0 ? i + 1 : p];
+      })),
       ptsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.points) || 0])),
       sectorsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), {
         s1: parseSecs(r.sector_1 || r.sector1 || r.s1 || r.Sector1), 
@@ -863,6 +870,7 @@ export default function App() {
     const agg = {};
     seasonSessions.forEach((s) => {
       
+      // Calculate explicitly named penalties AND exclusions robustly
       (s.penalties || []).forEach((p) => {
         const pKart = String(p.kart || "");
         const kartObj = s.karts.find(k => 
@@ -880,7 +888,17 @@ export default function App() {
         a.pens += 1;
         
         const m = String(p.penalty || "").match(/(\d+)\s*(grid|place|pos)/i);
-        if (m) a.penPos += Number(m[1]);
+        if (m) {
+          a.penPos += Number(m[1]);
+        } else if (/exclud|exclusion|dsq|disqual/i.test(p.penalty || "") || /exclud|dsq|disqual/i.test(p.reason || "")) {
+          // If excluded, extract their exact placement drop from the parsed metrics
+          const lost = s.posByKart ? s.posByKart[kartObj.num] : 0;
+          if (lost < 0) {
+            a.penPos += Math.abs(lost);
+          } else {
+            a.penPos += Math.floor((s.allKarts ? s.allKarts.length : 30) / 2); // Conservative backup
+          }
+        }
       });
 
       if (!s.isRound) return;
@@ -1274,6 +1292,7 @@ export default function App() {
               ))}
             </div>
 
+            {/* TAB: EVENT OVERVIEW */}
             {tab === "scraped" && (
               <Panel title={`EVENT METRICS — ${scrapedEventData.title.toUpperCase()}`}>
                 <div style={{ display: "grid", gap: 24 }}>
@@ -1374,7 +1393,9 @@ export default function App() {
                         {(() => {
                           const sp = (session.penalties || []).filter((p) => {
                             const t = (p.team || "").toLowerCase();
-                            return t.includes("leeds") && !t.includes("beckett");
+                            const pKart = String(p.kart || "");
+                            return (t.includes("leeds") && !t.includes("beckett")) || 
+                                   leedsSessionRows.some(r => String(r.kart) === pKart);
                           });
                           if (!sp.length) return null;
                           return (
@@ -1423,7 +1444,7 @@ export default function App() {
                         const m = summarySort.dir === "asc" ? 1 : -1;
                         if (k === "name") return m * String(a.name).localeCompare(String(b.name));
                         
-                        // Push drivers missing data safely to the bottom of the stack
+                        // Push nulls to the bottom automatically
                         if (a[k] == null && b[k] == null) return 0;
                         if (a[k] == null) return 1;
                         if (b[k] == null) return -1;
@@ -2056,7 +2077,6 @@ function StatsTable({ boxes, fieldMed }) {
     const k = sort.key;
     if (k === "label") return m * String(a.label).localeCompare(String(b.label));
     
-    // push nulls to the bottom regardless of sort direction
     if (a[k] == null && b[k] == null) return 0;
     if (a[k] == null) return 1;
     if (b[k] == null) return -1;
@@ -2070,7 +2090,7 @@ function StatsTable({ boxes, fieldMed }) {
     ["CLEAN AVG", "avg"],
     ["CONSISTENCY", "cons"],
     ["INCIDENTS", "inc"],
-    ["VS FIELD", "gap"] // gap uses "avg" for the actual math logic
+    ["VS FIELD", "gap"]
   ];
 
   return (
