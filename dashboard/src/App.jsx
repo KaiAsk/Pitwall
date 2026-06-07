@@ -935,39 +935,6 @@ export default function App() {
     return [...set].sort();
   }, [seasonSessions]);
 
-  const arionSummary = useMemo(() => {
-    const agg = {};
-    seasonSessions.forEach((s) => {
-      if (!s.isRound) return;
-      const isQuali = /quali/i.test(s.raceLabel);
-      const isRace = /race/i.test(s.raceLabel) && !isQuali;
-      if (!isQuali && !isRace) return;
-      const bests = (s.allKarts || []).map((k) => s.sectorsByKart && s.sectorsByKart[k.num] && s.sectorsByKart[k.num].best).filter((x) => x != null);
-      const fastest = bests.length ? Math.min(...bests) : null;
-      s.karts.forEach((k) => {
-        const key = `${s.id}|${k.num}`;
-        if (removed.has(key)) return;
-        const name = assign[key]?.trim();
-        if (!name) return;
-        const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], penPos: 0, pens: 0 });
-        const best = s.sectorsByKart && s.sectorsByKart[k.num] ? s.sectorsByKart[k.num].best : null;
-        const gap = (best != null && fastest != null) ? best - fastest : null;
-        if (isQuali) {
-          if (s.finByKart && s.finByKart[k.num] != null) a.qPos.push(s.finByKart[k.num]);
-          if (gap != null) a.qGap.push(gap);
-        } else if (gap != null) a.rGap.push(gap);
-        (s.penalties || []).filter((p) => String(p.kart) === k.num).forEach((p) => {
-          a.pens += 1;
-          const m = String(p.penalty || "").match(/(\d+)\s*grid/i);
-          if (m) a.penPos += Number(m[1]);
-        });
-      });
-    });
-    const avg = (x) => (x.length ? x.reduce((p, c) => p + c, 0) / x.length : null);
-    return Object.values(agg).map((d) => ({ name: d.name, avgQpos: avg(d.qPos), avgQgap: avg(d.qGap), avgRgap: avg(d.rGap), penPos: d.penPos, pens: d.pens }))
-      .sort((a, b) => (a.avgQpos ?? 99) - (b.avgQpos ?? 99));
-  }, [seasonSessions, assign, removed]);
-
   const signedOverview = !!scrapedEventData && (scrapedEventData.sessions || []).some((s) => (s.results || []).some((r) => (r.position_change || 0) < 0));
 
   // Driver rating /10 from pace (z-score vs field), consistency (lap spread), and racecraft (net positions gained)
@@ -1287,7 +1254,6 @@ export default function App() {
             <div className="apptabs" style={{ display: "flex", gap: 8, margin: "20px 0 16px", flexWrap: "wrap", alignItems: "center" }}>
               {[
                 ["scraped", "LIVE EVENT OVERVIEW"],
-                ["summary", "SUMMARY"],
                 ["field", "FIELD COMPARISON"], 
                 ["trace", "LAP TRACES"], 
                 ["prog", "PROGRESSION"],
@@ -1429,42 +1395,6 @@ export default function App() {
                     );
                   })}
                 </div>
-              </Panel>
-            )}
-
-            {/* TAB: ARION'S CRITICAL SUMMARY LOGS */}
-            {tab === "summary" && (
-              <Panel title="SUMMARY — QUALIFYING, PACE GAP & PENALTIES (WHOLE SEASON)">
-                {arionSummary.length === 0 ? <Empty msg="Name drivers to build logs summary." /> : (
-                  <div style={{ overflowX: "auto" }}>
-                    <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-                      <thead>
-                        <tr style={{ color: "#6b7685" }}>
-                          <th style={{ textAlign: "left", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>#</th>
-                          <th style={{ textAlign: "left", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>DRIVER</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>AVG QUALI POS</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>QUALI GAP</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>RACE GAP</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>POS LOST (PENALTY)</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>PENALTIES</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {arionSummary.map((d, i) => (
-                          <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
-                            <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
-                            <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER, fontWeight: 600 }}>{d.avgQpos != null ? "P" + d.avgQpos.toFixed(1) : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgQgap != null ? "+" + d.avgQgap.toFixed(3) + "s" : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgRgap != null ? "+" + d.avgRgap.toFixed(3) + "s" : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: d.penPos > 0 ? "#ff8a5b" : "#5b6776" }}>{d.penPos > 0 ? "-" + d.penPos : "0"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: d.pens > 0 ? "#ff6b6b" : "#5b6776" }}>{d.pens}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
               </Panel>
             )}
 
