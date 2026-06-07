@@ -399,8 +399,6 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
       posByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position_change) || 0])),
       finByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.position) || null])),
       ptsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), Number(r.points) || 0])),
-      
-      // RESTORED: Advanced Key-Sniffing Sector Fallbacks (Fixes empty sector UI)
       sectorsByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), {
         s1: parseSecs(r.sector_1 || r.sector1 || r.s1 || r.Sector1), 
         s2: parseSecs(r.sector_2 || r.sector2 || r.s2 || r.Sector2), 
@@ -423,13 +421,14 @@ export default function App() {
   const [debrief, setDebrief] = useState("");
   const [debriefLoading, setDebriefLoading] = useState(false);
   const [ratingSort, setRatingSort] = useState({ key: "overall", dir: "desc" });
+  const [statsSort, setStatsSort] = useState({ key: "points", dir: "desc" });
+  const [summarySort, setSummarySort] = useState({ key: "avgRgap", dir: "asc" });
   const [debriefScope, setDebriefScope] = useState("overall");
   const [debriefTime, setDebriefTime] = useState("season");
   const [statsView, setStatsView] = useState("drivers");
   const [statsMode, setStatsMode] = useState("cards");
   const [statsCat, setStatsCat] = useState("all");
   const [progSel, setProgSel] = useState(null);
-  const [statsSort, setStatsSort] = useState({ key: "points", dir: "desc" });
   const [traceType, setTraceType] = useState("all");
   const [adminPw, setAdminPw] = useState("");
   const [syncMsg, setSyncMsg] = useState("");
@@ -864,7 +863,6 @@ export default function App() {
     const agg = {};
     seasonSessions.forEach((s) => {
       
-      // 1. Process all penalties robustly by Kart Number
       (s.penalties || []).forEach((p) => {
         const pKart = String(p.kart || "");
         const kartObj = s.karts.find(k => 
@@ -881,7 +879,6 @@ export default function App() {
         const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], penPos: 0, pens: 0 });
         a.pens += 1;
         
-        // Catch all wording: "+5 places", "-2 positions", "5 grid penalty"
         const m = String(p.penalty || "").match(/(\d+)\s*(grid|place|pos)/i);
         if (m) a.penPos += Number(m[1]);
       });
@@ -909,13 +906,11 @@ export default function App() {
     });
     
     const avg = (x) => (x.length ? x.reduce((p, c) => p + c, 0) / x.length : null);
-    return Object.values(agg).map((d) => ({ name: d.name, avgQpos: avg(d.qPos), avgQgap: avg(d.qGap), avgRgap: avg(d.rGap), penPos: d.penPos, pens: d.pens }))
-      .sort((a, b) => (a.avgQpos ?? 99) - (b.avgQpos ?? 99));
+    return Object.values(agg).map((d) => ({ name: d.name, avgQpos: avg(d.qPos), avgQgap: avg(d.qGap), avgRgap: avg(d.rGap), penPos: d.penPos, pens: d.pens }));
   }, [seasonSessions, assign, removed]);
 
   const signedOverview = !!scrapedEventData && (scrapedEventData.sessions || []).some((s) => (s.results || []).some((r) => (r.position_change || 0) < 0));
 
-  /* RESTORED: Advanced Mathematical Driver Ratings with Stint Decay and Anomaly Detection */
   const driverRatings = useMemo(() => {
     const clamp = (v) => Math.max(0, Math.min(10, v));
     const agg = {};
@@ -949,10 +944,8 @@ export default function App() {
         const consZ = (cvMean - cv) / cvSd;          
         const isWet = wetSessions.has(s.id);
         
-        // RESTORED: decaySlopes tracking metric array added to driver objects
         agg[name] = agg[name] || { name, team: r.teamLetter, pace: [], cons: [], race: [], gain: [], wet: [], decaySlopes: [], races: 0 };
         
-        // RESTORED: Linear regression stint degradation slope calculation
         if (clean.length > 5) {
           let sx = 0, sy = 0, sxy = 0, sxx = 0;
           clean.forEach((t, i) => { const lapIdx = i + 1; sx += lapIdx; sy += t; sxy += lapIdx * t; sxx += lapIdx * lapIdx; });
@@ -968,14 +961,13 @@ export default function App() {
           
           let calculatedPaceScore = pacePct != null ? clamp(6 - pacePct * paceScale) : clamp(5 - (r.z ?? 0) * 2.5);
           
-          // RESTORED: Split-Class Anomaly protections
           if (s.category === "Mains" && calculatedPaceScore < 6.5 && csd < 0.12) {
-            calculatedPaceScore = Math.max(calculatedPaceScore, 7.8); // Chassis Deficit protection
+            calculatedPaceScore = Math.max(calculatedPaceScore, 7.8); 
           }
           if (s.category === "Inters" && s.sectorsByKart && s.sectorsByKart[r.num]) {
             const qBest = s.sectorsByKart[r.num].best;
             if (qBest && cavg && (cavg - qBest) > 1.2 && csd < 0.15) {
-              calculatedPaceScore = Math.max(calculatedPaceScore, 8.0); // Horsepower mismatch validation protection
+              calculatedPaceScore = Math.max(calculatedPaceScore, 8.0); 
             }
           }
           
@@ -1004,7 +996,6 @@ export default function App() {
     return Object.values(agg).map((d) => {
       const pace = avg(d.pace), race = avg(d.race);
       
-      // RESTORED: apply stint decay slope modifier directly onto consistency metric
       const decayIndex = d.decaySlopes.length ? avg(d.decaySlopes) : 0;
       const cons = d.cons.length ? clamp(avg(d.cons) - (decayIndex * 35)) : 0; 
       
@@ -1014,7 +1005,7 @@ export default function App() {
       if (hasRace) { tot += race * 0.20; w += 0.20; }
       if (hasCons) { tot += cons * 0.15; w += 0.15; }
       
-      const overall = w ? tot / w : (hasRace ? race : 0); // RESTORED: wet race division-by-zero fallback
+      const overall = w ? tot / w : (hasRace ? race : 0); 
       const wetDelta = d.wet.length ? sum(d.wet) / d.wet.length : null;
       return { ...d, pace, cons, race, hasPace, hasRace, hasCons, wetDelta, netGain: sum(d.gain), overall };
     }).sort((a, b) => b.overall - a.overall);
@@ -1283,7 +1274,6 @@ export default function App() {
               ))}
             </div>
 
-            {/* TAB: EVENT OVERVIEW */}
             {tab === "scraped" && (
               <Panel title={`EVENT METRICS — ${scrapedEventData.title.toUpperCase()}`}>
                 <div style={{ display: "grid", gap: 24 }}>
@@ -1384,10 +1374,7 @@ export default function App() {
                         {(() => {
                           const sp = (session.penalties || []).filter((p) => {
                             const t = (p.team || "").toLowerCase();
-                            const pKart = String(p.kart || "");
-                            // Show penalty if the team says leeds, OR if the kart number matches our row
-                            return (t.includes("leeds") && !t.includes("beckett")) || 
-                                   leedsSessionRows.some(r => String(r.kart) === pKart);
+                            return t.includes("leeds") && !t.includes("beckett");
                           });
                           if (!sp.length) return null;
                           return (
@@ -1410,37 +1397,70 @@ export default function App() {
               </Panel>
             )}
 
-            {/* TAB: ARION'S CRITICAL SUMMARY LOGS */}
+            {/* TAB: ARION'S CRITICAL SUMMARY LOGS - NOW INTERACTIVE */}
             {tab === "summary" && (
               <Panel title="SUMMARY — QUALIFYING, PACE GAP & PENALTIES (WHOLE SEASON)">
                 {arionSummary.length === 0 ? <Empty msg="Name drivers to build logs summary." /> : (
                   <div style={{ overflowX: "auto" }}>
-                    <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-                      <thead>
-                        <tr style={{ color: "#6b7685" }}>
-                          <th style={{ textAlign: "left", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>#</th>
-                          <th style={{ textAlign: "left", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>DRIVER</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>AVG QUALI POS</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>QUALI GAP</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>RACE GAP</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>POS LOST (PENALTY)</th>
-                          <th style={{ textAlign: "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>PENALTIES</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {arionSummary.map((d, i) => (
-                          <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
-                            <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
-                            <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER, fontWeight: 600 }}>{d.avgQpos != null ? "P" + d.avgQpos.toFixed(1) : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgQgap != null ? "+" + d.avgQgap.toFixed(3) + "s" : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgRgap != null ? "+" + d.avgRgap.toFixed(3) + "s" : "—"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: d.penPos > 0 ? "#ff8a5b" : "#5b6776" }}>{d.penPos > 0 ? "-" + d.penPos : "0"}</td>
-                            <td style={{ padding: "7px 10px", textAlign: "right", color: d.pens > 0 ? "#ff6b6b" : "#5b6776" }}>{d.pens}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    {(() => {
+                      const cols = [
+                        ["#", null],
+                        ["DRIVER", "name"],
+                        ["AVG QUALI POS", "avgQpos"],
+                        ["QUALI GAP", "avgQgap"],
+                        ["RACE GAP", "avgRgap"],
+                        ["POS LOST (PENALTY)", "penPos"],
+                        ["PENALTIES", "pens"]
+                      ];
+                      
+                      const clickSort = (key) => {
+                        if (!key) return;
+                        setSummarySort((s) => ({ key, dir: s.key === key && s.dir === "asc" ? "desc" : "asc" }));
+                      };
+
+                      const sortedSummary = [...arionSummary].sort((a, b) => {
+                        const k = summarySort.key;
+                        const m = summarySort.dir === "asc" ? 1 : -1;
+                        if (k === "name") return m * String(a.name).localeCompare(String(b.name));
+                        
+                        // Push drivers missing data safely to the bottom of the stack
+                        if (a[k] == null && b[k] == null) return 0;
+                        if (a[k] == null) return 1;
+                        if (b[k] == null) return -1;
+                        
+                        return m * (a[k] - b[k]);
+                      });
+
+                      return (
+                        <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 640 }}>
+                          <thead>
+                            <tr style={{ color: "#6b7685" }}>
+                              {cols.map(([h, key], i) => (
+                                <th key={h} onClick={() => clickSort(key)}
+                                  style={{ textAlign: i < 2 ? "left" : "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", 
+                                    fontWeight: 500, cursor: key ? "pointer" : "default", 
+                                    color: summarySort.key === key ? AMBER : "#6b7685", userSelect: "none" }}>
+                                  {h}{summarySort.key === key ? (summarySort.dir === "desc" ? " ▾" : " ▴") : ""}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sortedSummary.map((d, i) => (
+                              <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
+                                <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
+                                <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER, fontWeight: 600 }}>{d.avgQpos != null ? "P" + d.avgQpos.toFixed(1) : "—"}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgQgap != null ? "+" + d.avgQgap.toFixed(3) + "s" : "—"}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgRgap != null ? "+" + d.avgRgap.toFixed(3) + "s" : "—"}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: d.penPos > 0 ? "#ff8a5b" : "#5b6776" }}>{d.penPos > 0 ? "-" + d.penPos : "0"}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: d.pens > 0 ? "#ff6b6b" : "#5b6776" }}>{d.pens}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
                   </div>
                 )}
               </Panel>
@@ -1915,7 +1935,6 @@ export default function App() {
             )}
 
             {tab === "sectors" && (() => {
-              // RESTORED: sector tab now properly identifies practice and quali sessions again
               const races = convertedSessions.filter((s) => s.isRound && s.laps.length && (/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel) || /practice/i.test(s.raceLabel)));
               const hasOurs = (s) => (s.karts || []).some((k) => !removed.has(`${s.id}|${k.num}`) && s.sectorsByKart && s.sectorsByKart[k.num] && (s.sectorsByKart[k.num].best != null || s.sectorsByKart[k.num].s1 != null));
               const rep = races.find((s) => s.id === sectorSession) || races.find(hasOurs) || races[0];
@@ -2024,17 +2043,53 @@ export default function App() {
 
 /* ---------- stats table ---------- */
 function StatsTable({ boxes, fieldMed }) {
+  const [sort, setSort] = useState({ key: "avg", dir: "asc" });
   if (!boxes || !boxes.length) return null;
-  const ranked = [...boxes].sort((a, b) => (a.avg ?? 9e9) - (b.avg ?? 9e9));
+
+  const clickSort = (key) => {
+    if (!key) return;
+    setSort((s) => ({ key, dir: s.key === key && s.dir === "asc" ? "desc" : "asc" }));
+  };
+
+  const ranked = [...boxes].sort((a, b) => {
+    const m = sort.dir === "asc" ? 1 : -1;
+    const k = sort.key;
+    if (k === "label") return m * String(a.label).localeCompare(String(b.label));
+    
+    // push nulls to the bottom regardless of sort direction
+    if (a[k] == null && b[k] == null) return 0;
+    if (a[k] == null) return 1;
+    if (b[k] == null) return -1;
+    
+    return m * (a[k] - b[k]);
+  });
+
+  const cols = [
+    ["DRIVER/TEAM", "label"],
+    ["BEST LAP", "best"],
+    ["CLEAN AVG", "avg"],
+    ["CONSISTENCY", "cons"],
+    ["INCIDENTS", "inc"],
+    ["VS FIELD", "gap"] // gap uses "avg" for the actual math logic
+  ];
+
   return (
     <div style={{ marginTop: 12, overflowX: "auto" }}>
       <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
         <thead>
           <tr style={{ color: "#6b7685", textAlign: "right" }}>
-            {["DRIVER/TEAM", "BEST LAP", "CLEAN AVG", "CONSISTENCY", "INCIDENTS", "VS FIELD"].map((h, i) => (
-              <th key={h} style={{ padding: "6px 10px", textAlign: i === 0 ? "left" : "right",
-                borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
-            ))}
+            {cols.map(([h, key], i) => {
+              const activeKey = key === "gap" ? "avg" : key;
+              const isActive = sort.key === activeKey;
+              return (
+                <th key={h} onClick={() => clickSort(activeKey)} 
+                  style={{ padding: "6px 10px", textAlign: i === 0 ? "left" : "right",
+                    borderBottom: "1px solid #1e2733", fontWeight: 500, cursor: "pointer", 
+                    color: isActive ? AMBER : "#6b7685", userSelect: "none" }}>
+                  {h}{isActive ? (sort.dir === "desc" ? " ▾" : " ▴") : ""}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
