@@ -392,15 +392,12 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
     (s.results || []).forEach((r) => { const num = String(r.kart || ""); if (num && !seen.has(num)) { seen.add(num); allKarts.push({ num, teamName: r.team || num }); } });
     
     return { id: `scraped__${s.session_id}`, name: s.label, title: s.label, round, isRound, category, raceLabel, karts, allKarts, laps,
-      // Penalties: Keep it if it targets our team name OR if the targeted kart matches one of our karts
       penalties: (s.penalties || []).filter((p) => 
         isOurTeam(p.team, extraTeams) || 
         extraNums.includes(String(p.kart || "")) || 
         karts.some(k => k.num === String(p.kart || ""))
       ),
-      // Automatically pull negative drops explicitly from parsing (works on EX drops)
       posByKart: Object.fromEntries((s.results || []).map((r) => [String(r.kart), parseInt(r.position_change, 10) || 0])),
-      // If position is "EX", drop them to the index length (the back)
       finByKart: Object.fromEntries((s.results || []).map((r, i) => {
         let p = Number(r.position);
         return [String(r.kart), isNaN(p) || p === 0 ? i + 1 : p];
@@ -598,6 +595,45 @@ export default function App() {
     evs.filter((e) => !e.date).forEach((e) => { baselines[e.title] = quantile([...e.leeds].sort((a, b) => a - b), 0.5); });
     return baselines;
   }, [seasonRaws, extraTeams, extraNums, wetSessions]);
+
+  // NEW METRIC: Calculate absolute fastest clean lap recorded by ANY driver per weekend cluster
+  const weekendFastest = useMemo(() => {
+    const evs = [];
+    Object.values(seasonRaws).forEach((raw) => {
+      if (!raw || !raw.title) return;
+      if (!/(?:mains|inters)\s*round\s*\d+/i.test(raw.title)) return;   
+      let date = null; let minLap = Infinity;
+      (raw.sessions || []).forEach((s) => {
+        const lab = s.label || s.title || "";
+        if (s.date && !date) { const dt = new Date(s.date); if (!isNaN(dt)) date = dt; }
+        if (!/race/i.test(lab) || /quali/i.test(lab)) return;
+        if (wetSessions.has(`scraped__${s.session_id}`)) return;   
+        (s.lap_times || []).forEach((e) => {
+          const laps = (e.laps || []).map(parseSecs).filter((x) => x != null);
+          const clean = splitClean(laps).clean;
+          if (clean.length) {
+            const fast = Math.min(...clean);
+            if (fast < minLap) minLap = fast;
+          }
+        });
+      });
+      if (minLap !== Infinity) evs.push({ title: raw.title, date, fast: minLap });
+    });
+    const baselines = {};
+    const dated = evs.filter((e) => e.date).sort((a, b) => a.date - b.date);
+    const weekends = [];
+    dated.forEach((e) => {
+      let wk = weekends.find((w) => Math.abs(w.date - e.date) <= 10 * 86400000);
+      if (!wk) { wk = { date: e.date, fasts: [], titles: [] }; weekends.push(wk); }
+      wk.fasts.push(e.fast); wk.titles.push(e.title);
+    });
+    weekends.forEach((w) => {
+      const outright = Math.min(...w.fasts);
+      w.titles.forEach((t) => { baselines[t] = outright; });
+    });
+    evs.filter((e) => !e.date).forEach((e) => { baselines[e.title] = e.fast; });
+    return baselines;
+  }, [seasonRaws, wetSessions]);
 
   useEffect(() => {
     compareIds.forEach((eid) => {
@@ -870,7 +906,6 @@ export default function App() {
     const agg = {};
     seasonSessions.forEach((s) => {
       
-      // Calculate explicitly named penalties AND exclusions robustly
       (s.penalties || []).forEach((p) => {
         const pKart = String(p.kart || "");
         const kartObj = s.karts.find(k => 
@@ -884,19 +919,18 @@ export default function App() {
         const name = assign[key]?.trim();
         if (!name) return;
 
-        const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], penPos: 0, pens: 0 });
+        const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], pGap: [], penPos: 0, pens: 0 });
         a.pens += 1;
         
         const m = String(p.penalty || "").match(/(\d+)\s*(grid|place|pos)/i);
         if (m) {
           a.penPos += Number(m[1]);
         } else if (/exclud|exclusion|dsq|disqual/i.test(p.penalty || "") || /exclud|dsq|disqual/i.test(p.reason || "")) {
-          // If excluded, extract their exact placement drop from the parsed metrics
           const lost = s.posByKart ? s.posByKart[kartObj.num] : 0;
           if (lost < 0) {
             a.penPos += Math.abs(lost);
           } else {
-            a.penPos += Math.floor((s.allKarts ? s.allKarts.length : 30) / 2); // Conservative backup
+            a.penPos += Math.floor((s.allKarts ? s.allKarts.length : 30) / 2); 
           }
         }
       });
@@ -905,27 +939,51 @@ export default function App() {
       const isQuali = /quali/i.test(s.raceLabel);
       const isRace = /race/i.test(s.raceLabel) && !isQuali;
       if (!isQuali && !isRace) return;
+      const isWet = wetSessions.has(s.id);
 
       const bests = (s.allKarts || []).map((k) => s.sectorsByKart && s.sectorsByKart[k.num] && s.sectorsByKart[k.num].best).filter((x) => x != null);
       const fastest = bests.length ? Math.min(...bests) : null;
+      const wFast = weekendFastest[s.round]; 
+
       s.karts.forEach((k) => {
         const key = `${s.id}|${k.num}`;
         if (removed.has(key)) return;
         const name = assign[key]?.trim();
         if (!name) return;
-        const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], penPos: 0, pens: 0 });
+        
+        const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], pGap: [], penPos: 0, pens: 0 });
         const best = s.sectorsByKart && s.sectorsByKart[k.num] ? s.sectorsByKart[k.num].best : null;
+        
+        const ls = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
+        const clean = splitClean(ls).clean;
+        const cavg = clean.length ? mean(clean) : null;
+
         const gap = (best != null && fastest != null) ? best - fastest : null;
+        
         if (isQuali) {
           if (s.finByKart && s.finByKart[k.num] != null) a.qPos.push(s.finByKart[k.num]);
           if (gap != null) a.qGap.push(gap);
-        } else if (gap != null) a.rGap.push(gap);
+        } else if (isRace) {
+          if (gap != null) a.rGap.push(gap);
+          // NEW METRIC: Calculate pace gap to the clustered absolute weekend fastest (in tenths)
+          if (!isWet && cavg != null && wFast != null) {
+            a.pGap.push((cavg - wFast) * 10);
+          }
+        }
       });
     });
     
     const avg = (x) => (x.length ? x.reduce((p, c) => p + c, 0) / x.length : null);
-    return Object.values(agg).map((d) => ({ name: d.name, avgQpos: avg(d.qPos), avgQgap: avg(d.qGap), avgRgap: avg(d.rGap), penPos: d.penPos, pens: d.pens }));
-  }, [seasonSessions, assign, removed]);
+    return Object.values(agg).map((d) => ({ 
+      name: d.name, 
+      avgQpos: avg(d.qPos), 
+      avgQgap: avg(d.qGap), 
+      avgRgap: avg(d.rGap), 
+      avgPgap: avg(d.pGap), 
+      penPos: d.penPos, 
+      pens: d.pens 
+    }));
+  }, [seasonSessions, assign, removed, weekendFastest, wetSessions]);
 
   const signedOverview = !!scrapedEventData && (scrapedEventData.sessions || []).some((s) => (s.results || []).some((r) => (r.position_change || 0) < 0));
 
@@ -1430,6 +1488,7 @@ export default function App() {
                         ["AVG QUALI POS", "avgQpos"],
                         ["QUALI GAP", "avgQgap"],
                         ["RACE GAP", "avgRgap"],
+                        ["PACE GAP (TENTHS)", "avgPgap"],
                         ["POS LOST (PENALTY)", "penPos"],
                         ["PENALTIES", "pens"]
                       ];
@@ -1474,6 +1533,7 @@ export default function App() {
                                 <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER, fontWeight: 600 }}>{d.avgQpos != null ? "P" + d.avgQpos.toFixed(1) : "—"}</td>
                                 <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgQgap != null ? "+" + d.avgQgap.toFixed(3) + "s" : "—"}</td>
                                 <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgRgap != null ? "+" + d.avgRgap.toFixed(3) + "s" : "—"}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: "#3da9fc", fontWeight: 600 }}>{d.avgPgap != null ? "+" + d.avgPgap.toFixed(1) : "—"}</td>
                                 <td style={{ padding: "7px 10px", textAlign: "right", color: d.penPos > 0 ? "#ff8a5b" : "#5b6776" }}>{d.penPos > 0 ? "-" + d.penPos : "0"}</td>
                                 <td style={{ padding: "7px 10px", textAlign: "right", color: d.pens > 0 ? "#ff6b6b" : "#5b6776" }}>{d.pens}</td>
                               </tr>
@@ -1484,6 +1544,9 @@ export default function App() {
                     })()}
                   </div>
                 )}
+                <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
+                  Race/Quali Gap = difference between your fastest lap and the session's ultimate lap. Pace Gap = difference between your clean average race lap and the outright fastest lap of the entire weekend cluster, converted to tenths (ex: +12.0 = 1.2s avg pace deficit).
+                </div>
               </Panel>
             )}
 
@@ -2077,6 +2140,7 @@ function StatsTable({ boxes, fieldMed }) {
     const k = sort.key;
     if (k === "label") return m * String(a.label).localeCompare(String(b.label));
     
+    // push nulls to the bottom regardless of sort direction
     if (a[k] == null && b[k] == null) return 0;
     if (a[k] == null) return 1;
     if (b[k] == null) return -1;
@@ -2090,7 +2154,7 @@ function StatsTable({ boxes, fieldMed }) {
     ["CLEAN AVG", "avg"],
     ["CONSISTENCY", "cons"],
     ["INCIDENTS", "inc"],
-    ["VS FIELD", "gap"]
+    ["VS FIELD", "gap"] // gap uses "avg" for the actual math logic
   ];
 
   return (
