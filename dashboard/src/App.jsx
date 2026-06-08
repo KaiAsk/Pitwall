@@ -95,6 +95,16 @@ const sd = (a) => {
   return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1));
 };
 const fmt = (t) => (t == null ? "—" : t.toFixed(3));
+
+// Aggressive Anomaly Filter: Drops any lap >1.5s faster than the field median best lap
+const getValidFastest = (arr) => {
+  const valid = arr.filter((x) => x != null && !isNaN(x)).sort((a, b) => a - b);
+  if (!valid.length) return null;
+  const med = quantile(valid, 0.5);
+  const filtered = valid.filter((t) => t >= med - 1.5);
+  return filtered.length ? filtered[0] : valid[0];
+};
+
 const splitClean = (laps, factor = 1.10) => {
   const valid = laps.filter((x) => x != null && !isNaN(x));
   if (!valid.length) return { clean: [], incidents: [] };
@@ -126,7 +136,7 @@ function fieldStats(session) {
     splitClean(ls).clean.forEach((x) => pooled.push(x));
   });
   const sorted = [...pooled].sort((a, b) => a - b);
-  return { median: quantile(sorted, 0.5), best: sorted[0] ?? null, n: pooled.length };
+  return { median: quantile(sorted, 0.5), best: getValidFastest(sorted) ?? null, n: pooled.length };
 }
 
 function racecraftGain(session) {
@@ -157,7 +167,7 @@ function driverReport(session, leedsNums = [], extraNums = [], removedSet = null
   const pool = [];
   session.laps.forEach((l) => { if (l.lap > 1) nums.forEach((n) => { const t = l.times[n]; if (t != null) pool.push(t); }); });
   if (!pool.length) return null;
-  const classFastest = Math.min(...pool);
+  const classFastest = getValidFastest(pool);
   const lapStats = {};
   session.laps.forEach((l) => {
     if (l.lap <= 1) return;
@@ -601,22 +611,23 @@ export default function App() {
     Object.values(seasonRaws).forEach((raw) => {
       if (!raw || !raw.title) return;
       if (!/(?:mains|inters)\s*round\s*\d+/i.test(raw.title)) return;   
-      let date = null; let minLap = Infinity;
+      let date = null; 
+      const sessionBests = [];
       (raw.sessions || []).forEach((s) => {
         const lab = s.label || s.title || "";
         if (s.date && !date) { const dt = new Date(s.date); if (!isNaN(dt)) date = dt; }
         if (!/race/i.test(lab) || /quali/i.test(lab)) return;
         if (wetSessions.has(`scraped__${s.session_id}`)) return;   
-        (s.lap_times || []).forEach((e) => {
-          const laps = (e.laps || []).map(parseSecs).filter((x) => x != null);
-          const clean = splitClean(laps).clean;
-          if (clean.length) {
-            const fast = Math.min(...clean);
-            if (fast < minLap) minLap = fast;
-          }
-        });
+        
+        const sBests = (s.results || []).map(r => parseSecs(r.best_lap_time)).filter(x => x != null);
+        if (sBests.length) {
+          const validLap = getValidFastest(sBests);
+          if (validLap) sessionBests.push(validLap);
+        }
       });
-      if (minLap !== Infinity) evs.push({ title: raw.title, date, fast: minLap });
+      if (sessionBests.length) {
+        evs.push({ title: raw.title, date, fast: Math.min(...sessionBests) });
+      }
     });
     const baselines = {};
     const dated = evs.filter((e) => e.date).sort((a, b) => a.date - b.date);
@@ -796,9 +807,11 @@ export default function App() {
       const fieldFastest = (s.allKarts || []).map((k) => {
         const c = splitClean(s.laps.map((l) => l.times[k.num]).filter((x) => x != null)).clean;
         return c.length ? Math.min(...c) : null;
-      }).filter((x) => x != null).sort((a, b) => a - b);
-      const fieldMedFast = quantile(fieldFastest, 0.5);
+      }).filter((x) => x != null);
+      
+      const fieldMedFast = quantile(fieldFastest.sort((a, b) => a - b), 0.5);
       if (fieldMedFast == null) return;
+      
       s.karts.forEach((k) => {
         const driver = assign[`${s.id}|${k.num}`]?.trim();
         if (!driver) return;
@@ -940,11 +953,10 @@ export default function App() {
       if (!isQuali && !isRace) return;
       const isWet = wetSessions.has(s.id);
 
-      // EXCLUDE WET RACES FROM SUMMARY GAPS
       if (isWet) return;
 
       const bests = (s.allKarts || []).map((k) => s.sectorsByKart && s.sectorsByKart[k.num] && s.sectorsByKart[k.num].best).filter((x) => x != null);
-      const fastest = bests.length ? Math.min(...bests) : null;
+      const fastest = getValidFastest(bests);
       const wFast = weekendFastest[s.round]; 
 
       s.karts.forEach((k) => {
@@ -956,10 +968,6 @@ export default function App() {
         const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], pGap: [], penPos: 0, pens: 0 });
         const best = s.sectorsByKart && s.sectorsByKart[k.num] ? s.sectorsByKart[k.num].best : null;
         
-        const ls = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
-        const clean = splitClean(ls).clean;
-        const cavg = clean.length ? mean(clean) : null;
-
         const gap = (best != null && fastest != null) ? best - fastest : null;
         
         if (isQuali) {
@@ -967,9 +975,8 @@ export default function App() {
           if (gap != null) a.qGap.push(gap);
         } else if (isRace) {
           if (gap != null) a.rGap.push(gap);
-          // CORRECTED PACE GAP: Your average clean race lap vs weekend's absolute fastest lap (not multiplied by 10)
-          if (cavg != null && wFast != null) {
-            a.pGap.push(cavg - wFast);
+          if (best != null && wFast != null) {
+            a.pGap.push((best - wFast));
           }
         }
       });
@@ -1478,7 +1485,7 @@ export default function App() {
               </Panel>
             )}
 
-            {/* TAB: ARION'S CRITICAL SUMMARY LOGS */}
+            {/* TAB: ARION'S CRITICAL SUMMARY LOGS - NOW INTERACTIVE */}
             {tab === "summary" && (
               <Panel title="SUMMARY — QUALIFYING, PACE GAP & PENALTIES (WHOLE SEASON)">
                 {arionSummary.length === 0 ? <Empty msg="Name drivers to build logs summary." /> : (
@@ -1505,6 +1512,7 @@ export default function App() {
                         const m = summarySort.dir === "asc" ? 1 : -1;
                         if (k === "name") return m * String(a.name).localeCompare(String(b.name));
                         
+                        // Push nulls to the bottom automatically
                         if (a[k] == null && b[k] == null) return 0;
                         if (a[k] == null) return 1;
                         if (b[k] == null) return -1;
@@ -1546,7 +1554,7 @@ export default function App() {
                   </div>
                 )}
                 <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
-                  Race/Quali Gap = difference between your fastest lap and the session's ultimate lap. Pace Gap = difference between your clean average race lap and the outright fastest lap of the entire weekend cluster. Wet races are excluded from gap metrics to prevent skewed averages.
+                  Race/Quali Gap = difference between your best lap and the session's ultimate lap. Pace Gap = difference between your best lap and the outright best lap of the entire weekend cluster. Anomalous transponder glitches (&gt;1.5s faster than the field median) are permanently removed from all baseline calculations. Wet races are ignored from gap metrics.
                 </div>
               </Panel>
             )}
