@@ -610,37 +610,28 @@ export default function App() {
     const evs = [];
     Object.values(seasonRaws).forEach((raw) => {
       if (!raw || !raw.title) return;
-      if (!/(?:mains|inters)\s*round\s*\d+/i.test(raw.title)) return;   
-      let date = null; 
-      const sessionBests = [];
+      if (!/(?:mains|inters)\s*round\s*\d+/i.test(raw.title)) return;
+      let date = null;
+      const bests = [];
       (raw.sessions || []).forEach((s) => {
         const lab = s.label || s.title || "";
         if (s.date && !date) { const dt = new Date(s.date); if (!isNaN(dt)) date = dt; }
-        if (!/race/i.test(lab) || /quali/i.test(lab)) return;
-        if (wetSessions.has(`scraped__${s.session_id}`)) return;   
-        
-        const sBests = (s.results || []).map(r => parseSecs(r.best_lap_time)).filter(x => x != null);
-        if (sBests.length) {
-          const validLap = getValidFastest(sBests);
-          if (validLap) sessionBests.push(validLap);
-        }
+        if (/practice/i.test(lab) || !/race/i.test(lab)) return;   // races + quali, never practice
+        if (wetSessions.has(`scraped__${s.session_id}`)) return;   // dry only
+        (s.results || []).forEach((r) => { const t = parseSecs(r.best_lap_time); if (t != null) bests.push(t); });
       });
-      if (sessionBests.length) {
-        evs.push({ title: raw.title, date, fast: Math.min(...sessionBests) });
-      }
+      if (bests.length) evs.push({ title: raw.title, date, fast: Math.min(...bests) });  // true fastest lap (a lap can't be anomalously quick)
     });
     const baselines = {};
     const dated = evs.filter((e) => e.date).sort((a, b) => a.date - b.date);
     const weekends = [];
     dated.forEach((e) => {
-      let wk = weekends.find((w) => Math.abs(w.date - e.date) <= 10 * 86400000);
-      if (!wk) { wk = { date: e.date, fasts: [], titles: [] }; weekends.push(wk); }
+      // same weekend AND same-length track (within 12% of the weekend's pace) — stops a 53s track merging with a 73s one
+      let wk = weekends.find((w) => Math.abs(w.date - e.date) <= 6 * 86400000 && Math.abs(e.fast - w.fast) / w.fast < 0.12);
+      if (!wk) { wk = { date: e.date, fast: e.fast, fasts: [], titles: [] }; weekends.push(wk); }
       wk.fasts.push(e.fast); wk.titles.push(e.title);
     });
-    weekends.forEach((w) => {
-      const outright = Math.min(...w.fasts);
-      w.titles.forEach((t) => { baselines[t] = outright; });
-    });
+    weekends.forEach((w) => { const outright = Math.min(...w.fasts); w.titles.forEach((t) => { baselines[t] = outright; }); });
     evs.filter((e) => !e.date).forEach((e) => { baselines[e.title] = e.fast; });
     return baselines;
   }, [seasonRaws, wetSessions]);
@@ -955,29 +946,23 @@ export default function App() {
 
       if (isWet) return;
 
-      const bests = (s.allKarts || []).map((k) => s.sectorsByKart && s.sectorsByKart[k.num] && s.sectorsByKart[k.num].best).filter((x) => x != null);
-      const fastest = getValidFastest(bests);
-      const wFast = weekendFastest[s.round]; 
+      const wFast = weekendFastest[s.round];   // genuine fastest lap at this track (dry, both categories)
 
       s.karts.forEach((k) => {
         const key = `${s.id}|${k.num}`;
         if (removed.has(key)) return;
         const name = assign[key]?.trim();
         if (!name) return;
-        
+
         const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], pGap: [], penPos: 0, pens: 0 });
         const best = s.sectorsByKart && s.sectorsByKart[k.num] ? s.sectorsByKart[k.num].best : null;
-        
-        const gap = (best != null && fastest != null) ? best - fastest : null;
-        
+        const gap = (best != null && wFast != null) ? best - wFast : null;
+
         if (isQuali) {
           if (s.finByKart && s.finByKart[k.num] != null) a.qPos.push(s.finByKart[k.num]);
           if (gap != null) a.qGap.push(gap);
         } else if (isRace) {
           if (gap != null) a.rGap.push(gap);
-          if (best != null && wFast != null) {
-            a.pGap.push((best - wFast));
-          }
         }
       });
     });
