@@ -596,7 +596,6 @@ export default function App() {
     return baselines;
   }, [seasonRaws, extraTeams, extraNums, wetSessions]);
 
-  // NEW METRIC: Calculate absolute fastest clean lap recorded by ANY driver per weekend cluster
   const weekendFastest = useMemo(() => {
     const evs = [];
     Object.values(seasonRaws).forEach((raw) => {
@@ -941,6 +940,9 @@ export default function App() {
       if (!isQuali && !isRace) return;
       const isWet = wetSessions.has(s.id);
 
+      // EXCLUDE WET RACES FROM SUMMARY GAPS
+      if (isWet) return;
+
       const bests = (s.allKarts || []).map((k) => s.sectorsByKart && s.sectorsByKart[k.num] && s.sectorsByKart[k.num].best).filter((x) => x != null);
       const fastest = bests.length ? Math.min(...bests) : null;
       const wFast = weekendFastest[s.round]; 
@@ -965,8 +967,7 @@ export default function App() {
           if (gap != null) a.qGap.push(gap);
         } else if (isRace) {
           if (gap != null) a.rGap.push(gap);
-          // NEW METRIC: Calculate pace gap to the clustered absolute weekend fastest (in tenths)
-          if (!isWet && cavg != null && wFast != null) {
+          if (cavg != null && wFast != null) {
             a.pGap.push((cavg - wFast) * 10);
           }
         }
@@ -1545,7 +1546,7 @@ export default function App() {
                   </div>
                 )}
                 <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
-                  Race/Quali Gap = difference between your fastest lap and the session's ultimate lap. Pace Gap = difference between your clean average race lap and the outright fastest lap of the entire weekend cluster, converted to tenths (ex: +12.0 = 1.2s avg pace deficit).
+                  Race/Quali Gap = difference between your fastest lap and the session's ultimate lap. Pace Gap = difference between your clean average race lap and the outright fastest lap of the entire weekend cluster, converted to tenths (ex: +12.0 = 1.2s avg pace deficit). Wet races are excluded from gap metrics to prevent skewed averages.
                 </div>
               </Panel>
             )}
