@@ -608,44 +608,30 @@ export default function App() {
     return baselines;
   }, [seasonRaws, extraTeams, extraNums, wetSessions]);
 
+  // NEW METRIC: Groups Mains 1&2 with Inters 1, Mains 3&4 with Inters 2, etc. (Locking to exact track layout)
   const weekendFastest = useMemo(() => {
-    const evs = [];
-    Object.values(seasonRaws).forEach((raw) => {
-      if (!raw || !raw.title) return;
-      if (!/(?:mains|inters)\s*round\s*\d+/i.test(raw.title)) return;   
-      let date = null; 
-      const sessionBests = [];
-      (raw.sessions || []).forEach((s) => {
-        const lab = s.label || s.title || "";
-        if (s.date && !date) { const dt = new Date(s.date); if (!isNaN(dt)) date = dt; }
-        if (!/race/i.test(lab) || /quali/i.test(lab)) return;
-        if (wetSessions.has(`scraped__${s.session_id}`)) return;   
-        
-        const sBests = (s.results || []).map(r => parseSecs(r.best_lap_time)).filter(x => x != null);
-        if (sBests.length) {
-          const validLap = getValidFastest(sBests);
-          if (validLap) sessionBests.push(validLap);
+    const wFasts = {};
+    convertedSessions.forEach((s) => {
+      if (!s.isRound || /quali/i.test(s.raceLabel)) return;
+      if (wetSessions.has(s.id)) return;
+
+      // Mathematically group the BUKC rounds into discrete weekend IDs sharing the exact same track
+      let weekendId = null;
+      if (s.category === "Mains") weekendId = Math.ceil(s.round / 2);
+      else if (s.category === "Inters") weekendId = s.round;
+      else return;
+
+      const bests = (s.allKarts || []).map((k) => s.sectorsByKart && s.sectorsByKart[k.num] ? s.sectorsByKart[k.num].best : null).filter((x) => x != null);
+      const validFast = getValidFastest(bests);
+
+      if (validFast != null) {
+        if (!wFasts[weekendId] || validFast < wFasts[weekendId]) {
+          wFasts[weekendId] = validFast;
         }
-      });
-      if (sessionBests.length) {
-        evs.push({ title: raw.title, date, fast: getValidFastest(sessionBests) });
       }
     });
-    const baselines = {};
-    const dated = evs.filter((e) => e.date).sort((a, b) => a.date - b.date);
-    const weekends = [];
-    dated.forEach((e) => {
-      let wk = weekends.find((w) => Math.abs(w.date - e.date) <= 5 * 86400000); 
-      if (!wk) { wk = { date: e.date, fasts: [], titles: [] }; weekends.push(wk); }
-      wk.fasts.push(e.fast); wk.titles.push(e.title);
-    });
-    weekends.forEach((w) => {
-      const outright = getValidFastest(w.fasts);
-      w.titles.forEach((t) => { baselines[t] = outright; });
-    });
-    evs.filter((e) => !e.date).forEach((e) => { baselines[e.title] = e.fast; });
-    return baselines;
-  }, [seasonRaws, wetSessions]);
+    return wFasts;
+  }, [convertedSessions, wetSessions]);
 
   useEffect(() => {
     compareIds.forEach((eid) => {
@@ -955,9 +941,14 @@ export default function App() {
 
       if (isWet) return;
 
+      let weekendId = null;
+      if (s.category === "Mains") weekendId = Math.ceil(s.round / 2);
+      else if (s.category === "Inters") weekendId = s.round;
+
       const bests = (s.allKarts || []).map((k) => s.sectorsByKart && s.sectorsByKart[k.num] && s.sectorsByKart[k.num].best).filter((x) => x != null);
       const fastest = getValidFastest(bests);
-      const wFast = weekendFastest[s.round]; 
+      
+      const wFast = weekendId ? weekendFastest[weekendId] : null;
 
       s.karts.forEach((k) => {
         const key = `${s.id}|${k.num}`;
@@ -968,6 +959,10 @@ export default function App() {
         const a = agg[name] || (agg[name] = { name, qPos: [], qGap: [], rGap: [], pGap: [], penPos: 0, pens: 0 });
         const best = s.sectorsByKart && s.sectorsByKart[k.num] ? s.sectorsByKart[k.num].best : null;
         
+        const ls = s.laps.map((l) => l.times[k.num]).filter((x) => x != null);
+        const clean = splitClean(ls).clean;
+        const cavg = clean.length ? mean(clean) : null;
+
         const gap = (best != null && fastest != null) ? best - fastest : null;
         
         if (isQuali) {
@@ -975,8 +970,9 @@ export default function App() {
           if (gap != null) a.qGap.push(gap);
         } else if (isRace) {
           if (gap != null) a.rGap.push(gap);
-          if (best != null && wFast != null) {
-            a.pGap.push((best - wFast));
+          // Pace Gap = Driver's Average Clean Lap vs The Weekend's Outright Fastest Lap
+          if (cavg != null && wFast != null) {
+            a.pGap.push(cavg - wFast);
           }
         }
       });
@@ -1554,7 +1550,7 @@ export default function App() {
                   </div>
                 )}
                 <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
-                  Race/Quali Gap = difference between your best lap and the session's ultimate lap. Pace Gap = difference between your best lap and the outright best lap of the entire weekend cluster. Anomalous transponder glitches (&gt;0.9s faster than the next driver) are permanently dropped from all baseline calculations. Wet races are ignored from gap metrics.
+                  Race/Quali Gap = difference between your best lap and the session's ultimate lap. Pace Gap = difference between your Clean Average Race Lap and the absolute fastest lap of the entire weekend cluster. Anomalous transponder glitches (&gt;0.9s faster than the next driver) are permanently dropped from all baseline calculations. Wet races are ignored from gap metrics.
                 </div>
               </Panel>
             )}
