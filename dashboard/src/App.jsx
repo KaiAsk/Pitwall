@@ -440,6 +440,8 @@ export default function App() {
   const [debriefScope, setDebriefScope] = useState("overall");
   const [debriefTime, setDebriefTime] = useState("season");
   const [statsView, setStatsView] = useState("drivers");
+  const [h2hA, setH2hA] = useState("");
+  const [h2hB, setH2hB] = useState("");
   const [statsMode, setStatsMode] = useState("cards");
   const [statsCat, setStatsCat] = useState("all");
   const [progSel, setProgSel] = useState(null);
@@ -1333,7 +1335,8 @@ export default function App() {
                 ["stats", "STATS"],
                 ["special", "SPECIAL EVENTS"],
                 ["sectors", "SECTORS"],
-                ["lineup", "LINEUP"]
+                ["lineup", "LINEUP"],
+                ["h2h", "HEAD-TO-HEAD"]
               ].map(([k, l]) => (
                 <button key={k} onClick={() => setTab(k)} className="disp"
                   style={{ padding: "8px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer",
@@ -2102,6 +2105,62 @@ export default function App() {
                       </div>
                     </div>
                   )}
+                </Panel>
+              );
+            })()}
+
+            {tab === "h2h" && (() => {
+              const r = Object.fromEntries(driverRatings.map((d) => [d.name, d]));
+              const st = Object.fromEntries(stats.drivers.map((d) => [d.name, d]));
+              const names = [...new Set([...driverRatings.map((d) => d.name), ...stats.drivers.map((d) => d.name)])].sort();
+              if (names.length < 2) return <Panel title="HEAD-TO-HEAD"><Empty msg="Name at least two drivers to compare." /></Panel>;
+              const A = names.includes(h2hA) ? h2hA : names[0];
+              const B = names.includes(h2hB) ? h2hB : (names[1] || names[0]);
+              const rows = [
+                ["OVERALL RATING", r[A]?.overall, r[B]?.overall, true, (v) => v?.toFixed(2)],
+                ["PACE", r[A]?.pace, r[B]?.pace, true, (v) => v?.toFixed(2)],
+                ["CONSISTENCY", r[A]?.cons, r[B]?.cons, true, (v) => v?.toFixed(2)],
+                ["RACECRAFT", r[A]?.race, r[B]?.race, true, (v) => v?.toFixed(2)],
+                ["POINTS", st[A]?.points, st[B]?.points, true, (v) => v],
+                ["AVG FINISH", st[A]?.avgFinish, st[B]?.avgFinish, false, (v) => v != null ? "P" + v.toFixed(1) : "—"],
+                ["BEST LAP", st[A]?.bestLap, st[B]?.bestLap, false, (v) => v != null ? fmt(v) : "—"],
+                ["BEST QUALI", st[A]?.bestQualiPos, st[B]?.bestQualiPos, false, (v) => v != null ? "P" + v : "—"],
+              ];
+              const sel = (val, set, other) => (
+                <select value={val} onChange={(e) => set(e.target.value)} className="disp"
+                  style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 7, color: "#e6edf3", padding: "8px 10px", fontSize: 16, fontWeight: 700, fontFamily: "Archivo, sans-serif", width: "100%" }}>
+                  {names.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              );
+              return (
+                <Panel title="HEAD-TO-HEAD">
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 1fr", gap: 10, alignItems: "center", marginBottom: 14 }}>
+                    <div>{sel(A, setH2hA)}</div>
+                    <div className="disp" style={{ textAlign: "center", color: "#5b6776", fontWeight: 700 }}>VS</div>
+                    <div>{sel(B, setH2hB)}</div>
+                  </div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {rows.map(([label, av, bv, higher, f]) => {
+                      const valid = av != null && bv != null;
+                      const aWin = valid && (higher ? av > bv : av < bv);
+                      const bWin = valid && (higher ? bv > av : bv < av);
+                      const cell = (v, win) => (
+                        <div style={{ textAlign: "center", padding: "10px", borderRadius: 8, background: win ? "#0e2018" : "#0b1017", border: `1px solid ${win ? "#43d97755" : "#1b2430"}` }}>
+                          <span className="mono" style={{ fontSize: 17, fontWeight: 700, color: win ? "#43d977" : "#c2cbd6" }}>{f(v) ?? "—"}</span>
+                        </div>
+                      );
+                      return (
+                        <div key={label} style={{ display: "grid", gridTemplateColumns: "1fr 120px 1fr", gap: 10, alignItems: "center" }}>
+                          {cell(av, aWin)}
+                          <div className="mono" style={{ textAlign: "center", fontSize: 10.5, color: "#6b7685", letterSpacing: "0.5px" }}>{label}</div>
+                          {cell(bv, bWin)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12 }}>
+                    Green = the better of the two on that metric. Ratings/points: higher wins. Avg finish, best lap, best quali: lower wins. Whole season.
+                  </div>
                 </Panel>
               );
             })()}
