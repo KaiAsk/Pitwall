@@ -451,6 +451,25 @@ export default function App() {
   const [syncing, setSyncing] = useState(false);
   const [appMode, setAppMode] = useState(() => LS("appMode", "telemetry"));
   useEffect(() => { saveLS("appMode", appMode); }, [appMode]);
+  const [telemetryLocked, setTelemetryLocked] = useState(false);
+  const [telemetryUnlocked, setTelemetryUnlocked] = useState(() => { try { return sessionStorage.getItem("pw_tele") === "1"; } catch { return false; } });
+  const [gatePw, setGatePw] = useState("");
+  const [gateMsg, setGateMsg] = useState("");
+  const unlockTelemetry = async () => {
+    setGateMsg("Checking…");
+    try {
+      const res = await fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ verify: true, adminPassword: gatePw }) });
+      const d = await res.json();
+      if (res.ok && d.ok) { setTelemetryUnlocked(true); try { sessionStorage.setItem("pw_tele", "1"); } catch {} setGateMsg(""); }
+      else setGateMsg(d.error || "Wrong password.");
+    } catch { setGateMsg("Couldn't reach the server (live site only)."); }
+  };
+
+  useEffect(() => {
+    let m = document.querySelector('meta[name="viewport"]');
+    if (!m) { m = document.createElement("meta"); m.name = "viewport"; document.head.appendChild(m); }
+    m.setAttribute("content", "width=device-width, initial-scale=1, viewport-fit=cover");
+  }, []);
 
   useEffect(() => {
     fetch("/api/roster").then((r) => r.json())
@@ -459,6 +478,7 @@ export default function App() {
         if (d && Array.isArray(d.wetSessions) && d.wetSessions.length) setWetSessions(new Set(d.wetSessions));
         if (d && Array.isArray(d.extraList) && d.extraList.length) setExtraList(d.extraList);
         if (d && Array.isArray(d.removed) && d.removed.length) setRemoved(new Set(d.removed));
+        if (d) setTelemetryLocked(!!d.telemetryLocked);
       })
       .catch(() => {});
   }, []);
@@ -1101,22 +1121,36 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#07090d", color: "#e6edf3", zoom: 1.18,
+    <div className="approot" style={{ minHeight: "100vh", background: "#07090d", color: "#e6edf3",
       fontFamily: "IBM Plex Sans, system-ui, sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
-        html, body, #root { margin: 0 !important; padding: 0 !important; max-width: none !important; width: 100% !important; display: block !important; place-items: initial !important; text-align: left !important; background: #07090d; }
+        html, body, #root { margin: 0 !important; padding: 0 !important; max-width: none !important; width: 100% !important; display: block !important; place-items: initial !important; text-align: left !important; background: #07090d; overflow-x: hidden; }
         * { box-sizing: border-box; }
+        .approot { zoom: 1.18; }
         .mono { font-family: 'IBM Plex Mono', monospace; }
         .disp { font-family: 'Archivo', sans-serif; letter-spacing: 0.2px; }
         ::-webkit-scrollbar { height: 8px; width: 8px; }
         ::-webkit-scrollbar-thumb { background:#1e2733; border-radius: 4px; }
         .appwrap { padding: 24px 28px; max-width: 1380px; margin: 0 auto; }
         .apphead { padding: 16px 28px; max-width: 1380px; margin: 0 auto; }
-        @media (max-width: 680px) {
-          .appwrap { padding: 12px 12px; }
-          .apphead { padding: 12px 14px; flex-wrap: wrap; gap: 10px; }
-          .apptabs button { font-size: 12px !important; padding: 7px 11px !important; }
+        .scrollx { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { max-width: 100%; }
+        img, svg { max-width: 100%; }
+        @media (max-width: 820px) {
+          .approot { zoom: 1 !important; }
+          .appwrap { padding: 12px 11px; }
+          .apphead { padding: 11px 13px; flex-wrap: wrap; gap: 10px; }
+          .apptabs { flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; max-width: 100%; }
+          .apptabs::-webkit-scrollbar { display: none; }
+          .apptabs button { font-size: 12px !important; padding: 7px 11px !important; white-space: nowrap; flex: 0 0 auto; }
+          input, select, textarea { font-size: 16px !important; }
+          .panelpad { padding: 13px !important; }
+          .g2, .g3 { grid-template-columns: 1fr 1fr !important; }
+        }
+        @media (max-width: 460px) {
+          .appwrap { padding: 10px 9px; }
+          .hidesm { display: none !important; }
         }
       `}</style>
 
@@ -1211,7 +1245,19 @@ export default function App() {
         {appMode === "live24" && (
           <Live24 knownDrivers={[...new Set(Object.values(assign).map((v) => v && v.trim()).filter(Boolean))]} />
         )}
-        {appMode === "telemetry" && (<>
+        {appMode === "telemetry" && telemetryLocked && !telemetryUnlocked && (
+          <div style={{ maxWidth: 380, margin: "60px auto", textAlign: "center", padding: 24, background: "#0b1017", border: "1px solid #222c38", borderRadius: 12 }}>
+            <div className="disp" style={{ fontSize: 16, fontWeight: 700, color: "#e6edf3" }}>🔒 Season telemetry is locked</div>
+            <div className="mono" style={{ fontSize: 12, color: "#6b7685", margin: "8px 0 16px" }}>Enter the admin password to view it. The 24 Hours Live section stays open.</div>
+            <input type="password" value={gatePw} onChange={(e) => setGatePw(e.target.value)} placeholder="admin password"
+              onKeyDown={(e) => { if (e.key === "Enter") unlockTelemetry(); }}
+              style={{ ...inp(260), fontFamily: "IBM Plex Sans, sans-serif", margin: "0 auto", display: "block" }} />
+            <button onClick={unlockTelemetry} className="disp"
+              style={{ marginTop: 12, background: AMBER, color: "#1a160a", border: "none", borderRadius: 8, padding: "10px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>UNLOCK</button>
+            {gateMsg && <div className="mono" style={{ fontSize: 12, color: gateMsg === "Checking…" ? "#8b97a7" : "#ff8a5b", marginTop: 10 }}>{gateMsg}</div>}
+          </div>
+        )}
+        {appMode === "telemetry" && (!telemetryLocked || telemetryUnlocked) && (<>
         
         {/* driver assignment */}
         {allEntries.length > 0 && (
@@ -1974,7 +2020,7 @@ export default function App() {
                           })()}
                         </div>
                       ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 300px), 1fr))", gap: 12 }}>
                           {list.map((d, i) => (
                             <div key={d.name} style={{ background: "#0b1017", border: "1px solid #1b2430", borderRadius: 10, padding: "14px 16px" }}>
                               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
@@ -2324,14 +2370,20 @@ function parseSheetStints(rows) {
   }
   if (hr < 0) return null;
   const hrow = rows[hr] || [];
-  let dc = -1, lc = -1, nc = -1;
+  let dc = -1, lc = -1, nc = -1, leadC = -1, seatC = -1, pedC = -1, radC = -1, asstC = -1;
   for (let c = 0; c < hrow.length; c++) {
     const h = String(hrow[c] || "").trim().toLowerCase();
     if ((h === "driver" || h === "name") && dc < 0 && c >= tc) dc = c;
     if (h === "stint length" || h === "length") lc = c;
     if (h === "pitstop notes" || h === "notes") nc = c;
+    if (leadC < 0 && (h === "total lead" || h === "lead needed" || h === "lead" || h.includes("lead (kg)"))) leadC = c;
+    if (seatC < 0 && h.includes("seat insert")) seatC = c;
+    if (pedC < 0 && (h === "pedals" || h.includes("pedal position"))) pedC = c;
+    if (radC < 0 && h.includes("radio")) radC = c;
+    if (asstC < 0 && h.includes("pit assist")) asstC = c;
   }
   if (dc < 0) return null;
+  const num = (v) => { const n = parseFloat(String(v).replace(/[^\d.\-]/g, "")); return isNaN(n) ? null : n; };
   const stints = []; let startClock = null, began = false;
   for (let r = hr + 1; r < rows.length; r++) {
     const row = rows[r] || [];
@@ -2348,7 +2400,25 @@ function parseSheetStints(rows) {
     began = true;
     if (startClock == null && st != null) startClock = st;
     const note = nc >= 0 && row[nc] != null ? String(row[nc]).trim() : null;
-    stints.push({ driver: drv, len, note: note || undefined });
+    const cell = (c) => c >= 0 && row[c] != null && String(row[c]).trim() !== "" ? String(row[c]).trim() : undefined;
+    stints.push({ driver: drv, len, note: note || undefined,
+      lead: leadC >= 0 ? num(row[leadC]) : undefined, seat: cell(seatC), pedals: cell(pedC), radio: cell(radC), assist: cell(asstC) });
+  }
+  // no explicit notes column (Leeds A / Grads A): synthesise a changeover note from
+  // the lead/seat/assist/radio columns so the board + planner still show the pit actions
+  if (nc < 0) {
+    for (let i = 0; i < stints.length; i++) {
+      const cur = stints[i], prev = stints[i - 1], bits = [];
+      if (cur.lead != null && prev && prev.lead != null) {
+        const d = Math.round((cur.lead - prev.lead) * 10) / 10;
+        if (d > 0) bits.push(`add ${d}kg lead`); else if (d < 0) bits.push(`remove ${Math.abs(d)}kg lead`);
+      }
+      if (cur.seat && prev && cur.seat !== prev.seat) bits.push(`seat → ${cur.seat}`);
+      else if (cur.seat && !prev) bits.push(`seat ${cur.seat}`);
+      if (cur.assist) bits.push(`assist ${cur.assist}`);
+      if (cur.radio) bits.push(`radio ${cur.radio}`);
+      if (bits.length) cur.note = bits.join(" · ");
+    }
   }
   return stints.length ? { stints, startClock } : null;
 }
@@ -2367,7 +2437,7 @@ function parseMasterWorkbook(wb) {
 }
 
 function Live24({ knownDrivers = [] }) {
-  const [sub, setSub] = useState("board");
+  const [sub, setSub] = useState("leedsa");
   const [cfg, setCfg] = useState(() => {
     const v = LS("live24", null);
     if (v && v.teams && v.v >= LIVE_SCHEMA) return { ...DEFAULT_LIVE, ...v };
@@ -2383,6 +2453,7 @@ function Live24({ knownDrivers = [] }) {
   const [syncMsg, setSyncMsg] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [importMsg, setImportMsg] = useState("");
+  const [teleLocked, setTeleLocked] = useState(false);
   const xlsxRef = useRef();
 
   useEffect(() => { saveLS("live24", cfg); }, [cfg]);
@@ -2391,7 +2462,7 @@ function Live24({ knownDrivers = [] }) {
   // pull a shared plan if one has been synced
   useEffect(() => {
     fetch("/api/roster").then((r) => r.json())
-      .then((d) => { if (d && d.stintPlan && d.stintPlan.teams) setCfg((c) => ({ ...DEFAULT_LIVE, ...d.stintPlan })); })
+      .then((d) => { if (d && d.stintPlan && d.stintPlan.teams) setCfg((c) => ({ ...DEFAULT_LIVE, ...d.stintPlan })); if (d) setTeleLocked(!!d.telemetryLocked); })
       .catch(() => {});
   }, []);
 
@@ -2444,7 +2515,8 @@ function Live24({ knownDrivers = [] }) {
             const p = byKart[String(t.num)];
             if (!p) return t;
             const drivers = [...new Set([...(t.drivers || []), ...p.stints.map((s) => s.driver)])];
-            return { ...t, drivers, stints: p.stints.map((s) => ({ id: uid(), driver: s.driver, len: s.len, note: s.note })) };
+            return { ...t, drivers, stints: p.stints.map((s) => ({ id: uid(), driver: s.driver, len: s.len, note: s.note,
+              lead: s.lead, seat: s.seat, pedals: s.pedals, radio: s.radio, assist: s.assist })) };
           });
           let raceStartISO = c.raceStartISO;
           if (startClock != null) {
@@ -2495,7 +2567,7 @@ function Live24({ knownDrivers = [] }) {
 
   const staleMin = liveModel && liveModel.scrapedAt ? (Date.now() - new Date(liveModel.scrapedAt).getTime()) / 60000 : null;
 
-  const tabs = [["board", "PIT BOARD"], ["plan", "STINT PLANNER"], ["live", "LIVE TRACKER"], ["pace", "TEAM PACE"]];
+  const tabs = [["leedsa", "◈ LEEDS A"], ["board", "ALL TEAMS"], ["plan", "PLANNER"], ["live", "LIVE"], ["pace", "PACE"]];
 
   return (
     <div>
@@ -2534,6 +2606,13 @@ function Live24({ knownDrivers = [] }) {
           </button>
         ))}
       </div>
+
+      {sub === "leedsa" && (() => {
+        const ti = cfg.teams.findIndex((t) => String(t.num) === "18");
+        const team = ti >= 0 ? cfg.teams[ti] : cfg.teams[0];
+        const live = liveModel ? liveModel.leeds.find((l) => l.kart === String(team?.num)) : null;
+        return <LeedsACommand team={team} teamIdx={ti >= 0 ? ti : 0} raceStart={raceStart} totalMin={totalMin} now={now} live={live} setCfg={setCfg} />;
+      })()}
 
       {sub === "board" && (
         <PitBoard cfg={cfg} setCfg={setCfg} raceStart={raceStart} totalMin={totalMin} now={now} liveModel={liveModel} />
@@ -2587,6 +2666,18 @@ function Live24({ knownDrivers = [] }) {
               </button>
               <span className="mono" style={{ fontSize: 11, color: "#5b6776" }}>shares this stint plan with everyone (admin only)</span>
               {syncMsg && <span className="mono" style={{ fontSize: 11.5, color: syncMsg.startsWith("✓") ? "#43d977" : "#ff8a5b" }}>{syncMsg}</span>}
+              <button onClick={async () => {
+                  const next = !teleLocked;
+                  try {
+                    const res = await fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ telemetryLocked: next, adminPassword: adminPw }) });
+                    const d = await res.json();
+                    if (res.ok && d.ok) { setTeleLocked(next); setSyncMsg(next ? "✓ Season telemetry locked." : "✓ Season telemetry unlocked."); }
+                    else setSyncMsg(d.error || "Failed.");
+                  } catch { setSyncMsg("Couldn't reach the server (live site only)."); }
+                }} className="disp"
+                style={{ background: teleLocked ? "#1a0a0e" : "#0b1017", color: teleLocked ? "#ff8a5b" : "#8b97a7", border: `1px solid ${teleLocked ? "#ff8a5b55" : "#2a3543"}`, borderRadius: 7, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                {teleLocked ? "🔒 TELEMETRY LOCKED" : "🔓 LOCK SEASON TELEMETRY"}
+              </button>
             </div>
           </Panel>
 
@@ -2611,7 +2702,7 @@ function Live24({ knownDrivers = [] }) {
             <Empty msg="No Leeds karts found in the live feed yet." />
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 260px),1fr))", gap: 12 }}>
                 {liveModel.leeds.sort((a, b) => (a.pos || 999) - (b.pos || 999)).map((r) => {
                   const planTeam = cfg.teams.find((t) => t.num === r.kart);
                   return (
@@ -2706,6 +2797,207 @@ function Live24({ knownDrivers = [] }) {
   );
 }
 
+function LeedsACommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg }) {
+  const logPit = (atMin) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === teamIdx ? { ...t, pitLog: [...(t.pitLog || []), { atMin, t: new Date().toISOString() }] } : t) }));
+  const undoPit = () => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === teamIdx ? { ...t, pitLog: (t.pitLog || []).slice(0, -1) } : t) }));
+  const setLastPit = (atMin) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => { if (i !== teamIdx) return t; const pl = [...(t.pitLog || [])]; if (pl.length) pl[pl.length - 1] = { ...pl[pl.length - 1], atMin }; return { ...t, pitLog: pl }; }) }));
+  const clockToMin = (hhmm) => { const m = String(hhmm).match(/(\d{1,2}):(\d{2})/); if (!m) return null; const base = raceStart.getHours() * 60 + raceStart.getMinutes(); let d = (+m[1] * 60 + +m[2]) - base; if (d < 0) d += 1440; return d; };
+
+  if (!team || !(team.stints || []).length) {
+    return <Panel title="LEEDS A — COMMAND"><Empty msg="No plan for Leeds A yet. Import the master spreadsheet in the Planner tab." /></Panel>;
+  }
+
+  const rs = teamRaceState(team, raceStart, now);
+  const cur = rs.onKartIdx >= 0 ? rs.rows[rs.onKartIdx] : null;
+  const inc = rs.onKartIdx >= 0 ? rs.rows[rs.onKartIdx + 1] : null;
+  const toPit = rs.minsToPit;
+  const overdue = rs.started && toPit != null && toPit < 0;
+  const pitC = toPit == null ? "#5b6776" : overdue || toPit <= 5 ? "#ff3355" : toPit <= 15 ? "#ff8a5b" : "#43d977";
+  const clockOf = (m) => fmtClockDay(new Date(raceStart.getTime() + m * 60000), raceStart);
+  const projStart = (i) => { if (rs.onKartIdx < 0 || i < rs.onKartIdx) return null; let a = rs.onKartStart; for (let k = rs.onKartIdx; k < i; k++) a += rs.rows[k].len; return a; };
+  const spare = totalMin - rs.projFinish;
+  const isFinal = rs.onKartIdx === rs.rows.length - 1 && rs.onKartIdx >= 0;
+  const toFlag = totalMin - rs.nowMin;
+  const stintPct = cur && rs.stintElapsed != null ? Math.max(0, Math.min(1, rs.stintElapsed / cur.len)) : 0;
+  const leadDelta = (inc && cur && inc.lead != null && cur.lead != null) ? Math.round((inc.lead - cur.lead) * 10) / 10 : null;
+  const seatLabel = (v) => v ? (String(v).toUpperCase().includes("M/H") ? `${v} (heavy insert)` : v) : "—";
+
+  const ChkRow = ({ label, value, big, accent }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, padding: "7px 0", borderBottom: "1px solid #11171f" }}>
+      <span className="disp" style={{ fontSize: 11, color: "#6b7685", letterSpacing: 0.5, fontWeight: 600, flex: "0 0 auto" }}>{label}</span>
+      <span className="mono" style={{ fontSize: big ? 15 : 13, color: accent || "#e6edf3", fontWeight: big ? 700 : 500, textAlign: "right" }}>{value}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      {/* current stint */}
+      <div className="panelpad" style={{ background: "linear-gradient(135deg,#11233a22,#0b1017)", border: "1px solid #222c38", borderLeft: "4px solid " + AMBER, borderRadius: 12, padding: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+          <span className="disp" style={{ fontSize: 12, color: "#8b97a7", fontWeight: 700, letterSpacing: 1 }}>#18 BUZZER'S HUZZ · LEEDS A</span>
+          <span className="mono" style={{ fontSize: 12, color: "#6b7685" }}>
+            {live && live.pos ? "P" + live.pos : ""}{live && live.gap ? "  " + live.gap : ""}
+          </span>
+        </div>
+
+        {rs.finished ? (
+          <div className="disp" style={{ fontSize: 24, fontWeight: 800, color: "#43d977", marginTop: 12 }}>FINISHED · {rs.completed} stops</div>
+        ) : (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 12, gap: 12, flexWrap: "wrap" }}>
+              <div>
+                <div className="disp" style={{ fontSize: 10, color: "#5b6776", letterSpacing: 0.5 }}>IN THE KART</div>
+                <div className="disp" style={{ fontSize: 26, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>{rs.currentDriver || "—"}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div className="disp" style={{ fontSize: 10, color: "#5b6776", letterSpacing: 0.5 }}>{overdue ? "PIT DUE" : rs.started ? "NEXT PIT" : "STARTS"}</div>
+                <div className="mono" style={{ fontSize: 26, fontWeight: 800, color: pitC, lineHeight: 1.1 }}>
+                  {rs.nextPitMin != null ? clockOf(rs.nextPitMin) : "—"}
+                </div>
+                <div className="mono" style={{ fontSize: 12, color: pitC }}>{rs.started && toPit != null ? (overdue ? "+" + fmtDur(-toPit) + " over" : "in " + fmtDur(Math.max(0, toPit))) : ""}</div>
+              </div>
+            </div>
+            {cur && rs.started && (
+              <div style={{ marginTop: 10 }}>
+                <div className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6b7685" }}>
+                  <span>stint {rs.onKartIdx + 1}/{rs.rows.length}</span>
+                  <span>{fmtDur(Math.max(0, rs.stintElapsed))} / {fmtDur(cur.len)}</span>
+                </div>
+                <div style={{ height: 7, borderRadius: 4, background: "#11171f", marginTop: 5, overflow: "hidden" }}>
+                  <div style={{ width: `${stintPct * 100}%`, height: "100%", background: pitC }} />
+                </div>
+              </div>
+            )}
+            <button onClick={() => logPit((Date.now() - raceStart.getTime()) / 60000)} className="disp"
+              style={{ width: "100%", marginTop: 14, background: "#ff3355", color: "#fff", border: "none", borderRadius: 10,
+                padding: "16px", fontWeight: 800, fontSize: 18, cursor: "pointer", letterSpacing: 1 }}>
+              ◉ PIT IN — {rs.currentDriver || "driver"} OUT
+            </button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, flexWrap: "wrap", gap: 8 }}>
+              {rs.completed > 0 ? (
+                <button onClick={undoPit} className="mono" style={{ background: "none", border: "1px solid #2a3543", color: "#8b97a7", borderRadius: 7, padding: "7px 12px", cursor: "pointer", fontSize: 12 }}>↩ undo last</button>
+              ) : <span />}
+              {rs.lastActual != null && (
+                <span className="mono" style={{ fontSize: 11, color: "#8b97a7" }}>
+                  last: {rs.lastDriver} {fmtDur(rs.lastActual)}
+                  <span style={{ color: rs.lastActual <= rs.lastPlanned ? "#43d977" : "#ff8a5b" }}> ({rs.lastActual <= rs.lastPlanned ? "-" : "+"}{fmtDur(Math.abs(rs.lastActual - rs.lastPlanned))})</span>
+                </span>
+              )}
+            </div>
+            <div className="mono" style={{ marginTop: 8, fontSize: 12, color: "#8b97a7" }}>
+              {isFinal ? <span>FINAL STINT · <b style={{ color: pitC }}>{fmtDur(Math.max(0, toFlag))} to flag</b></span>
+                : rs.started ? <span>proj. finish {clockOf(rs.projFinish)} · <b style={{ color: spare >= 0 ? "#43d977" : "#ff8a5b" }}>{spare >= 0 ? fmtDur(spare) + " in hand" : fmtDur(-spare) + " over"}</b></span> : null}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* next changeover checklist */}
+      {inc && !rs.finished && (
+        <div className="panelpad" style={{ background: "#0b1017", border: "1px solid #ff335540", borderRadius: 12, padding: 16 }}>
+          <div className="disp" style={{ fontSize: 12, color: "#ff3355", fontWeight: 800, letterSpacing: 1 }}>NEXT CHANGEOVER</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 4, marginBottom: 6 }}>
+            <span className="disp" style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>→ {inc.driver}</span>
+            <span className="mono" style={{ fontSize: 13, color: "#8b97a7" }}>{clockOf(rs.nextPitMin)}</span>
+          </div>
+          <ChkRow label="LEAD" big accent={leadDelta ? (leadDelta > 0 ? "#ff8a5b" : "#43d977") : "#e6edf3"}
+            value={leadDelta != null ? (leadDelta > 0 ? `ADD ${leadDelta}kg` : leadDelta < 0 ? `REMOVE ${Math.abs(leadDelta)}kg` : "no change") + (inc.lead != null ? `  → ${inc.lead}kg` : "") : (inc.lead != null ? `${inc.lead}kg total` : "—")} />
+          <ChkRow label="SEAT INSERT" big={!!(cur && inc.seat && cur.seat !== inc.seat)}
+            accent={cur && inc.seat && cur.seat !== inc.seat ? AMBER : "#e6edf3"}
+            value={seatLabel(inc.seat) + (cur && inc.seat && cur.seat !== inc.seat ? `  (was ${cur.seat || "?"})` : "")} />
+          <ChkRow label="PEDALS" value={inc.pedals || "—"} />
+          <ChkRow label="PIT ASSIST" accent="#3da9fc" value={inc.assist || "—"} />
+          <ChkRow label="ON RADIO" accent="#3da9fc" value={inc.radio || "—"} />
+          {inc.note && !inc.lead && !inc.seat && (
+            <div className="mono" style={{ marginTop: 8, fontSize: 12, color: AMBER }}>⚙ {inc.note}</div>
+          )}
+        </div>
+      )}
+
+      {/* wake + driver status */}
+      <div className="panelpad" style={{ background: "#0b1017", border: "1px solid #161d27", borderRadius: 12, padding: 16 }}>
+        {inc && !rs.finished && (
+          <div style={{ background: "#1a160a", border: "1px solid " + AMBER + "55", borderRadius: 8, padding: "9px 12px", marginBottom: 12 }}>
+            <span className="disp" style={{ fontSize: 12, color: AMBER, fontWeight: 700 }}>⏰ WAKE {inc.driver}</span>
+            <span className="mono" style={{ fontSize: 12, color: "#8b97a7" }}> — in at {clockOf(rs.nextPitMin)} ({rs.started && toPit != null ? fmtDur(Math.max(0, toPit)) : "—"})</span>
+          </div>
+        )}
+        <Label>DRIVER STATUS</Label>
+        <div style={{ display: "grid", gap: 4 }}>
+          {team.drivers.map((d) => {
+            const dsi = rs.rows.map((r, i) => ({ r, i })).filter((x) => x.r.driver === d);
+            const total = dsi.reduce((a, x) => a + (Number(x.r.len) || 0), 0);
+            const isOn = rs.currentDriver === d && rs.started && !rs.finished;
+            const isNext = inc && inc.driver === d && !isOn;
+            const nextOut = dsi.find((x) => x.i > rs.onKartIdx);
+            const nextMin = nextOut ? projStart(nextOut.i) : null;
+            const rest = nextMin != null && rs.started ? nextMin - rs.nowMin : null;
+            return (
+              <div key={d} className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "6px 9px", borderRadius: 6,
+                background: isOn ? "#ff335518" : isNext ? AMBER + "15" : "#080d13" }}>
+                <span style={{ color: isOn ? "#ff3355" : isNext ? AMBER : "#c2cbd6", fontWeight: isOn || isNext ? 700 : 400 }}>
+                  {isOn ? "● " : isNext ? "▶ " : ""}{d}
+                </span>
+                <span style={{ color: "#6b7685", textAlign: "right" }}>
+                  {dsi.length} stints · {fmtDur(total)}
+                  {isOn ? " · IN NOW" : nextMin != null ? ` · in ${clockOf(nextMin)}${rest != null ? ` (rest ${fmtDur(Math.max(0, rest))})` : ""}` : rs.started ? " · done" : ""}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* live + log */}
+      <div className="panelpad" style={{ background: "#0b1017", border: "1px solid #161d27", borderRadius: 12, padding: 16 }}>
+        <Label>LIVE</Label>
+        <div className="mono g3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "10px 12px", fontSize: 13 }}>
+          <Stat label="POS" v={live && live.pos ? "P" + live.pos : "—"} />
+          <Stat label="LAPS" v={live && live.laps != null ? live.laps : "—"} />
+          <Stat label="BEST" v={live && live.bestClean != null ? fmt(live.bestClean) : "—"} />
+          <Stat label="RECENT 5" v={live && live.recent != null ? fmt(live.recent) : "—"} c={live && live.recent != null && live.bestClean != null ? (live.recent <= live.bestClean * 1.03 ? "#43d977" : "#ff8a5b") : "#e6edf3"} />
+        </div>
+        {rs.completed > 0 && (
+          <Collapsible title={`PIT LOG (${rs.completed})`} accent="#ff3355">
+            <div style={{ display: "grid", gap: 3 }}>
+              {rs.rows.slice(0, rs.completed).map((r, i) => {
+                const atMin = (team.pitLog || [])[i]?.atMin;
+                const isLast = i === rs.completed - 1;
+                return (
+                  <div key={i} className="mono" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, padding: "3px 4px" }}>
+                    <span style={{ color: "#8b97a7" }}>{i + 1}. {r.driver} → {rs.rows[i + 1]?.driver || "—"}</span>
+                    {isLast ? (
+                      <input type="time" defaultValue={`${pad2(Math.floor((((atMin % 1440) + 1440) % 1440) / 60))}:${pad2(Math.round(((atMin % 60) + 60) % 60))}`}
+                        onChange={(e) => { const v = clockToMin(e.target.value); if (v != null) setLastPit(v); }}
+                        style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 5, color: "#e6edf3", padding: "3px 6px", fontSize: 12, fontFamily: "IBM Plex Mono, monospace" }} />
+                    ) : <span style={{ color: "#5b6776" }}>{atMin != null ? clockOf(atMin) : "—"}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </Collapsible>
+        )}
+        <Collapsible title="LEAD & SEAT REFERENCE" accent="#3da9fc">
+          <div style={{ display: "grid", gap: 3 }}>
+            {team.drivers.map((d) => {
+              const st = rs.rows.find((r) => r.driver === d) || {};
+              return (
+                <div key={d} className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 6px" }}>
+                  <span style={{ color: "#c2cbd6" }}>{d}</span>
+                  <span style={{ color: "#6b7685" }}>{st.lead != null ? st.lead + "kg" : "—"}{st.seat ? " · " + st.seat : ""}{st.pedals ? " · " + st.pedals : ""}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Collapsible>
+        <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 10, lineHeight: 1.5 }}>
+          M/H = Arion's heavy seat insert. Lead shown as the change to make at the pit (and the new total). Tap PIT IN the moment the driver's in — next pit, wake times and finish margin all reflow off it.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
   const teams = cfg.teams || [];
   const states = teams.map((t, i) => {
@@ -2794,7 +3086,7 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
       </Panel>
 
       {/* one card per team, in importance order */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 300px),1fr))", gap: 12 }}>
         {states.map((s) => {
           const { rs, live, color } = s;
           const clash = clashNums.has(s.team.num);
@@ -3190,7 +3482,7 @@ function StatsTable({ boxes, fieldMed }) {
 /* ---------- small ui ---------- */
 const td = { padding: "6px 10px", textAlign: "right", color: "#c2cbd6" };
 const inp = (w) => ({ background: "#11171f", border: "1px solid #222c38", borderRadius: 6,
-  color: "#e6edf3", padding: "5px 8px", fontSize: 12.5, width: w, fontFamily: "IBM Plex Mono, monospace" });
+  color: "#e6edf3", padding: "5px 8px", fontSize: 12.5, width: "100%", maxWidth: w, fontFamily: "IBM Plex Mono, monospace" });
 const Label = ({ children }) => (
   <div className="disp" style={{ fontSize: 12.5, color: "#8b97a7", letterSpacing: "1px",
     fontWeight: 600, marginBottom: 9, textTransform: "uppercase" }}>{children}</div>
