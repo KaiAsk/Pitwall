@@ -4,25 +4,27 @@ const json = (obj, status = 200) =>
 
 export async function onRequestGet({ env }) {
   try {
-    if (!env.PITWALL_KV) return json({ roster: {}, wetSessions: [], extraList: [], removed: [], stintPlan: null });
+    if (!env.PITWALL_KV) return json({ roster: {}, wetSessions: [], extraList: [], removed: [], stintPlan: null, telemetryLocked: false });
     const v = await env.PITWALL_KV.get("global_state");
     if (!v) {
       const oldRoster = await env.PITWALL_KV.get("global_roster");
-      return json({ roster: oldRoster ? JSON.parse(oldRoster) : {}, wetSessions: [], extraList: [], removed: [], stintPlan: null });
+      return json({ roster: oldRoster ? JSON.parse(oldRoster) : {}, wetSessions: [], extraList: [], removed: [], stintPlan: null, telemetryLocked: false });
     }
     const parsed = JSON.parse(v);
-    return json({ roster: parsed.roster || {}, wetSessions: parsed.wetSessions || [], extraList: parsed.extraList || [], removed: parsed.removed || [], stintPlan: parsed.stintPlan || null });
+    return json({ roster: parsed.roster || {}, wetSessions: parsed.wetSessions || [], extraList: parsed.extraList || [], removed: parsed.removed || [], stintPlan: parsed.stintPlan || null, telemetryLocked: !!parsed.telemetryLocked });
   } catch (e) {
-    return json({ roster: {}, wetSessions: [], extraList: [], removed: [], stintPlan: null, error: String(e) });
+    return json({ roster: {}, wetSessions: [], extraList: [], removed: [], stintPlan: null, telemetryLocked: false, error: String(e) });
   }
 }
 
 export async function onRequestPost({ request, env }) {
   try {
     const body = await request.json();
-    const { roster, wetSessions, extraList, removed, stintPlan, adminPassword } = body;
+    const { roster, wetSessions, extraList, removed, stintPlan, telemetryLocked, verify, adminPassword } = body;
     if (!env.ADMIN_PASSWORD) return json({ error: "Server has no ADMIN_PASSWORD set." }, 500);
     if (adminPassword !== env.ADMIN_PASSWORD) return json({ error: "Wrong admin password." }, 401);
+    // verify-only: used to unlock the season telemetry without changing anything
+    if (verify) return json({ ok: true });
     if (!env.PITWALL_KV) return json({ error: "KV namespace PITWALL_KV not bound." }, 500);
 
     // Merge over what's already stored so a roster sync doesn't wipe the stint
@@ -37,6 +39,7 @@ export async function onRequestPost({ request, env }) {
     if (Array.isArray(extraList)) statePayload.extraList = extraList;
     if (Array.isArray(removed)) statePayload.removed = removed;
     if (stintPlan && typeof stintPlan === "object") statePayload.stintPlan = stintPlan;
+    if (typeof telemetryLocked === "boolean") statePayload.telemetryLocked = telemetryLocked;
 
     statePayload.roster = statePayload.roster || {};
     statePayload.wetSessions = statePayload.wetSessions || [];
