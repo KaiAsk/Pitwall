@@ -2459,7 +2459,8 @@ function Live24({ knownDrivers = [] }) {
   const [teleLocked, setTeleLocked] = useState(false);
   const [simOn, setSimOn] = useState(false);
   const [simFast, setSimFast] = useState(false);
-  const [simStartAt, setSimStartAt] = useState(null);
+  const [testClock, setTestClock] = useState(false);
+  const [clockStartAt, setClockStartAt] = useState(null);
   const [simModel, setSimModel] = useState(null);
   const xlsxRef = useRef();
 
@@ -2494,7 +2495,7 @@ function Live24({ knownDrivers = [] }) {
     return () => { stop = true; clearInterval(iv); };
   }, []);
 
-  const raceStart = useMemo(() => (simOn && simStartAt ? new Date(simStartAt) : new Date(cfg.raceStartISO)), [simOn, simStartAt, cfg.raceStartISO]);
+  const raceStart = useMemo(() => (testClock && clockStartAt ? new Date(clockStartAt) : new Date(cfg.raceStartISO)), [testClock, clockStartAt, cfg.raceStartISO]);
   const raceEnd = useMemo(() => new Date(raceStart.getTime() + cfg.raceHours * 3600000), [raceStart, cfg.raceHours]);
   const totalMin = cfg.raceHours * 60;
   const elapsedMin = (now - raceStart) / 60000;
@@ -2540,7 +2541,8 @@ function Live24({ knownDrivers = [] }) {
           return { ...c, teams, raceStartISO };
         });
         const sc = startClock != null ? `${pad2(Math.floor(startClock / 60))}:${pad2(startClock % 60)}` : null;
-        let msg = `✓ Imported ${got.length} team${got.length === 1 ? "" : "s"} (${got.map((k) => "#" + k).join(", ")}).`;
+        const withExtras = got.filter((k) => byKart[k].stints.some((s) => s.lead != null || s.seat || s.note)).length;
+        let msg = `✓ Imported ${got.length} team${got.length === 1 ? "" : "s"} (${got.map((k) => "#" + k).join(", ")}); lead/seat/notes captured for ${withExtras}.`;
         if (sc) msg += ` Start set to ${sc} from the sheet.` + (sc !== "15:03" ? " Timing site says 15:03 — change Race Start above if that's the real start." : "");
         if (warn.length) msg += "  (" + warn.join("; ") + ")";
         setImportMsg(msg);
@@ -2631,6 +2633,7 @@ function Live24({ knownDrivers = [] }) {
           </div>
         </div>
         <div className="mono" style={{ fontSize: 11.5, color: "#6b7685", lineHeight: 1.7 }}>
+          {testClock ? <span style={{ color: "#ff8a5b" }}>TEST CLOCK (started now)<br /></span> : null}
           START {fmtClock(raceStart)} ({raceStart.toLocaleDateString("en-GB")})<br />
           FINISH {fmtClockDay(raceEnd, raceStart)} · {cfg.raceHours}h
         </div>
@@ -2672,7 +2675,7 @@ function Live24({ knownDrivers = [] }) {
         <PitBoard cfg={cfg} setCfg={setCfg} raceStart={raceStart} totalMin={totalMin} now={now} liveModel={liveModel} />
       )}
 
-      {sub === "track" && <TrackMap model={liveModel} teams={cfg.teams} simOn={simOn} onSim={() => { setSimStartAt(Date.now()); setSimOn(true); }} />}
+      {sub === "track" && <TrackMap model={liveModel} teams={cfg.teams} simOn={simOn} speedMul={simOn && simFast ? 12 : 1} onSim={() => { setSimOn(true); }} />}
 
       {sub === "plan" && (
         <>
@@ -2696,11 +2699,6 @@ function Live24({ knownDrivers = [] }) {
                   onChange={(e) => setCfgField("defaultStintLen", Math.max(5, Number(e.target.value) || 45))}
                   style={inp(90)} />
               </div>
-              <button onClick={() => setCfg((c) => ({ ...c, teams: [...c.teams, { num: "", name: "New team", drivers: [], stints: [] }] }))}
-                className="disp" style={{ background: "#11233a", color: AMBER, border: `1px solid ${AMBER}55`,
-                  borderRadius: 7, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                + ADD TEAM
-              </button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
               <button onClick={() => xlsxRef.current?.click()} className="disp"
@@ -2715,7 +2713,7 @@ function Live24({ knownDrivers = [] }) {
 
             {/* test / simulation mode */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap", padding: "10px 12px", borderRadius: 8, background: simOn ? "#1a0a0e" : "#0b1017", border: `1px solid ${simOn ? "#ff8a5b" : "#222c38"}` }}>
-              <button onClick={() => { if (simOn) { setSimOn(false); } else { setSimStartAt(Date.now()); setSimOn(true); } }} className="disp"
+              <button onClick={() => { if (simOn) { setSimOn(false); setTestClock(false); } else { setSimOn(true); } }} className="disp"
                 style={{ background: simOn ? "#ff3355" : "#11233a", color: simOn ? "#fff" : "#43d977", border: `1px solid ${simOn ? "#ff3355" : "#43d97755"}`, borderRadius: 7, padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
                 {simOn ? "■ STOP TEST" : "▶ TEST MODE (simulate a live race)"}
               </button>
@@ -2725,12 +2723,18 @@ function Live24({ knownDrivers = [] }) {
                   {simFast ? "FAST ×12 ON" : "speed ×12"}
                 </button>
               )}
+              {simOn && (
+                <button onClick={() => { if (testClock) { setTestClock(false); } else { setClockStartAt(Date.now()); setTestClock(true); } }} className="disp"
+                  style={{ background: testClock ? "#1a160a" : "#0b1017", color: testClock ? AMBER : "#8b97a7", border: `1px solid ${testClock ? AMBER : "#2a3543"}`, borderRadius: 7, padding: "8px 12px", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+                  {testClock ? "TEST CLOCK ON (race running now)" : "run test clock (rehearse pit stops)"}
+                </button>
+              )}
               <button onClick={() => { if (confirm("Clear all logged pit stops for every team?")) setCfg((c) => ({ ...c, teams: c.teams.map((t) => ({ ...t, pitLog: [] })) })); }} className="mono"
                 style={{ background: "none", color: "#8b97a7", border: "1px solid #2a3543", borderRadius: 7, padding: "8px 12px", fontSize: 12, cursor: "pointer" }}>
                 clear pit logs
               </button>
-              <span className="mono" style={{ fontSize: 11, color: simOn ? "#ffb3a0" : "#5b6776", flexBasis: simOn ? "100%" : "auto" }}>
-                {simOn ? "Fake data is running and the race clock starts now — open Track Map / Live / a team tab, try PIT STOP NOW. Clear pit logs and stop test before the real race." : "Rehearse the whole system with made-up cars before race day."}
+              <span className="mono" style={{ fontSize: 11, color: simOn ? "#ffb3a0" : "#5b6776", flexBasis: "100%" }}>
+                {simOn ? "Fake cars are running — open Track Map / Live to watch them. The real race start (12:30) is unchanged. To rehearse PIT STOP NOW + the reflow, turn on the test clock (it starts the race from now). Clear pit logs + stop test before race day." : "Rehearse the whole system with made-up cars before race day. Doesn't touch your plan or the real race clock."}
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
@@ -3102,71 +3106,96 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg }) 
   );
 }
 
-function TrackMap({ model, teams, simOn, onSim }) {
+const TRACK_PATH = "M408.0,185.0 L364.0,185.0 L350.0,190.0 L339.0,201.0 L242.0,384.0 L231.0,400.0 L221.0,410.0 L213.0,414.0 L196.0,412.0 L176.0,393.0 L104.0,256.0 L103.0,246.0 L106.0,239.0 L125.0,224.0 L135.0,211.0 L136.0,203.0 L134.0,195.0 L126.0,187.0 L115.0,183.0 L60.0,183.0 L49.0,178.0 L42.0,171.0 L38.0,163.0 L37.0,146.0 L42.0,132.0 L53.0,119.0 L72.0,107.0 L154.0,89.0 L253.0,72.0 L317.0,72.0 L382.0,78.0 L463.0,90.0 L475.0,96.0 L488.0,114.0 L500.0,124.0 L506.0,126.0 L537.0,124.0 L542.0,126.0 L548.0,133.0 L551.0,152.0 L561.0,159.0 L591.0,167.0 L628.0,172.0 L636.0,171.0 L645.0,164.0 L648.0,152.0 L646.0,142.0 L638.0,133.0 L633.0,131.0 L592.0,128.0 L573.0,124.0 L565.0,115.0 L564.0,102.0 L571.0,90.0 L582.0,85.0 L810.0,111.0 L835.0,119.0 L847.0,126.0 L860.0,139.0 L868.0,156.0 L870.0,180.0 L867.0,199.0 L859.0,219.0 L845.0,236.0 L830.0,244.0 L816.0,247.0 L785.0,246.0 L748.0,235.0 L729.0,226.0 L723.0,219.0 L720.0,209.0 L722.0,197.0 L725.0,192.0 L734.0,183.0 L742.0,180.0 L754.0,180.0 L798.0,191.0 L807.0,192.0 L818.0,189.0 L824.0,182.0 L826.0,176.0 L824.0,160.0 L815.0,151.0 L793.0,144.0 L760.0,144.0 L729.0,152.0 L717.0,158.0 L701.0,170.0 L671.0,200.0 L659.0,206.0 L646.0,208.0 L602.0,205.0 L556.0,194.0 L542.0,186.0 L521.0,162.0 L507.0,157.0 L500.0,157.0 L487.0,162.0 L467.0,179.0 L455.0,185.0 L442.0,187.0 L409.0,186.0 Z";
+const TRACK_VIEWBOX = "0 0 928 482";
+
+function TrackMap({ model, teams, simOn, speedMul = 1, onSim }) {
   const pathRef = useRef(null);
   const [len, setLen] = useState(0);
+  const stateRef = useRef({});
+  const [, force] = useState(0);
+  const lastRef = useRef(0);
+
   useEffect(() => { if (pathRef.current) setLen(pathRef.current.getTotalLength()); }, []);
-  // schematic kart-circuit loop (not the real circuit geometry — swap the path
-  // string for the actual track outline when we have it)
-  const PATH = "M70,210 C30,200 20,150 45,120 C70,90 60,55 100,48 C140,41 165,80 205,78 C250,76 270,38 315,50 C365,63 380,120 350,150 C325,175 270,160 235,172 C195,185 215,225 165,228 C120,231 105,218 70,210 Z";
+
+  useEffect(() => {
+    const st = stateRef.current;
+    (model?.leeds || []).forEach((k, i) => {
+      const lapSec = k.recent || k.bestClean || 30;
+      const speed = 1 / lapSec;
+      if (!st[k.kart]) st[k.kart] = { frac: k.lapFrac != null ? k.lapFrac : (i * 0.137) % 1, speed };
+      else {
+        st[k.kart].speed = speed;
+        if (k.lapFrac != null) { const d = (((k.lapFrac - st[k.kart].frac) % 1) + 1) % 1; if (d > 0.12 && d < 0.88) st[k.kart].frac = k.lapFrac; }
+      }
+    });
+    Object.keys(st).forEach((kk) => { if (!(model?.leeds || []).some((k) => k.kart === kk)) delete st[kk]; });
+  }, [model]);
+
+  useEffect(() => {
+    let raf;
+    const tick = (t) => {
+      const dt = lastRef.current ? Math.min(0.1, (t - lastRef.current) / 1000) : 0;
+      lastRef.current = t;
+      const st = stateRef.current;
+      Object.values(st).forEach((s) => { s.frac = (s.frac + s.speed * dt * speedMul) % 1; });
+      force((n) => (n + 1) % 1000000);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [speedMul]);
+
   const colorOf = (kart) => { const i = (teams || []).findIndex((t) => String(t.num) === String(kart)); return DRIVER_PALETTE[(i < 0 ? 0 : i) % DRIVER_PALETTE.length]; };
-  const fracOf = (k) => {
-    if (k.lapFrac != null) return k.lapFrac;
-    const rec = k.recent || 30, age = model?.scrapedAt ? (Date.now() - new Date(model.scrapedAt).getTime()) / 1000 : 0;
-    const seed = (((parseInt(k.kart) || 0) * 0.137) % 1 + 1) % 1;
-    return (seed + age / rec) % 1;
-  };
+  const pt = (frac) => (len && pathRef.current) ? pathRef.current.getPointAtLength((((frac % 1) + 1) % 1) * len) : null;
   const karts = model?.leeds || [];
-  const pt = (frac) => (len && pathRef.current) ? pathRef.current.getPointAtLength(((frac % 1) + 1) % 1 * len) : null;
-  const sectorPts = [0, 1 / 3, 2 / 3];
 
   if (!model) {
     return (
-      <Panel title="TRACK MAP">
-        <Empty msg={simOn ? "Waiting for data…" : "No live data yet. Start Test Mode to watch the cars move, or wait for the race feed."} />
+      <Panel title="TRACK MAP \u2014 TEESSIDE">
+        <Empty msg={simOn ? "Waiting for data\u2026" : "No live data yet. Start Test Mode to watch the cars move, or wait for the race feed."} />
         {!simOn && <div style={{ textAlign: "center", marginTop: 12 }}>
-          <button onClick={onSim} className="disp" style={{ background: "#11233a", color: "#43d977", border: "1px solid #43d97755", borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>▶ START TEST MODE</button>
+          <button onClick={onSim} className="disp" style={{ background: "#11233a", color: "#43d977", border: "1px solid #43d97755", borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>\u25B6 START TEST MODE</button>
         </div>}
       </Panel>
     );
   }
 
+  const sf = pt(0);
   return (
-    <Panel title="TRACK MAP">
+    <Panel title="TRACK MAP \u2014 TEESSIDE">
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,300px),1fr))", gap: 16, alignItems: "start" }}>
         <div style={{ background: "#080d13", borderRadius: 12, padding: 10 }}>
-          <svg viewBox="0 0 400 260" style={{ width: "100%", height: "auto", display: "block" }}>
-            <path ref={pathRef} d={PATH} fill="none" stroke="#1e2733" strokeWidth="16" strokeLinejoin="round" />
-            <path d={PATH} fill="none" stroke="#0b1017" strokeWidth="12" strokeLinejoin="round" />
-            <path d={PATH} fill="none" stroke="#2a3543" strokeWidth="1.5" strokeDasharray="3 6" />
-            {len > 0 && sectorPts.map((f, i) => { const p = pt(f); if (!p) return null; return (
-              <g key={i}>
-                <circle cx={p.x} cy={p.y} r="3" fill={i === 0 ? "#fff" : "#5b6776"} />
-                <text x={p.x} y={p.y - 8} fill={i === 0 ? "#fff" : "#6b7685"} fontSize="9" fontFamily="IBM Plex Mono" textAnchor="middle">{i === 0 ? "S/F" : "S" + i}</text>
-              </g>
-            ); })}
-            {len > 0 && karts.map((k) => { const p = pt(fracOf(k)); if (!p) return null; const c = colorOf(k.kart); return (
+          <svg viewBox={TRACK_VIEWBOX} style={{ width: "100%", height: "auto", display: "block" }}>
+            <path ref={pathRef} d={TRACK_PATH} fill="none" stroke="#16202c" strokeWidth="13" strokeLinejoin="round" strokeLinecap="round" />
+            <path d={TRACK_PATH} fill="none" stroke="#2a3a4d" strokeWidth="9" strokeLinejoin="round" strokeLinecap="round" />
+            <path d={TRACK_PATH} fill="none" stroke="#3da9fc" strokeWidth="1.4" strokeDasharray="2 7" />
+            {sf && <g>
+              <circle cx={sf.x} cy={sf.y} r="6" fill="none" stroke="#fff" strokeWidth="2.5" />
+              <text x={sf.x} y={sf.y - 11} fill="#fff" fontSize="13" fontWeight="700" fontFamily="IBM Plex Mono" textAnchor="middle">S/F</text>
+            </g>}
+            {len > 0 && karts.map((k) => { const p = pt(stateRef.current[k.kart]?.frac ?? 0); if (!p) return null; const c = colorOf(k.kart); return (
               <g key={k.kart}>
-                <circle cx={p.x} cy={p.y} r="7" fill={c} stroke="#07090d" strokeWidth="2" />
-                <text x={p.x} y={p.y + 3} fill="#07090d" fontSize="8" fontWeight="700" fontFamily="IBM Plex Mono" textAnchor="middle">{k.kart}</text>
+                <circle cx={p.x} cy={p.y} r="11" fill={c} stroke="#07090d" strokeWidth="2.5" />
+                <text x={p.x} y={p.y + 4} fill="#07090d" fontSize="11" fontWeight="800" fontFamily="IBM Plex Mono" textAnchor="middle">{k.kart}</text>
               </g>
             ); })}
           </svg>
           <div className="mono" style={{ fontSize: 10, color: "#5b6776", textAlign: "center", marginTop: 4 }}>
-            Schematic layout — positions are {karts[0]?.lapFrac != null ? "from the live/test feed" : "estimated from pace"}. Send me the real circuit outline and I'll drop it in.
+            Teesside Autodrome, clockwise from S/F. Cars move at their own pace \u2014 there's no live sector data, so position around the lap is predicted from lap times, not exact.
           </div>
         </div>
 
         <div>
-          <Label>ON TRACK — OUR CARS</Label>
+          <Label>ON TRACK \u2014 OUR CARS</Label>
           <div style={{ display: "grid", gap: 4 }}>
             {[...karts].sort((a, b) => (a.pos || 999) - (b.pos || 999)).map((k) => (
               <div key={k.kart} className="mono" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, background: "#080d13", borderRadius: 7, padding: "7px 10px" }}>
-                <span style={{ width: 11, height: 11, borderRadius: "50%", background: colorOf(k.kart), flex: "0 0 auto" }} />
+                <span style={{ width: 12, height: 12, borderRadius: "50%", background: colorOf(k.kart), flex: "0 0 auto" }} />
                 <span style={{ color: "#fff", fontWeight: 600 }}>#{k.kart}</span>
                 <span style={{ color: "#8b97a7", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(teams.find((t) => String(t.num) === String(k.kart)) || {}).name || k.team}</span>
-                <span style={{ color: AMBER }}>{k.pos ? "P" + k.pos : "—"}</span>
-                <span style={{ color: "#6b7685" }}>S{k.sector || Math.floor(fracOf(k) * 3) + 1}</span>
+                <span style={{ color: AMBER }}>{k.pos ? "P" + k.pos : "\u2014"}</span>
+                <span style={{ color: "#6b7685" }}>{k.laps != null ? k.laps + " laps" : ""}</span>
               </div>
             ))}
           </div>
