@@ -2260,30 +2260,110 @@ function detectStints(laps) {
 
 /* Shared stint state for one team at the current race clock. One source of
    truth for the planner and the pit board. */
+/* Live state for one team. The live timing gives no pit/stint times, so the
+   crew logs each changeover by hand (team.pitLog = [{atMin, t}]). Everything
+   downstream is anchored to the LAST ACTUAL pit, not the clock: if a stint
+   runs short or long, the projected next pit and the finish margin reflow. */
 function teamRaceState(team, raceStart, now) {
   const stints = team.stints || [];
   let acc = 0;
   const rows = stints.map((s) => { const startMin = acc; acc += Number(s.len) || 0; return { ...s, startMin, endMin: acc }; });
   const scheduledMin = acc;
   const nowMin = (now - raceStart) / 60000;
-  const started = nowMin >= 0;
-  const finished = rows.length > 0 && nowMin >= scheduledMin;
-  const activeIdx = started && !finished ? rows.findIndex((r) => nowMin >= r.startMin && nowMin < r.endMin) : -1;
-  const active = activeIdx >= 0 ? rows[activeIdx] : null;
-  // who's "in the kart" now: pre-race that's the grid driver (stint 0)
-  const onKart = active || (!started && rows.length ? rows[0] : null);
-  const onKartIdx = active ? activeIdx : (!started && rows.length ? 0 : -1);
-  const nextPitMin = onKart ? onKart.endMin : null;          // next changeover boundary
-  const incoming = onKartIdx >= 0 ? (rows[onKartIdx + 1]?.driver ?? null) : null;
+
+  const pits = (team.pitLog || []).map((p) => Number(p.atMin)).filter((x) => !isNaN(x)).sort((a, b) => a - b);
+  const completed = pits.length;                              // changeovers logged
+  const started = nowMin >= 0 || completed > 0;
+  const finished = rows.length > 0 && completed >= rows.length;
+  const onKartIdx = finished ? -1 : (rows.length ? Math.min(completed, rows.length - 1) : -1);
+  const onKart = onKartIdx >= 0 ? rows[onKartIdx] : null;
+  const onKartStart = completed > 0 ? pits[completed - 1] : 0; // elapsed-min the current stint began
+  const nextPitMin = onKart ? onKartStart + onKart.len : null; // projected, anchored to the last actual pit
   const minsToPit = nextPitMin != null ? nextPitMin - nowMin : null;
-  // pit stops = changeovers whose boundary has passed; first stint start isn't a pit
-  const startsPassed = rows.filter((r) => r.startMin <= nowMin).length;
-  const plannedPitsDone = Math.max(0, startsPassed - 1);
-  const totalPits = Math.max(0, rows.length - 1);
-  const stintElapsed = onKart && started ? nowMin - onKart.startMin : null;
-  return { rows, scheduledMin, nowMin, started, finished, activeIdx, active, onKart, onKartIdx,
-    currentDriver: onKart?.driver || null, nextPitMin, incoming, minsToPit,
-    plannedPitsDone, totalPits, stintElapsed };
+  const stintElapsed = onKart && started ? nowMin - onKartStart : null;
+  const incoming = onKartIdx >= 0 ? (rows[onKartIdx + 1]?.driver ?? null) : null;
+  const incomingNote = onKartIdx >= 0 ? (rows[onKartIdx + 1]?.note ?? null) : null;
+
+  // projected finish, anchored to the current actual stint start
+  let projFinish = scheduledMin;
+  if (onKartIdx >= 0) { let a = onKartStart; for (let i = onKartIdx; i < rows.length; i++) a += rows[i].len; projFinish = a; }
+  const driftMin = onKartIdx >= 0 ? onKartStart - rows[onKartIdx].startMin : 0; // +behind plan / -ahead
+
+  // last completed stint: actual vs planned
+  let lastActual = null, lastPlanned = null, lastDriver = null;
+  if (completed > 0 && rows[completed - 1]) {
+    lastActual = pits[completed - 1] - (completed > 1 ? pits[completed - 2] : 0);
+    lastPlanned = rows[completed - 1].len; lastDriver = rows[completed - 1].driver;
+  }
+  return { rows, scheduledMin, nowMin, started, finished, onKart, onKartIdx, onKartStart,
+    currentDriver: onKart?.driver || null, nextPitMin, incoming, incomingNote, minsToPit, stintElapsed,
+    projFinish, driftMin, lastActual, lastPlanned, lastDriver, completed,
+    plannedPitsDone: completed, totalPits: Math.max(0, rows.length - 1) };
+}
+
+/* ---- master spreadsheet import (per-team sheet -> stints) ----
+   Three layouts appear in the master sheet, all handled here:
+   - "Stint Time (Clock)" with a "HH:MM-HH:MM" range in one cell (Leeds A)
+   - "Stint Start Time" + a "Stint Length" time column (Grads A)
+   - "Planned Stint" range + "Name" + "Pitstop Notes" (Leeds B/C/D, Grads B)
+   Sheets map to karts by name; drivers and per-pit notes come across too. */
+const SHEET_KART = { "Leeds A": "18", "Leeds B": "19", "Leeds C": "20", "Leeds D": "21", "Grads A": "57", "Grads B": "58" };
+const excelMin = (v) => { const m = String(v || "").match(/(\d{1,2}):(\d{2})/); return m ? (+m[1] * 60 + +m[2]) : null; };
+const parseStintRange = (v) => {
+  const m = String(v || "").match(/(\d{1,2}):(\d{2})\s*[-\u2013]\s*(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const a = +m[1] * 60 + +m[2], b = +m[3] * 60 + +m[4];
+  return { start: a, len: (((b - a) % 1440) + 1440) % 1440 };
+};
+function parseSheetStints(rows) {
+  const reTime = /planned stint|stint start time|stint time \(clock\)/i;
+  let hr = -1, tc = -1;
+  for (let r = 0; r < Math.min(rows.length, 15) && hr < 0; r++) {
+    const row = rows[r] || [];
+    for (let c = 0; c < row.length; c++) { if (row[c] && reTime.test(String(row[c]))) { hr = r; tc = c; break; } }
+  }
+  if (hr < 0) return null;
+  const hrow = rows[hr] || [];
+  let dc = -1, lc = -1, nc = -1;
+  for (let c = 0; c < hrow.length; c++) {
+    const h = String(hrow[c] || "").trim().toLowerCase();
+    if ((h === "driver" || h === "name") && dc < 0 && c >= tc) dc = c;
+    if (h === "stint length" || h === "length") lc = c;
+    if (h === "pitstop notes" || h === "notes") nc = c;
+  }
+  if (dc < 0) return null;
+  const stints = []; let startClock = null, began = false;
+  for (let r = hr + 1; r < rows.length; r++) {
+    const row = rows[r] || [];
+    const tv = row[tc], dv = row[dc];
+    const drv = dv != null ? String(dv).trim() : "";
+    const blank = (tv == null || String(tv).trim() === "") && !drv;
+    if (blank) { if (began) break; else continue; }
+    let len = null, st = null;
+    if (lc >= 0 && row[lc]) len = excelMin(row[lc]);
+    const range = parseStintRange(tv);
+    if (range) { st = range.start; if (len == null) len = range.len; }
+    else if (tv) { st = excelMin(tv); }
+    if (!drv || len == null) continue;
+    began = true;
+    if (startClock == null && st != null) startClock = st;
+    const note = nc >= 0 && row[nc] != null ? String(row[nc]).trim() : null;
+    stints.push({ driver: drv, len, note: note || undefined });
+  }
+  return stints.length ? { stints, startClock } : null;
+}
+function parseMasterWorkbook(wb) {
+  const byKart = {}, warn = []; let startClock = null;
+  Object.entries(SHEET_KART).forEach(([sheet, kart]) => {
+    const ws = wb.Sheets[sheet];
+    if (!ws) { warn.push(`no sheet "${sheet}"`); return; }
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: null });
+    const p = parseSheetStints(rows);
+    if (!p) { warn.push(`couldn't read "${sheet}"`); return; }
+    byKart[kart] = p;
+    if (startClock == null) startClock = p.startClock;
+  });
+  return { byKart, startClock, warn };
 }
 
 function Live24({ knownDrivers = [] }) {
@@ -2302,6 +2382,8 @@ function Live24({ knownDrivers = [] }) {
   const [adminPw, setAdminPw] = useState("");
   const [syncMsg, setSyncMsg] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+  const xlsxRef = useRef();
 
   useEffect(() => { saveLS("live24", cfg); }, [cfg]);
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
@@ -2346,6 +2428,39 @@ function Live24({ knownDrivers = [] }) {
       setSyncMsg(res.ok && d.ok ? "✓ Stint plan synced to the team." : (d.error || "Sync failed."));
     } catch { setSyncMsg("Couldn't reach the sync service (live site only)."); }
     setSyncing(false);
+  };
+
+  const onMaster = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+        const { byKart, startClock, warn } = parseMasterWorkbook(wb);
+        const got = Object.keys(byKart);
+        if (!got.length) { setImportMsg("Imported nothing — " + (warn.join("; ") || "unrecognised layout.")); return; }
+        setCfg((c) => {
+          const teams = c.teams.map((t) => {
+            const p = byKart[String(t.num)];
+            if (!p) return t;
+            const drivers = [...new Set([...(t.drivers || []), ...p.stints.map((s) => s.driver)])];
+            return { ...t, drivers, stints: p.stints.map((s) => ({ id: uid(), driver: s.driver, len: s.len, note: s.note })) };
+          });
+          let raceStartISO = c.raceStartISO;
+          if (startClock != null) {
+            const d = new Date(c.raceStartISO);
+            raceStartISO = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(Math.floor(startClock / 60))}:${pad2(startClock % 60)}`;
+          }
+          return { ...c, teams, raceStartISO };
+        });
+        const sc = startClock != null ? `${pad2(Math.floor(startClock / 60))}:${pad2(startClock % 60)}` : null;
+        let msg = `✓ Imported ${got.length} team${got.length === 1 ? "" : "s"} (${got.map((k) => "#" + k).join(", ")}).`;
+        if (sc) msg += ` Start set to ${sc} from the sheet.` + (sc !== "15:03" ? " Timing site says 15:03 — change Race Start above if that's the real start." : "");
+        if (warn.length) msg += "  (" + warn.join("; ") + ")";
+        setImportMsg(msg);
+      } catch (err) { setImportMsg("Couldn't read that file: " + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   // ---- live parse (raw event schema, single race session) ----
@@ -2451,6 +2566,16 @@ function Live24({ knownDrivers = [] }) {
                   borderRadius: 7, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
                 + ADD TEAM
               </button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+              <button onClick={() => xlsxRef.current?.click()} className="disp"
+                style={{ background: "#1a160a", color: AMBER, border: `1px solid ${AMBER}`, borderRadius: 7,
+                  padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                ⬆ IMPORT MASTER SPREADSHEET
+              </button>
+              <input ref={xlsxRef} type="file" accept=".xlsx,.xlsm" hidden onChange={(ev) => { onMaster(ev.target.files?.[0]); ev.target.value = ""; }} />
+              <span className="mono" style={{ fontSize: 11, color: "#5b6776" }}>reads each team tab (Leeds A-D, Grads A-B) into stints, drivers and pit notes</span>
+              {importMsg && <span className="mono" style={{ fontSize: 11.5, color: importMsg.startsWith("✓") ? "#43d977" : "#ff8a5b", flexBasis: "100%" }}>{importMsg}</span>}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
               <input type="password" value={adminPw} onChange={(e) => setAdminPw(e.target.value)} placeholder="admin password"
@@ -2605,6 +2730,13 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
   const condColor = { dry: "#43d977", damp: "#3da9fc", wet: "#ff8a5b" };
   const pitClockOf = (s) => s.rs.nextPitMin != null ? fmtClockDay(new Date(raceStart.getTime() + s.rs.nextPitMin * 60000), raceStart) : "—";
 
+  const logPit = (ti, atMin) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === ti ? { ...t, pitLog: [...(t.pitLog || []), { atMin, t: new Date().toISOString() }] } : t) }));
+  const undoPit = (ti) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === ti ? { ...t, pitLog: (t.pitLog || []).slice(0, -1) } : t) }));
+  const setLastPit = (ti, atMin) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => {
+    if (i !== ti) return t; const pl = [...(t.pitLog || [])]; if (pl.length) pl[pl.length - 1] = { ...pl[pl.length - 1], atMin }; return { ...t, pitLog: pl }; }) }));
+  const clockToMin = (hhmm) => { const m = String(hhmm).match(/(\d{1,2}):(\d{2})/); if (!m) return null;
+    const base = raceStart.getHours() * 60 + raceStart.getMinutes(); let d = (+m[1] * 60 + +m[2]) - base; if (d < 0) d += 1440; return d; };
+
   return (
     <>
       {/* condition + clash banner */}
@@ -2666,10 +2798,15 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
         {states.map((s) => {
           const { rs, live, color } = s;
           const clash = clashNums.has(s.team.num);
-          const upNext = rs.onKartIdx >= 0 ? rs.rows.slice(rs.onKartIdx + 1, rs.onKartIdx + 3) : rs.rows.slice(0, 2);
           const toPit = rs.minsToPit;
-          const pitC = toPit == null ? "#5b6776" : toPit <= 5 ? "#ff3355" : toPit <= 15 ? "#ff8a5b" : "#43d977";
+          const overdue = rs.started && toPit != null && toPit < 0;
+          const pitC = toPit == null ? "#5b6776" : overdue ? "#ff3355" : toPit <= 5 ? "#ff3355" : toPit <= 15 ? "#ff8a5b" : "#43d977";
           const stintPct = rs.onKart && rs.stintElapsed != null ? Math.max(0, Math.min(1, rs.stintElapsed / rs.onKart.len)) : 0;
+          const clockOf = (min) => fmtClockDay(new Date(raceStart.getTime() + min * 60000), raceStart);
+          const projStart = (i) => { if (rs.onKartIdx < 0 || i < rs.onKartIdx) return null; let a = rs.onKartStart; for (let k = rs.onKartIdx; k < i; k++) a += rs.rows[k].len; return a; };
+          const spare = totalMin - rs.projFinish;            // elapsed-min in hand to the flag
+          const isFinal = rs.onKartIdx === rs.rows.length - 1 && rs.onKartIdx >= 0;
+          const toFlag = totalMin - rs.nowMin;
           return (
             <div key={s.team.num} style={{ background: "#0b1017", border: `1px solid ${clash ? "#ff3355" : "#161d27"}`,
               borderLeft: `4px solid ${color}`, borderRadius: 10, padding: 14 }}>
@@ -2687,29 +2824,70 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
                 {rs.rows.length === 0 ? (
                   <span className="mono" style={{ fontSize: 12, color: "#5b6776" }}>No stint plan yet — set one in the planner or import the sheet.</span>
                 ) : rs.finished ? (
-                  <span className="disp" style={{ fontSize: 16, fontWeight: 700, color: "#43d977" }}>FINISHED</span>
+                  <span className="disp" style={{ fontSize: 16, fontWeight: 700, color: "#43d977" }}>FINISHED · {rs.completed} stops</span>
                 ) : (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div className="disp" style={{ fontSize: 9.5, color: "#5b6776", letterSpacing: 0.5 }}>{rs.started ? "NEXT PIT" : "STARTS"}</div>
-                      <div className="mono" style={{ fontSize: 20, fontWeight: 700, color: pitC }}>
-                        {pitClockOf(s)}{rs.started && toPit != null ? <span style={{ fontSize: 13, color: "#8b97a7" }}>  ({Math.max(0, Math.ceil(toPit))}m)</span> : null}
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div className="disp" style={{ fontSize: 9.5, color: "#5b6776", letterSpacing: 0.5 }}>{rs.started ? (overdue ? "PIT DUE" : "NEXT PIT") : "STARTS"}</div>
+                        <div className="mono" style={{ fontSize: 20, fontWeight: 700, color: pitC }}>
+                          {pitClockOf(s)}{rs.started && toPit != null ? <span style={{ fontSize: 13, color: overdue ? "#ff3355" : "#8b97a7" }}>  ({overdue ? "+" + fmtDur(-toPit) + " over" : Math.max(0, Math.ceil(toPit)) + "m"})</span> : null}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div className="disp" style={{ fontSize: 9.5, color: "#5b6776", letterSpacing: 0.5 }}>{rs.started ? "→ IN" : "ON GRID"}</div>
+                        <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: "#e6edf3" }}>{rs.started ? (rs.incoming || "—") : (rs.currentDriver || "—")}</div>
                       </div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div className="disp" style={{ fontSize: 9.5, color: "#5b6776", letterSpacing: 0.5 }}>{rs.started ? "→ IN" : "ON GRID"}</div>
-                      <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: "#e6edf3" }}>{rs.started ? (rs.incoming || "—") : (rs.currentDriver || "—")}</div>
-                    </div>
-                  </div>
+                    {rs.incomingNote && (
+                      <div className="mono" style={{ marginTop: 6, fontSize: 11, color: AMBER, background: "#1a160a", borderRadius: 5, padding: "4px 7px" }}>
+                        ⚙ {rs.incomingNote}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
+
+              {/* PIT IN — manual changeover log */}
+              {rs.rows.length > 0 && !rs.finished && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  <button onClick={() => logPit(s.idx, (Date.now() - raceStart.getTime()) / 60000)} className="disp"
+                    style={{ background: "#ff3355", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px",
+                      fontWeight: 800, fontSize: 14, cursor: "pointer", letterSpacing: 0.5 }}>
+                    ◉ PIT IN
+                  </button>
+                  {rs.completed > 0 && (
+                    <button onClick={() => undoPit(s.idx)} className="mono" title="undo last pit"
+                      style={{ background: "none", border: "1px solid #2a3543", color: "#8b97a7", borderRadius: 7, padding: "8px 11px", cursor: "pointer", fontSize: 12 }}>
+                      ↩ undo
+                    </button>
+                  )}
+                  {rs.lastActual != null && (
+                    <span className="mono" style={{ fontSize: 11, color: "#8b97a7" }}>
+                      last: <span style={{ color: "#c2cbd6" }}>{rs.lastDriver}</span> {fmtDur(rs.lastActual)}
+                      <span style={{ color: rs.lastActual <= rs.lastPlanned ? "#43d977" : "#ff8a5b" }}> ({rs.lastActual <= rs.lastPlanned ? "-" : "+"}{fmtDur(Math.abs(rs.lastActual - rs.lastPlanned))} vs plan)</span>
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* projected finish / margin */}
+              {rs.rows.length > 0 && !rs.finished && rs.started && (
+                <div className="mono" style={{ marginTop: 8, fontSize: 11.5, color: "#8b97a7" }}>
+                  {isFinal ? (
+                    <span>FINAL STINT · <span style={{ color: pitC }}>{fmtDur(Math.max(0, toFlag))} to flag</span></span>
+                  ) : (
+                    <span>PROJ. FINISH {clockOf(rs.projFinish)} · <span style={{ color: spare >= 0 ? "#43d977" : "#ff8a5b" }}>{spare >= 0 ? fmtDur(spare) + " in hand" : fmtDur(-spare) + " over"}</span></span>
+                  )}
+                </div>
+              )}
 
               {/* current driver + stint progress */}
               {rs.started && !rs.finished && rs.currentDriver && (
                 <div style={{ marginTop: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }} className="mono">
                     <span style={{ color: "#8b97a7" }}>IN KART: <span style={{ color, fontWeight: 600 }}>{rs.currentDriver}</span></span>
-                    <span style={{ color: "#5b6776" }}>{fmtDur(rs.stintElapsed)} / {fmtDur(rs.onKart.len)}</span>
+                    <span style={{ color: "#5b6776" }}>{fmtDur(Math.max(0, rs.stintElapsed))} / {fmtDur(rs.onKart.len)}</span>
                   </div>
                   <div style={{ height: 5, borderRadius: 3, background: "#11171f", marginTop: 5, overflow: "hidden" }}>
                     <div style={{ width: `${stintPct * 100}%`, height: "100%", background: pitC }} />
@@ -2717,44 +2895,68 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
                 </div>
               )}
 
-              {/* up next */}
-              {upNext.length > 0 && !rs.finished && (
+              {/* up next (projected, anchored to actual) */}
+              {!rs.finished && rs.onKartIdx >= 0 && rs.rows.slice(rs.onKartIdx + 1, rs.onKartIdx + 3).length > 0 && (
                 <div className="mono" style={{ marginTop: 10, fontSize: 11, color: "#6b7685" }}>
-                  UP NEXT: {upNext.map((r, i) => (
-                    <span key={r.id}>{i ? "  ·  " : " "}<span style={{ color: "#c2cbd6" }}>{r.driver || "—"}</span> {fmtClockDay(new Date(raceStart.getTime() + r.startMin * 60000), raceStart)}</span>
-                  ))}
+                  UP NEXT: {rs.rows.slice(rs.onKartIdx + 1, rs.onKartIdx + 3).map((r, i) => {
+                    const ps = projStart(rs.onKartIdx + 1 + i);
+                    return <span key={r.id}>{i ? "  ·  " : " "}<span style={{ color: "#c2cbd6" }}>{r.driver || "—"}</span> {ps != null ? clockOf(ps) : ""}</span>;
+                  })}
                 </div>
               )}
 
               {/* stats */}
               <div className="mono" style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px 10px", fontSize: 12, borderTop: "1px solid #11171f", paddingTop: 10 }}>
-                <Stat label="PIT STOPS" v={`${rs.plannedPitsDone}/${rs.totalPits}`} c={live && live.changeovers != null && live.changeovers !== rs.plannedPitsDone ? "#ff8a5b" : "#e6edf3"} />
+                <Stat label="PIT STOPS" v={`${rs.plannedPitsDone}/${rs.totalPits}`} />
                 <Stat label="LAPS" v={live && live.laps != null ? live.laps : "—"} />
                 <Stat label="GAP" v={live && live.gap ? live.gap : "—"} />
                 <Stat label="STINT PACE" v={live && live.recent != null ? fmt(live.recent) : "—"} c={live && live.recent != null && live.bestClean != null ? (live.recent <= live.bestClean * 1.03 ? "#43d977" : "#ff8a5b") : "#e6edf3"} />
                 <Stat label="BEST" v={live && live.bestClean != null ? fmt(live.bestClean) : "—"} />
-                <Stat label="ACTUAL PITS" v={live && live.changeovers != null ? live.changeovers : "—"} />
+                <Stat label="POS" v={live && live.pos ? "P" + live.pos : "—"} />
               </div>
+
+              {/* pit log */}
+              {rs.completed > 0 && (
+                <Collapsible title={`PIT LOG (${rs.completed})`} accent="#ff3355">
+                  <div style={{ display: "grid", gap: 3 }}>
+                    {rs.rows.slice(0, rs.completed).map((r, i) => {
+                      const atMin = (s.team.pitLog || [])[i]?.atMin;
+                      const isLast = i === rs.completed - 1;
+                      return (
+                        <div key={i} className="mono" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5, padding: "2px 4px" }}>
+                          <span style={{ color: "#8b97a7" }}>{i + 1}. <span style={{ color: "#c2cbd6" }}>{r.driver}</span> out, <span style={{ color: "#c2cbd6" }}>{rs.rows[i + 1]?.driver || "—"}</span> in</span>
+                          {isLast ? (
+                            <input type="time" defaultValue={`${pad2(Math.floor(((atMin % 1440) + 1440) % 1440 / 60))}:${pad2(Math.round(((atMin % 60) + 60) % 60))}`}
+                              onChange={(e) => { const v = clockToMin(e.target.value); if (v != null) setLastPit(s.idx, v); }}
+                              style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 5, color: "#e6edf3", padding: "2px 5px", fontSize: 11, fontFamily: "IBM Plex Mono, monospace" }} />
+                          ) : (
+                            <span style={{ color: "#5b6776" }}>{atMin != null ? clockOf(atMin) : "—"}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Collapsible>
+              )}
 
               {/* driver status */}
               {rs.rows.length > 0 && (
                 <Collapsible title="DRIVER STATUS" accent={color}>
                   <div style={{ display: "grid", gap: 3 }}>
                     {s.team.drivers.map((d) => {
-                      const ds = rs.rows.filter((r) => r.driver === d);
-                      const total = ds.reduce((a, r) => a + (Number(r.len) || 0), 0);
+                      const dsi = rs.rows.map((r, i) => ({ r, i })).filter((x) => x.r.driver === d);
+                      const total = dsi.reduce((a, x) => a + (Number(x.r.len) || 0), 0);
                       const isOn = rs.currentDriver === d && rs.started && !rs.finished;
-                      const nextOut = ds.find((r) => r.startMin > rs.nowMin);
-                      const rest = nextOut ? nextOut.startMin - rs.nowMin : null;
+                      const nextOut = dsi.find((x) => x.i > rs.onKartIdx);
+                      const nextMin = nextOut ? projStart(nextOut.i) : null;
+                      const rest = nextMin != null && rs.started ? nextMin - rs.nowMin : null;
                       return (
                         <div key={d} className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5,
                           padding: "3px 6px", borderRadius: 5, background: isOn ? color + "18" : "transparent" }}>
-                          <span style={{ color: isOn ? color : "#c2cbd6", fontWeight: isOn ? 700 : 400 }}>
-                            {isOn ? "● " : ""}{d}
-                          </span>
+                          <span style={{ color: isOn ? color : "#c2cbd6", fontWeight: isOn ? 700 : 400 }}>{isOn ? "● " : ""}{d}</span>
                           <span style={{ color: "#6b7685" }}>
-                            {ds.length} stints · {fmtDur(total)}
-                            {isOn ? " · IN" : nextOut ? ` · next ${fmtClockDay(new Date(raceStart.getTime() + nextOut.startMin * 60000), raceStart)}${rest != null && rs.started ? ` (rest ${fmtDur(rest)})` : ""}` : rs.started ? " · done" : ""}
+                            {dsi.length} stints · {fmtDur(total)}
+                            {isOn ? " · IN" : nextMin != null ? ` · next ${clockOf(nextMin)}${rest != null ? ` (rest ${fmtDur(Math.max(0, rest))})` : ""}` : rs.started ? " · done" : ""}
                           </span>
                         </div>
                       );
@@ -2767,7 +2969,7 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
         })}
       </div>
       <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 4, lineHeight: 1.5 }}>
-        Pit stops and next-pit come from the stint plan. ACTUAL PITS is inferred from the live lap feed (laps over 1.6x median) — if it drifts from the planned count, someone pitted off-schedule. Teams shown in your order of importance.
+        Tap PIT IN the moment a driver comes in — everything below reflows off the actual time, so a short or long stint shifts the next pit and the finish margin automatically. Fix a mistap with the time field in PIT LOG, or undo. Teams are in your order of importance; the timing feed never gives pit times, so this log is the source of truth for stints.
       </div>
     </>
   );
@@ -2872,7 +3074,8 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
             const active = i === activeIdx;
             const remain = active ? (r.endMin - nowMin) : null;
             return (
-              <div key={r.id} style={{ display: "grid", gridTemplateColumns: "26px 92px 1fr 84px 64px 30px", gap: 8, alignItems: "center",
+              <div key={r.id}>
+              <div style={{ display: "grid", gridTemplateColumns: "26px 92px 1fr 84px 64px 30px", gap: 8, alignItems: "center",
                 background: active ? "#1a0a0e" : "#080d13", border: `1px solid ${active ? "#ff3355" : "#11171f"}`, borderRadius: 7, padding: "6px 9px" }}>
                 <span className="mono" style={{ color: "#5b6776", fontSize: 11 }}>{i + 1}</span>
                 <span className="mono" style={{ color: active ? "#ff3355" : "#c2cbd6", fontSize: 12, fontWeight: active ? 700 : 400 }}>
@@ -2895,6 +3098,8 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
                 </span>
                 <button onClick={() => setStints(stints.filter((s) => s.id !== r.id))} className="mono"
                   style={{ background: "none", border: "none", color: "#ff6b6b", cursor: "pointer", fontSize: 13, padding: 0 }}>✕</button>
+              </div>
+              {r.note && <div className="mono" style={{ fontSize: 10.5, color: "#8b7a4a", padding: "2px 9px 0 36px" }}>⚙ {r.note}</div>}
               </div>
             );
           })}
