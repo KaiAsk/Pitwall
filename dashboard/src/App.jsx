@@ -2462,6 +2462,8 @@ function Live24({ knownDrivers = [] }) {
   const [syncing, setSyncing] = useState(false);
   const [importMsg, setImportMsg] = useState("");
   const [teleLocked, setTeleLocked] = useState(false);
+  const [startPw, setStartPw] = useState("");
+  const [startMsg, setStartMsg] = useState("");
   const [simLocked, setSimLocked] = useState(false);
   const [simOn, setSimOn] = useState(() => LS("live24_sim", false));
   const [simFast, setSimFast] = useState(() => LS("live24_simfast", false));
@@ -2478,76 +2480,98 @@ function Live24({ knownDrivers = [] }) {
   useEffect(() => { saveLS("live24_owned", [...owned]); }, [owned]);
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
 
-  // GLOBAL SAVE — everyone pulls all teams every 20s (spectators + other Leeds
-  // teams see live pit status); a device only keeps its OWN teams local so its
-  // edits aren't clobbered.
+  // ===== GLOBAL SAVE (server-authoritative) =====
+  // The server is the single source of truth. Every device pulls every 5s and
+  // takes the merged state. Your own taps apply instantly (optimistic) and are
+  // kept visible by a short pending overlay until the server confirms — so two
+  // people logging the same team both stick, and a clear propagates to everyone.
   const ownedRef = useRef(owned); ownedRef.current = owned;
-  useEffect(() => {
-    let stop = false;
-    const pull = () => fetch("/api/roster").then((r) => r.json()).then((d) => {
-      if (stop || !d) return;
-      setTeleLocked(!!d.telemetryLocked);
-      setSimLocked(!!d.simLocked);
-      if (d.simLocked) { setSimOn(false); setTestClock(false); }
-      const gteams = d.stintPlan && d.stintPlan.teams;
-      if (!gteams) return;
-      setCfg((c) => {
-        let changed = false;
-        const sig = (t) => JSON.stringify({ n: t.name, d: t.drivers, s: (t.stints || []).map((x) => [x.driver, x.len, x.note, x.lead, x.seat, x.pedals, x.radio, x.assist]), p: (t.pitLog || []).map((x) => x.atMin) });
-        const teams = (c.teams || []).map((t) => {
-          if (ownedRef.current.has(String(t.num))) return t;               // this device owns it — keep local
-          const g = gteams.find((x) => String(x.num) === String(t.num));
-          if (!g || !(g.stints || []).length) return t;                    // don't wipe with empty
-          const next = { ...t, name: g.name || t.name, drivers: g.drivers || t.drivers, stints: g.stints || [], pitLog: g.pitLog || [] };
-          if (sig(next) === sig(t)) return t;                              // identical content — no churn
-          changed = true;
-          return next;
-        });
-        return changed ? { ...c, teams } : c;
-      });
-    }).catch(() => {});
-    pull();
-    const iv = setInterval(pull, 20000);
-    return () => { stop = true; clearInterval(iv); };
-  }, []);
+  const pendingRef = useRef({});        // num -> [{type:'add'|'remove'|'clear', entry?, id?, ts}]
+  const planGuardRef = useRef({});      // num -> ts (suppress pulling plan right after a local edit)
 
-  // push owned teams to the global save when they change (debounced)
-  const pushRef = useRef({ timer: null, last: {} });
-  useEffect(() => {
-    if (!owned.size) return;
-    clearTimeout(pushRef.current.timer);
-    pushRef.current.timer = setTimeout(() => {
-      cfg.teams.forEach((t) => {
-        const n = String(t.num);
-        if (!owned.has(n)) return;
-        const payload = JSON.stringify({ name: t.name, drivers: t.drivers, stints: t.stints, pitLog: t.pitLog || [] });
-        if (pushRef.current.last[n] === payload) return;
-        pushRef.current.last[n] = payload;
-        fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ teamSync: { num: n, passcode: ownPass.current[n], team: JSON.parse(payload) } }) }).catch(() => {});
+  const applyPending = (log, ops) => {
+    let out = (log || []).slice();
+    (ops || []).slice().sort((a, b) => a.ts - b.ts).forEach((op) => {
+      if (op.type === "clear") out = [];
+      else if (op.type === "add") { if (!out.some((p) => p.id === op.entry.id)) out.push(op.entry); }
+      else if (op.type === "remove") out = out.filter((p) => p.id !== op.id);
+      else if (op.type === "edit") out = out.map((p) => (p.id === op.id ? { ...p, atMin: op.atMin } : p));
+    });
+    return out.sort((a, b) => (a.atMin || 0) - (b.atMin || 0));
+  };
+  const queue = (num, op) => {
+    const n = String(num); op.ts = Date.now();
+    pendingRef.current[n] = [...(pendingRef.current[n] || []).filter((o) => Date.now() - o.ts < 9000), op];
+  };
+  const sendTeam = (num, extra) => {
+    const n = String(num);
+    fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ teamSync: { num: n, passcode: ownPass.current[n], ...extra } }) })
+      .then(() => setTimeout(pullNow, 500)).catch(() => {});
+  };
+
+  // optimistic local mutators (used by every team tab + the all-teams board)
+  const pitIn = (num, atMin) => { const e = { id: uid() + Date.now(), atMin, t: new Date().toISOString() };
+    setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: applyPending(t.pitLog, [{ type: "add", entry: e, ts: Date.now() }]) } : t) }));
+    queue(num, { type: "add", entry: e }); sendTeam(num, { pitAppend: e }); };
+  const pitUndo = (num) => { let id = null;
+    setCfg((c) => ({ ...c, teams: c.teams.map((t) => { if (String(t.num) !== String(num)) return t; const pl = t.pitLog || []; id = pl.length ? pl[pl.length - 1].id : null; return { ...t, pitLog: pl.slice(0, -1) }; }) }));
+    if (id) { queue(num, { type: "remove", id }); sendTeam(num, { pitRemove: id }); } };
+  const pitClear = (num) => { setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: [] } : t) }));
+    queue(num, { type: "clear" }); sendTeam(num, { pitClear: true }); };
+  const pitEdit = (num, id, atMin) => { setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: (t.pitLog || []).map((p) => p.id === id ? { ...p, atMin } : p) } : t) }));
+    queue(num, { type: "edit", id, atMin }); sendTeam(num, { pitEdit: { id, atMin } }); };
+
+  // plan (lineup / stint) edits push immediately for owned teams
+  const pushPlan = (num, team) => { planGuardRef.current[String(num)] = Date.now();
+    sendTeam(num, { plan: { name: team.name, drivers: team.drivers, stints: team.stints } }); };
+
+  const pullNow = () => fetch("/api/roster").then((r) => r.json()).then((d) => {
+    if (!d) return;
+    setTeleLocked(!!d.telemetryLocked); setSimLocked(!!d.simLocked);
+    if (d.simLocked) { setSimOn(false); setTestClock(false); }
+    const g = d.stintPlan;
+    if (!g) return;
+    setCfg((c) => {
+      let changed = false;
+      const teams = (c.teams || []).map((t) => {
+        const gt = (g.teams || []).find((x) => String(x.num) === String(t.num));
+        const guarded = Date.now() - (planGuardRef.current[String(t.num)] || 0) < 6000;
+        const next = { ...t };
+        // plan from global unless we just edited it locally or global is empty
+        if (gt && (gt.stints || []).length && !guarded) { next.name = gt.name || t.name; next.drivers = gt.drivers || t.drivers; next.stints = gt.stints; }
+        // pit log: server log + our pending overlay
+        const merged = applyPending(gt ? gt.pitLog : t.pitLog, pendingRef.current[String(t.num)]);
+        next.pitLog = merged;
+        if (JSON.stringify(next) !== JSON.stringify(t)) changed = true;
+        return next;
       });
-    }, 1500);
-    return () => clearTimeout(pushRef.current.timer);
-  }, [cfg, owned]);
+      let raceStartISO = c.raceStartISO;
+      if (g.raceStartISO && g.raceStartISO !== c.raceStartISO && Date.now() - (planGuardRef.current.__start || 0) > 6000) { raceStartISO = g.raceStartISO; changed = true; }
+      return changed ? { ...c, teams, raceStartISO } : c;
+    });
+  }).catch(() => {});
+
+  useEffect(() => { pullNow(); const iv = setInterval(pullNow, 5000); return () => clearInterval(iv); }, []);
 
   const unlockTeam = async (num, code) => {
     const n = String(num);
     if (!(TEAM_PASSCODES[n] && TEAM_PASSCODES[n] === code)) return false;
-    // adopt the latest global copy of this team BEFORE owning it, so stale local
-    // data on this device can't overwrite the team's live state
-    try {
-      const d = await fetch("/api/roster").then((r) => r.json());
-      const g = d && d.stintPlan && (d.stintPlan.teams || []).find((x) => String(x.num) === n);
-      if (g && (g.stints || []).length) {
-        setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === n
-          ? { ...t, name: g.name || t.name, drivers: g.drivers || t.drivers, stints: g.stints, pitLog: g.pitLog || [] } : t) }));
-      }
-    } catch {}
     ownPass.current = { ...ownPass.current, [n]: code }; saveLS("live24_pass", ownPass.current);
     setOwned((s) => new Set([...s, n]));
+    pullNow();
     return true;
   };
   const lockTeam = (num) => { const n = String(num); setOwned((s) => { const ns = new Set(s); ns.delete(n); return ns; }); };
+  const setGlobalStart = async (iso) => {
+    setStartMsg("Setting…");
+    try {
+      const res = await fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ setRaceStart: { iso, passcode: startPw } }) });
+      const d = await res.json();
+      if (res.ok && d.ok) { planGuardRef.current.__start = Date.now(); setCfg((c) => ({ ...c, raceStartISO: iso })); setStartMsg("✓ Race start set for everyone."); }
+      else setStartMsg(d.error || "Wrong password.");
+    } catch { setStartMsg("Couldn't reach the server (live site only)."); }
+  };
 
   // poll the live snapshot
   useEffect(() => {
@@ -2571,7 +2595,12 @@ function Live24({ knownDrivers = [] }) {
   const finished = now >= raceEnd;
 
   const setCfgField = (k, v) => setCfg((c) => ({ ...c, [k]: v }));
-  const updateTeam = (idx, patch) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === idx ? { ...t, ...patch } : t) }));
+  const updateTeam = (idx, patch) => setCfg((c) => {
+    const teams = c.teams.map((t, i) => i === idx ? { ...t, ...patch } : t);
+    const t = teams[idx];
+    if (ownedRef.current.has(String(t.num)) && (patch.stints || patch.drivers || patch.name)) pushPlan(t.num, t);
+    return { ...c, teams };
+  });
 
   const syncPlan = async () => {
     setSyncing(true); setSyncMsg("");
@@ -2702,7 +2731,7 @@ function Live24({ knownDrivers = [] }) {
 
   const staleMin = liveModel && liveModel.scrapedAt ? (Date.now() - new Date(liveModel.scrapedAt).getTime()) / 60000 : null;
 
-  const tabs = [...COMMAND_TEAMS.map((c) => ["cmd:" + c.num, c.label]), ["board", "ALL TEAMS"], ["track", "TRACK MAP"], ["plan", "PLANNER"], ["live", "LIVE"], ["pace", "PACE"]];
+  const tabs = [...COMMAND_TEAMS.map((c) => ["cmd:" + c.num, c.label]), ["board", "ALL TEAMS"], ["timing", "TIMING"], ["track", "TRACK MAP"], ["plan", "PLANNER"], ["live", "OUR CARS"], ["pace", "PACE"]];
 
   return (
     <div>
@@ -2753,7 +2782,7 @@ function Live24({ knownDrivers = [] }) {
               const late = rs.minsToPit < 0;
               const c = late || rs.minsToPit <= 5 ? "#ff2d4d" : rs.minsToPit <= 15 ? "#ff8a5b" : "#2fd372";
               return (
-                <div key={t.num} className="mono" style={{ flex: "0 0 auto", fontSize: 11.5, background: "#0b1017", border: `1px solid ${c}44`, borderRadius: 7, padding: "6px 10px", whiteSpace: "nowrap" }}>
+                <div key={t.num} className="mono" style={{ flex: "0 0 auto", fontSize: 12, background: "#0b1017", border: `1px solid ${c}44`, borderRadius: 7, padding: "7px 11px", whiteSpace: "nowrap" }}>
                   <b style={{ color: c }}>#{t.num}</b> <span style={{ color: "#9aa8bb" }}>{late ? "PIT DUE" : "pit in"}</span> <b style={{ color: c }}>{late ? fmtDur(-rs.minsToPit) + " ago" : fmtDur(Math.max(0, rs.minsToPit))}</b>{rs.incoming ? <span style={{ color: "#78889d" }}> → {rs.incoming}</span> : null}
                 </div>
               );
@@ -2762,7 +2791,7 @@ function Live24({ knownDrivers = [] }) {
         ) : null;
       })()}
 
-      <div className="apptabs" style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+      <div className="apptabs" style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", paddingBottom: 2 }}>
         {tabs.map(([k, l]) => (
           <button key={k} onClick={() => setSub(k)} className="disp"
             style={{ padding: "8px 16px", borderRadius: 6, fontWeight: 600, fontSize: 15.5, cursor: "pointer",
@@ -2779,12 +2808,13 @@ function Live24({ knownDrivers = [] }) {
         const team = ti >= 0 ? cfg.teams[ti] : null;
         const live = liveModel && team ? liveModel.leeds.find((l) => l.kart === String(team.num)) : null;
         return team ? <TeamCommand team={team} teamIdx={ti} raceStart={raceStart} totalMin={totalMin} now={now} live={live} setCfg={setCfg}
-          model={liveModel} owned={owned.has(num)} onUnlock={unlockTeam} onLock={lockTeam} />
+          model={liveModel} owned={owned.has(num)} onUnlock={unlockTeam} onLock={lockTeam}
+          pitIn={pitIn} pitUndo={pitUndo} pitEdit={pitEdit} />
           : <Panel title="TEAM COMMAND"><Empty msg="That team isn't in the plan." /></Panel>;
       })()}
 
       {sub === "board" && (
-        <PitBoard cfg={cfg} setCfg={setCfg} raceStart={raceStart} totalMin={totalMin} now={now} liveModel={liveModel} owned={owned} />
+        <PitBoard cfg={cfg} setCfg={setCfg} raceStart={raceStart} totalMin={totalMin} now={now} liveModel={liveModel} owned={owned} pitIn={pitIn} pitUndo={pitUndo} pitEdit={pitEdit} />
       )}
 
       {sub === "track" && <TrackMap model={liveModel} teams={cfg.teams} simOn={simOn} speedMul={simOn && simFast ? 12 : 1} onSim={() => { setSimOn(true); }} />}
@@ -2811,6 +2841,21 @@ function Live24({ knownDrivers = [] }) {
                   onChange={(e) => setCfgField("defaultStintLen", Math.max(5, Number(e.target.value) || 45))}
                   style={inp(90)} />
               </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap", padding: "10px 12px", borderRadius: 8, background: "#0b1017", border: "1px solid #2b3a4e" }}>
+              <span className="disp" style={{ fontSize: 12, color: AMBER, fontWeight: 700 }}>SET RACE START FOR EVERYONE</span>
+              <input type="password" value={startPw} onChange={(e) => setStartPw(e.target.value)} placeholder="control password (footjob)" style={{ ...inp(190), fontFamily: "Barlow, sans-serif" }} />
+              <button onClick={() => setGlobalStart(cfg.raceStartISO)} className="disp"
+                style={{ background: "#1a160a", color: AMBER, border: `1px solid ${AMBER}`, borderRadius: 7, padding: "8px 13px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                PUSH {fmtClock(raceStart)} TO ALL DEVICES
+              </button>
+              <button onClick={() => { const d = new Date(); const iso = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; setCfgField("raceStartISO", iso); setGlobalStart(iso); }} className="mono"
+                style={{ background: "none", color: "#9aa8bb", border: "1px solid #2a3543", borderRadius: 7, padding: "8px 12px", fontSize: 12, cursor: "pointer" }}>
+                start NOW
+              </button>
+              <span className="mono" style={{ fontSize: 11, color: startMsg.startsWith("✓") ? "#2fd372" : "#9aa8bb", flexBasis: "100%" }}>
+                {startMsg || "Set the time above then push it, or hit ‘start NOW’ if the race goes green late. Every device pulls this within 5s."}
+              </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
               <button onClick={() => xlsxRef.current?.click()} className="disp"
@@ -2841,12 +2886,12 @@ function Live24({ knownDrivers = [] }) {
                   {testClock ? "TEST CLOCK ON (race running now)" : "run test clock (rehearse pit stops)"}
                 </button>
               )}
-              <button onClick={() => { if (confirm("Clear all logged pit stops for every team?")) setCfg((c) => ({ ...c, teams: c.teams.map((t) => ({ ...t, pitLog: [] })) })); }} className="mono"
+              <button onClick={() => { if (confirm("Clear all logged pit stops for every team?")) { cfg.teams.forEach((t) => { if (owned.has(String(t.num))) pitClear(t.num); }); setCfg((c) => ({ ...c, teams: c.teams.map((t) => ({ ...t, pitLog: [] })) })); } }} className="mono"
                 style={{ background: "none", color: "#9aa8bb", border: "1px solid #2a3543", borderRadius: 7, padding: "8px 12px", fontSize: 12, cursor: "pointer" }}>
                 clear pit logs
               </button>
               <span className="mono" style={{ fontSize: 11, color: simOn ? "#ffb3a0" : "#66758a", flexBasis: "100%" }}>
-                {simOn ? "Fake cars are running — open Track Map / Live to watch them. The real race start (12:30) is unchanged. To rehearse PIT STOP NOW + the reflow, turn on the test clock (it starts the race from now). Clear pit logs + stop test before race day." : "Rehearse the whole system with made-up cars before race day. Doesn't touch your plan or the real race clock."}
+                {simOn ? "⚠ SIMULATION — these are fake cars to rehearse the app, NOT real timing. Real race data comes from the live feed on the day. The real start (12:30) is unchanged unless you turn on the test clock. Clear pit logs + stop test before race day." : "Rehearse the whole app with made-up cars. This is a simulation, not real timing — it does not touch your plan or the real race clock."}
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
@@ -2893,9 +2938,49 @@ function Live24({ knownDrivers = [] }) {
           {cfg.teams.map((team, ti) => (
             <StintTeamCard key={team.num || ti} team={team} ti={ti} raceStart={raceStart} totalMin={totalMin}
               defaultStintLen={cfg.defaultStintLen} now={now} started={started}
+              owned={owned.has(String(team.num))} onUnlock={unlockTeam}
               onUpdate={(patch) => updateTeam(ti, patch)} />
           ))}
         </>
+      )}
+
+      {sub === "timing" && (
+        <Panel title="LIVE TIMING — FULL FIELD">
+          {!liveModel ? (
+            <Empty msg={simOn ? "Loading…" : "No live feed yet. The board fills once the scraper is running (or turn on Test Mode). Works for practice, qualifying and the race — whatever session is being scraped."} />
+          ) : (
+            <>
+              <div className="mono" style={{ fontSize: 11.5, color: "#9aa8bb", marginBottom: 10 }}>
+                {liveModel.field.length} karts · field avg {liveModel.fieldAvg != null ? fmt(liveModel.fieldAvg) : "—"} · fastest {liveModel.fastestOverall ? fmt(liveModel.fastestOverall.b) + " (#" + liveModel.fastestOverall.kart + ")" : "—"}{simOn ? " · TEST DATA" : ""}
+              </div>
+              <div className="scrollx">
+                <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead><tr style={{ color: "#78889d", textAlign: "left" }}>
+                    {["POS", "KART", "TEAM", "LAPS", "GAP", "BEST LAP"].map((h, i) => (
+                      <th key={h} style={{ padding: "7px 10px", textAlign: i >= 3 ? "right" : "left", borderBottom: "1px solid #2b3a4e", fontWeight: 600, position: "sticky", top: 0, background: "#0a0f16" }}>{h}</th>))}
+                  </tr></thead>
+                  <tbody>
+                    {[...liveModel.field].sort((a, b) => (a.pos || 999) - (b.pos || 999)).map((r) => {
+                      const ours = ourNums.has(r.kart);
+                      const fastest = liveModel.fastestOverall && r.best != null && Math.abs(r.best - liveModel.fastestOverall.b) < 0.001;
+                      return (
+                        <tr key={r.kart} style={{ borderBottom: "1px solid #11171f", background: ours ? "#ff2d4d12" : "transparent" }}>
+                          <td style={{ padding: "7px 10px", color: AMBER, fontWeight: 700 }}>{r.pos || "—"}</td>
+                          <td style={{ padding: "7px 10px", color: "#78889d" }}>#{r.kart}</td>
+                          <td style={{ padding: "7px 10px", color: ours ? "#ff2d4d" : "#e6edf3", fontWeight: ours ? 700 : 400 }}>{r.team}{ours ? " ◄" : ""}</td>
+                          <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{r.laps ?? "—"}</td>
+                          <td style={{ padding: "7px 10px", textAlign: "right", color: "#9aa8bb" }}>{r.gap || "—"}</td>
+                          <td style={{ padding: "7px 10px", textAlign: "right", color: fastest ? "#b06bff" : "#c2cbd6", fontWeight: fastest ? 700 : 400 }}>{r.best != null ? fmt(r.best) : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 10 }}>Our cars highlighted in red. Purple = fastest lap of the field. This replaces having to watch AlphaRaceHub.</div>
+            </>
+          )}
+        </Panel>
       )}
 
       {sub === "live" && (
@@ -3013,7 +3098,7 @@ function Live24({ knownDrivers = [] }) {
   );
 }
 
-function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, model, owned, onUnlock, onLock }) {
+function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, model, owned, onUnlock, onLock, pitIn, pitUndo, pitEdit }) {
   const [code, setCode] = useState("");
   const [codeErr, setCodeErr] = useState("");
   const [armed, setArmed] = useState(false);
@@ -3031,9 +3116,9 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, mo
         o.start(ctx.currentTime + d); o.stop(ctx.currentTime + d + 0.22); });
     } catch {}
   };
-  const logPit = (atMin) => owned && setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === teamIdx ? { ...t, pitLog: [...(t.pitLog || []), { atMin, t: new Date().toISOString() }] } : t) }));
-  const undoPit = () => owned && setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === teamIdx ? { ...t, pitLog: (t.pitLog || []).slice(0, -1) } : t) }));
-  const setLastPit = (atMin) => owned && setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => { if (i !== teamIdx) return t; const pl = [...(t.pitLog || [])]; if (pl.length) pl[pl.length - 1] = { ...pl[pl.length - 1], atMin }; return { ...t, pitLog: pl }; }) }));
+  const logPit = (atMin) => owned && pitIn(team.num, atMin);
+  const undoPit = () => owned && pitUndo(team.num);
+  const setLastPit = (atMin) => { if (!owned) return; const pl = team.pitLog || []; if (pl.length) pitEdit(team.num, pl[pl.length - 1].id, atMin); };
   const clockToMin = (hhmm) => { const m = String(hhmm).match(/(\d{1,2}):(\d{2})/); if (!m) return null; const base = raceStart.getHours() * 60 + raceStart.getMinutes(); let d = (+m[1] * 60 + +m[2]) - base; if (d < 0) d += 1440; return d; };
 
   if (!team || !(team.stints || []).length) {
@@ -3094,7 +3179,7 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, mo
   };
 
   const Row = ({ label, value, accent, strong }) => (
-    <div style={{ padding: "9px 0", borderBottom: "1px solid #11171f" }}>
+    <div style={{ padding: "11px 0", borderBottom: "1px solid #11171f" }}>
       <div className="disp" style={{ fontSize: 11.5, color: "#78889d", letterSpacing: 0.5, fontWeight: 600, marginBottom: 2 }}>{label}</div>
       <div className="mono" style={{ fontSize: strong ? 16 : 14, color: accent || "#e6edf3", fontWeight: strong ? 700 : 500 }}>{value}</div>
     </div>
@@ -3218,23 +3303,21 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, mo
         </div>
       )}
 
-      {/* lead & seat for every driver (always visible) */}
+      {/* lead & seat for every driver (only when the sheet has the data) */}
+      {rs.rows.some((r) => r.lead != null || r.seat) && (
       <div className="panelpad" style={card}>
         <Label>LEAD &amp; SEAT BY DRIVER</Label>
-        {rs.rows.some((r) => r.lead != null || r.seat) ? (
-          <div style={{ display: "grid", gap: 4 }}>
+        <div style={{ display: "grid", gap: 4 }}>
             {planDrivers.map((d) => { const st = rs.rows.find((r) => r.driver === d) || {}; return (
               <div key={d} className="mono" style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13, background: "#080d13", borderRadius: 7, padding: "7px 10px" }}>
                 <span style={{ color: "#e6edf3", fontWeight: 600, flex: "0 0 auto" }}>{d}</span>
                 <span style={{ color: "#9aa8bb", textAlign: "right" }}>{st.lead != null ? <b style={{ color: "#fff" }}>{st.lead} kg</b> : "— kg"}{st.seat ? " · " + st.seat + (heavy(st.seat) ? " (heavy)" : "") : ""}{st.pedals ? " · " + st.pedals : ""}</span>
               </div>
             ); })}
-          </div>
-        ) : (
-          <div className="mono" style={{ fontSize: 12, color: "#ff8a5b", padding: "6px 0" }}>No lead/seat data on this plan — re-import the master spreadsheet (the import message will confirm it was captured).</div>
-        )}
+        </div>
         {anyHeavy && <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 8 }}>M/H = the heavy seat insert. Lead = ballast added to the kart for that driver.</div>}
       </div>
+      )}
 
       {/* penalties */}
       {pens.length > 0 && (
@@ -3303,7 +3386,7 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, mo
             const rest = nextMin != null && rs.started ? nextMin - rs.nowMin : null;
             const status = isOn ? "DRIVING NOW" : nextMin != null ? `drives at ${clockOf(nextMin)}${rest != null ? ` · rest ${fmtDur(Math.max(0, rest))}` : ""}` : rs.started ? "finished" : "waiting to start";
             return (
-              <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 7, background: isOn ? "#ff2d4d18" : isNext ? AMBER + "15" : "#080d13" }}>
+              <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "9px 11px", borderRadius: 7, background: isOn ? "#ff2d4d18" : isNext ? AMBER + "15" : "#080d13" }}>
                 <div className="mono" style={{ fontSize: 13, fontWeight: isOn || isNext ? 700 : 500, color: isOn ? "#ff2d4d" : isNext ? AMBER : "#e6edf3" }}>{isOn ? "● " : isNext ? "▶ " : ""}{d}</div>
                 <div className="mono" style={{ fontSize: 11, color: "#9aa8bb", textAlign: "right" }}>{status}<br /><span style={{ color: "#66758a" }}>{dsi.length} stints · {fmtDur(total)} total</span></div>
               </div>
@@ -3329,7 +3412,7 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, mo
               {rs.rows.slice(0, rs.completed).map((r, i) => {
                 const atMin = (team.pitLog || [])[i]?.atMin; const isLast = i === rs.completed - 1;
                 return (
-                  <div key={i} className="mono" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, padding: "3px 4px" }}>
+                  <div key={i} className="mono" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, fontSize: 12.5, padding: "5px 4px" }}>
                     <span style={{ color: "#9aa8bb" }}>{i + 1}. {r.driver} out, {rs.rows[i + 1]?.driver || "—"} in</span>
                     {isLast && owned ? (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -3353,6 +3436,9 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, mo
     </div>
   );
 }
+
+const TRACK_PATH = "M408.0,185.0 L364.0,185.0 L350.0,190.0 L339.0,201.0 L242.0,384.0 L231.0,400.0 L221.0,410.0 L213.0,414.0 L196.0,412.0 L176.0,393.0 L104.0,256.0 L103.0,246.0 L106.0,239.0 L125.0,224.0 L135.0,211.0 L136.0,203.0 L134.0,195.0 L126.0,187.0 L115.0,183.0 L60.0,183.0 L49.0,178.0 L42.0,171.0 L38.0,163.0 L37.0,146.0 L42.0,132.0 L53.0,119.0 L72.0,107.0 L154.0,89.0 L253.0,72.0 L317.0,72.0 L382.0,78.0 L463.0,90.0 L475.0,96.0 L488.0,114.0 L500.0,124.0 L506.0,126.0 L537.0,124.0 L542.0,126.0 L548.0,133.0 L551.0,152.0 L561.0,159.0 L591.0,167.0 L628.0,172.0 L636.0,171.0 L645.0,164.0 L648.0,152.0 L646.0,142.0 L638.0,133.0 L633.0,131.0 L592.0,128.0 L573.0,124.0 L565.0,115.0 L564.0,102.0 L571.0,90.0 L582.0,85.0 L810.0,111.0 L835.0,119.0 L847.0,126.0 L860.0,139.0 L868.0,156.0 L870.0,180.0 L867.0,199.0 L859.0,219.0 L845.0,236.0 L830.0,244.0 L816.0,247.0 L785.0,246.0 L748.0,235.0 L729.0,226.0 L723.0,219.0 L720.0,209.0 L722.0,197.0 L725.0,192.0 L734.0,183.0 L742.0,180.0 L754.0,180.0 L798.0,191.0 L807.0,192.0 L818.0,189.0 L824.0,182.0 L826.0,176.0 L824.0,160.0 L815.0,151.0 L793.0,144.0 L760.0,144.0 L729.0,152.0 L717.0,158.0 L701.0,170.0 L671.0,200.0 L659.0,206.0 L646.0,208.0 L602.0,205.0 L556.0,194.0 L542.0,186.0 L521.0,162.0 L507.0,157.0 L500.0,157.0 L487.0,162.0 L467.0,179.0 L455.0,185.0 L442.0,187.0 L409.0,186.0 Z";
+const TRACK_VIEWBOX = "0 0 928 482";
 
 function TrackMap({ model, teams, simOn, speedMul = 1, onSim }) {
   const pathRef = useRef(null);
@@ -3450,7 +3536,7 @@ function TrackMap({ model, teams, simOn, speedMul = 1, onSim }) {
   );
 }
 
-function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel, owned }) {
+function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel, owned, pitIn, pitUndo, pitEdit }) {
   const canEdit = (num) => owned && owned.has(String(num));
   const teams = cfg.teams || [];
   const states = teams.map((t, i) => {
@@ -3475,10 +3561,9 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel, owned }) {
   const condColor = { dry: "#2fd372", damp: "#3da9fc", wet: "#ff8a5b" };
   const pitClockOf = (s) => s.rs.nextPitMin != null ? fmtClockDay(new Date(raceStart.getTime() + s.rs.nextPitMin * 60000), raceStart) : "—";
 
-  const logPit = (ti, atMin) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === ti ? { ...t, pitLog: [...(t.pitLog || []), { atMin, t: new Date().toISOString() }] } : t) }));
-  const undoPit = (ti) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === ti ? { ...t, pitLog: (t.pitLog || []).slice(0, -1) } : t) }));
-  const setLastPit = (ti, atMin) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => {
-    if (i !== ti) return t; const pl = [...(t.pitLog || [])]; if (pl.length) pl[pl.length - 1] = { ...pl[pl.length - 1], atMin }; return { ...t, pitLog: pl }; }) }));
+  const logPit = (ti, atMin) => pitIn(cfg.teams[ti].num, atMin);
+  const undoPit = (ti) => pitUndo(cfg.teams[ti].num);
+  const setLastPit = (ti, atMin) => { const pl = cfg.teams[ti].pitLog || []; if (pl.length) pitEdit(cfg.teams[ti].num, pl[pl.length - 1].id, atMin); };
   const clockToMin = (hhmm) => { const m = String(hhmm).match(/(\d{1,2}):(\d{2})/); if (!m) return null;
     const base = raceStart.getHours() * 60 + raceStart.getMinutes(); let d = (+m[1] * 60 + +m[2]) - base; if (d < 0) d += 1440; return d; };
 
@@ -3487,18 +3572,6 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel, owned }) {
       {/* condition + clash banner */}
       <Panel title="PIT WALL">
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
-          <div>
-            <Label>TRACK</Label>
-            <div style={{ display: "flex", gap: 6 }}>
-              {["dry", "damp", "wet"].map((c) => (
-                <button key={c} onClick={() => setCfg((p) => ({ ...p, trackCond: c }))} className="disp"
-                  style={{ padding: "6px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer", textTransform: "uppercase",
-                    border: `1px solid ${cfg.trackCond === c ? condColor[c] : "#2b3a4e"}`,
-                    background: cfg.trackCond === c ? condColor[c] + "22" : "#0b1017",
-                    color: cfg.trackCond === c ? condColor[c] : "#78889d" }}>{c}</button>
-              ))}
-            </div>
-          </div>
           <div style={{ flex: 1 }} />
           {clashPairs.length > 0 && (
             <div style={{ background: "#1a0a0e", border: "1px solid #ff2d4d", borderRadius: 8, padding: "8px 12px", maxWidth: 460 }}>
@@ -3725,14 +3798,16 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel, owned }) {
 function Stat({ label, v, c }) {
   return (
     <div>
-      <div style={{ color: "#66758a", fontSize: 11, letterSpacing: 0.5, marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-      <div style={{ color: c || "#e6edf3", fontWeight: 600 }}>{v}</div>
+      <div style={{ color: "#66758a", fontSize: 11.5, letterSpacing: 0.4, marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
+      <div style={{ color: c || "#e6edf3", fontWeight: 700, fontSize: 16 }}>{v}</div>
     </div>
   );
 }
 
-function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, started, onUpdate }) {
+function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, started, onUpdate, owned, onUnlock }) {
   const [driverDraft, setDriverDraft] = useState("");
+  const [code, setCode] = useState("");
+  const [codeErr, setCodeErr] = useState("");
   const stints = team.stints || [];
   // cumulative start times
   let acc = 0;
@@ -3747,15 +3822,17 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
   const driverColor = {};
   team.drivers.forEach((d, i) => { driverColor[d] = DRIVER_PALETTE[i % DRIVER_PALETTE.length]; });
 
-  const setStints = (next) => onUpdate({ stints: next });
+  const setStints = (next) => { if (owned) onUpdate({ stints: next }); };
   const generate = () => {
+    if (!owned) return;
     if (!team.drivers.length) return;
     const out = []; let t = 0, i = 0;
     while (t < totalMin) { const len = Math.min(defaultStintLen, totalMin - t); out.push({ id: uid(), driver: team.drivers[i % team.drivers.length], len }); t += len; i++; }
     setStints(out);
   };
-  const addDriver = () => { const d = driverDraft.trim(); if (d && !team.drivers.includes(d)) onUpdate({ drivers: [...team.drivers, d] }); setDriverDraft(""); };
+  const addDriver = () => { if (!owned) return; const d = driverDraft.trim(); if (d && !team.drivers.includes(d)) onUpdate({ drivers: [...team.drivers, d] }); setDriverDraft(""); };
   const renameDriver = (oldN) => {
+    if (!owned) return;
     const nn = (typeof prompt === "function") ? prompt(`Rename "${oldN}" to:`, oldN) : null;
     if (!nn || !nn.trim() || nn.trim() === oldN) return;
     const n = nn.trim();
@@ -3766,14 +3843,24 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
 
   return (
     <Panel title={`#${team.num || "?"} · ${team.name.toUpperCase()}`}>
+      {!owned && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14, padding: "9px 11px", background: "#0b1017", border: "1px solid #2b3a4e", borderRadius: 8 }}>
+          <span className="mono" style={{ fontSize: 12, color: "#9aa8bb", flex: "1 1 160px" }}>🔒 View only. Enter this team's passcode to edit the plan.</span>
+          <input type="password" value={code} onChange={(e) => setCode(e.target.value)} placeholder="passcode" style={{ ...inp(140), fontFamily: "Barlow, sans-serif" }}
+            onKeyDown={(e) => { if (e.key === "Enter") onUnlock(team.num, code).then((ok) => setCodeErr(ok ? "" : "Wrong passcode.")); }} />
+          <button onClick={() => onUnlock(team.num, code).then((ok) => setCodeErr(ok ? "" : "Wrong passcode."))} className="disp"
+            style={{ background: "#11233a", color: "#2fd372", border: "1px solid #2fd37255", borderRadius: 7, padding: "8px 13px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>UNLOCK</button>
+          {codeErr && <span className="mono" style={{ fontSize: 11.5, color: "#ff8a5b" }}>{codeErr}</span>}
+        </div>
+      )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-end", marginBottom: 14 }}>
         <div>
           <Label>KART #</Label>
-          <input value={team.num} onChange={(e) => onUpdate({ num: e.target.value.replace(/\D/g, "") })} style={inp(70)} placeholder="19" />
+          <input value={team.num} disabled={!owned} onChange={(e) => owned && onUpdate({ num: e.target.value.replace(/\D/g, "") })} style={inp(70)} placeholder="19" />
         </div>
         <div>
           <Label>TEAM NAME</Label>
-          <input value={team.name} onChange={(e) => onUpdate({ name: e.target.value })} style={inp(220)} />
+          <input value={team.name} disabled={!owned} onChange={(e) => owned && onUpdate({ name: e.target.value })} style={inp(220)} />
         </div>
         <div style={{ flex: 1 }} />
         <button onClick={generate} className="disp"
@@ -3792,7 +3879,7 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
             {totals[d] && <span style={{ color: "#66758a", fontWeight: 400 }}>{fmtDur(totals[d].min)}</span>}
             <button onClick={() => renameDriver(d)} title="rename driver everywhere"
               style={{ background: "none", border: "none", color: "#78889d", cursor: "pointer", fontSize: 11, lineHeight: 1, padding: 0 }}>✎</button>
-            <button onClick={() => onUpdate({ drivers: team.drivers.filter((x) => x !== d), stints: stints.map((s) => s.driver === d ? { ...s, driver: "" } : s) })}
+            <button onClick={() => owned && onUpdate({ drivers: team.drivers.filter((x) => x !== d), stints: stints.map((s) => s.driver === d ? { ...s, driver: "" } : s) })}
               style={{ background: "none", border: "none", color: "#ff8a5b", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: 0 }}>✕</button>
           </span>
         ))}
@@ -3948,7 +4035,7 @@ const Label = ({ children }) => (
 );
 function Panel({ title, children }) {
   return (
-    <div style={{ background: "#0a0f16", border: "1px solid #1b2433", borderRadius: 12, padding: 18, marginBottom: 14 }}>
+    <div style={{ background: "#0a0f16", border: "1px solid #1b2433", borderRadius: 12, padding: 18, marginBottom: 16 }}>
       <div className="disp" style={{ fontSize: 13, color: AMBER, letterSpacing: "1.5px",
         fontWeight: 600, marginBottom: 14 }}>{title}</div>
       {children}
