@@ -81,11 +81,22 @@ export async function onRequestPost({ request, env }) {
       T.pitLog = T.pitLog || [];
       const b = body.teamSync;
       if (b.plan) { T.name = b.plan.name ?? T.name; T.drivers = b.plan.drivers ?? T.drivers; T.stints = b.plan.stints ?? T.stints; }
-      if (b.pitAppend) { if (!T.pitLog.some((p) => p.id === b.pitAppend.id)) T.pitLog.push(b.pitAppend); }
-      if (b.pitRemove != null) T.pitLog = T.pitLog.filter((p) => p.id !== b.pitRemove);
-      if (b.pitClear) T.pitLog = [];
-      if (b.pitEdit) T.pitLog = T.pitLog.map((p) => (p.id === b.pitEdit.id ? { ...p, atMin: b.pitEdit.atMin } : p));
-      T.pitLog.sort((a, c) => (a.atMin || 0) - (c.atMin || 0));
+      // owner pushes its WHOLE pit log + a version (seq). Only accept newer
+      // versions, so out-of-order requests (fast log+undo) can't resurrect a pit.
+      if (Array.isArray(b.pitLog)) {
+        if (b.seq == null || T._seq == null || b.seq > T._seq) {
+          T.pitLog = b.pitLog.slice().sort((a, c) => (a.atMin || 0) - (c.atMin || 0));
+          T._seq = b.seq != null ? b.seq : Date.now();
+        }
+      }
+      // legacy granular ops (kept as a fallback, also version-guarded off)
+      else {
+        if (b.pitAppend) { if (!T.pitLog.some((p) => p.id === b.pitAppend.id)) T.pitLog.push(b.pitAppend); }
+        if (b.pitRemove != null) T.pitLog = T.pitLog.filter((p) => p.id !== b.pitRemove);
+        if (b.pitClear) T.pitLog = [];
+        if (b.pitEdit) T.pitLog = T.pitLog.map((p) => (p.id === b.pitEdit.id ? { ...p, atMin: b.pitEdit.atMin } : p));
+        T.pitLog.sort((a, c) => (a.atMin || 0) - (c.atMin || 0));
+      }
       T._updated = Date.now();
       await env.PITWALL_KV.put("global_state", JSON.stringify(state));
       return json({ ok: true, pitLog: T.pitLog });
