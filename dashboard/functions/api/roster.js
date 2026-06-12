@@ -36,6 +36,9 @@ export async function onRequestPost({ request, env }) {
       const { num, passcode } = body.verifyTeam;
       return json({ ok: TEAM_PASSCODES[String(num)] != null && TEAM_PASSCODES[String(num)] === passcode });
     }
+    if (body.verifyControl) {
+      return json({ ok: body.verifyControl.passcode === CONTROL_PW || (env.ADMIN_PASSWORD && body.verifyControl.passcode === env.ADMIN_PASSWORD) });
+    }
 
     // set the global race start time on the day (control password)
     if (body.setRaceStart) {
