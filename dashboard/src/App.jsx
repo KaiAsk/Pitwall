@@ -457,8 +457,13 @@ export default function App() {
   const [gatePw, setGatePw] = useState("");
   const [gateMsg, setGateMsg] = useState("");
   const unlockTelemetry = async () => {
-    if (gatePw === TELEMETRY_PW) { setTelemetryUnlocked(true); try { sessionStorage.setItem("pw_tele", "1"); } catch {} setGateMsg(""); }
-    else setGateMsg("Wrong password.");
+    setGateMsg("Checking…");
+    try {
+      const res = await fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ verifyControl: { passcode: gatePw } }) });
+      const d = await res.json();
+      if (res.ok && d.ok) { setTelemetryUnlocked(true); try { sessionStorage.setItem("pw_tele", "1"); } catch {} setGateMsg(""); }
+      else setGateMsg("Wrong password.");
+    } catch { setGateMsg("Couldn't reach the server (live site only)."); }
   };
 
   useEffect(() => {
@@ -2276,8 +2281,7 @@ const COMMAND_TEAMS = [
   { num: "18", label: "◈ LEEDS A" }, { num: "19", label: "LEEDS B" }, { num: "20", label: "LEEDS C" },
   { num: "21", label: "LEEDS D" }, { num: "57", label: "GRADS A" }, { num: "58", label: "GRADS B" },
 ];
-const TEAM_PASSCODES = { "18": "huZZ", "19": "bee", "20": "cunty", "21": "wth", "57": "unc", "58": "free" };
-const TELEMETRY_PW = "footjob";
+// passcodes are validated server-side (api/roster) so no secrets ship in the client bundle
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -2556,7 +2560,11 @@ function Live24({ knownDrivers = [] }) {
 
   const unlockTeam = async (num, code) => {
     const n = String(num);
-    if (!(TEAM_PASSCODES[n] && TEAM_PASSCODES[n] === code)) return false;
+    try {
+      const res = await fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ verifyTeam: { num: n, passcode: code } }) });
+      const d = await res.json();
+      if (!(res.ok && d.ok)) return false;
+    } catch { return false; }
     ownPass.current = { ...ownPass.current, [n]: code }; saveLS("live24_pass", ownPass.current);
     setOwned((s) => new Set([...s, n]));
     pullNow();
@@ -2844,7 +2852,7 @@ function Live24({ knownDrivers = [] }) {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap", padding: "10px 12px", borderRadius: 8, background: "#0b1017", border: "1px solid #2b3a4e" }}>
               <span className="disp" style={{ fontSize: 12, color: AMBER, fontWeight: 700 }}>SET RACE START FOR EVERYONE</span>
-              <input type="password" value={startPw} onChange={(e) => setStartPw(e.target.value)} placeholder="control password (footjob)" style={{ ...inp(190), fontFamily: "Barlow, sans-serif" }} />
+              <input type="password" value={startPw} onChange={(e) => setStartPw(e.target.value)} placeholder="control password" style={{ ...inp(190), fontFamily: "Barlow, sans-serif" }} />
               <button onClick={() => setGlobalStart(cfg.raceStartISO)} className="disp"
                 style={{ background: "#1a160a", color: AMBER, border: `1px solid ${AMBER}`, borderRadius: 7, padding: "8px 13px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
                 PUSH {fmtClock(raceStart)} TO ALL DEVICES
