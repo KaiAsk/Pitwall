@@ -2262,7 +2262,8 @@ export default function App() {
    excluded by the existing !beckett rule.
    ======================================================================= */
 
-const LIVE_FILE = "/live/24h.json";
+const LIVE_SITE = (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("site")) || "bukc";
+const LIVE_FILE = `/api/live?site=${LIVE_SITE}`;
 const SEED_TEAMS = [
   { num: "18", name: "Buzzer's Huzz", drivers: ["Kai Askey", "Khaled Saab", "Arion Nela", "Lucas Burrow", "Iago Sierlecki"] },
   { num: "19", name: "Leeds (B)y a mile", drivers: ["Luca Wigley", "Morgan Driscoll", "Ben Jones", "Harrison Rowe", "Vivaan Baig", "Simon Wilkins", "Connor Morton", "Ademi Elukanlo"] },
@@ -2597,7 +2598,7 @@ function Live24({ knownDrivers = [] }) {
         .catch(() => { if (!stop) setLiveErr("No live snapshot yet."); });
     };
     pull();
-    const iv = setInterval(pull, 30000);
+    const iv = setInterval(pull, 5000);
     return () => { stop = true; clearInterval(iv); };
   }, []);
 
