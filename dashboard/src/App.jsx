@@ -2518,9 +2518,15 @@ function Live24({ knownDrivers = [] }) {
   const pitIn = (num, atMin) => { const e = { id: uid() + Date.now(), atMin, t: new Date().toISOString() };
     setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: applyPending(t.pitLog, [{ type: "add", entry: e, ts: Date.now() }]) } : t) }));
     queue(num, { type: "add", entry: e }); sendTeam(num, { pitAppend: e }); };
-  const pitUndo = (num) => { let id = null;
-    setCfg((c) => ({ ...c, teams: c.teams.map((t) => { if (String(t.num) !== String(num)) return t; const pl = t.pitLog || []; id = pl.length ? pl[pl.length - 1].id : null; return { ...t, pitLog: pl.slice(0, -1) }; }) }));
-    if (id) { queue(num, { type: "remove", id }); sendTeam(num, { pitRemove: id }); } };
+  const pitUndo = (num) => {
+    const team = (cfg.teams || []).find((t) => String(t.num) === String(num));
+    const pl = (team && team.pitLog) || [];
+    if (!pl.length) return;
+    const id = pl[pl.length - 1].id;
+    if (id == null) { setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: (t.pitLog || []).slice(0, -1) } : t) })); return; }
+    setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: (t.pitLog || []).filter((p) => p.id !== id) } : t) }));
+    if (id != null) { queue(num, { type: "remove", id }); sendTeam(num, { pitRemove: id }); }
+  };
   const pitClear = (num) => { setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: [] } : t) }));
     queue(num, { type: "clear" }); sendTeam(num, { pitClear: true }); };
   const pitEdit = (num, id, atMin) => { setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: (t.pitLog || []).map((p) => p.id === id ? { ...p, atMin } : p) } : t) }));
