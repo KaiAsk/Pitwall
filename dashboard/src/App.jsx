@@ -2469,7 +2469,7 @@ function Live24({ knownDrivers = [] }) {
   const [startPw, setStartPw] = useState("");
   const [startMsg, setStartMsg] = useState("");
   const [simLocked, setSimLocked] = useState(false);
-  const [simOn, setSimOn] = useState(() => LS("live24_sim", false));
+  const [simOn, setSimOn] = useState(false);   // never auto-start the demo — data must be fresh
   const [simFast, setSimFast] = useState(() => LS("live24_simfast", false));
   const [testClock, setTestClock] = useState(false);
   const [clockStartAt, setClockStartAt] = useState(null);
@@ -2745,7 +2745,7 @@ function Live24({ knownDrivers = [] }) {
 
   const staleMin = liveModel && liveModel.scrapedAt ? (Date.now() - new Date(liveModel.scrapedAt).getTime()) / 60000 : null;
 
-  const tabs = [...COMMAND_TEAMS.map((c) => ["cmd:" + c.num, c.label]), ["board", "ALL TEAMS"], ["timing", "TIMING"], ["track", "TRACK MAP"], ["plan", "PLANNER"], ["live", "OUR CARS"], ["pace", "PACE"]];
+  const tabs = [...COMMAND_TEAMS.map((c) => ["cmd:" + c.num, c.label]), ["board", "ALL TEAMS"], ["timing", "TIMING"], ["track", "TRACK MAP"], ["plan", "PLANNER"], ["live", "OUR KARTS"], ["pace", "PACE"]];
 
   return (
     <div>
@@ -2905,7 +2905,7 @@ function Live24({ knownDrivers = [] }) {
                 clear pit logs
               </button>
               <span className="mono" style={{ fontSize: 11, color: simOn ? "#ffb3a0" : "#66758a", flexBasis: "100%" }}>
-                {simOn ? "⚠ SIMULATION — these are fake cars to rehearse the app, NOT real timing. Real race data comes from the live feed on the day. The real start (12:30) is unchanged unless you turn on the test clock. Clear pit logs + stop test before race day." : "Rehearse the whole app with made-up cars. This is a simulation, not real timing — it does not touch your plan or the real race clock."}
+                {simOn ? "⚠ SIMULATION — these are fake karts to rehearse the app, NOT real timing. Real race data comes from the live feed on the day. The real start (12:30) is unchanged unless you turn on the test clock. Clear pit logs + stop test before race day." : "Rehearse the whole app with made-up karts. This is a simulation, not real timing — it does not touch your plan or the real race clock."}
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
@@ -2991,7 +2991,7 @@ function Live24({ knownDrivers = [] }) {
                   </tbody>
                 </table>
               </div>
-              <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 10 }}>Our cars highlighted in red. Purple = fastest lap of the field. This replaces having to watch AlphaRaceHub.</div>
+              <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 10 }}>Our karts highlighted in red. Purple = fastest lap of the field. This replaces having to watch AlphaRaceHub.</div>
             </>
           )}
         </Panel>
@@ -3498,7 +3498,7 @@ function TrackMap({ model, teams, simOn, speedMul = 1, onSim }) {
   if (!model) {
     return (
       <Panel title="TRACK MAP \u2014 TEESSIDE">
-        <Empty msg={simOn ? "Waiting for data\u2026" : "No live data yet. Start Test Mode to watch the cars move, or wait for the race feed."} />
+        <Empty msg={simOn ? "Waiting for data\u2026" : "No live data yet. Start Test Mode to watch the karts move, or wait for the race feed."} />
         {!simOn && <div style={{ textAlign: "center", marginTop: 12 }}>
           <button onClick={onSim} className="disp" style={{ background: "#11233a", color: "#2fd372", border: "1px solid #2fd37255", borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>\u25B6 START TEST MODE</button>
         </div>}
@@ -3527,12 +3527,12 @@ function TrackMap({ model, teams, simOn, speedMul = 1, onSim }) {
             ); })}
           </svg>
           <div className="mono" style={{ fontSize: 11, color: "#66758a", textAlign: "center", marginTop: 4 }}>
-            Teesside Autodrome, clockwise from S/F. Cars move at their own pace \u2014 there's no live sector data, so position around the lap is predicted from lap times, not exact.
+            Teesside Autodrome, clockwise from S/F. Karts move at their own pace \u2014 there's no live sector data, so position around the lap is predicted from lap times, not exact.
           </div>
         </div>
 
         <div>
-          <Label>ON TRACK \u2014 OUR CARS</Label>
+          <Label>ON TRACK \u2014 OUR KARTS</Label>
           <div style={{ display: "grid", gap: 4 }}>
             {[...karts].sort((a, b) => (a.pos || 999) - (b.pos || 999)).map((k) => (
               <div key={k.kart} className="mono" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, background: "#080d13", borderRadius: 7, padding: "7px 10px" }}>
