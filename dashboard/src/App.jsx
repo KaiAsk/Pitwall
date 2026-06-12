@@ -2592,9 +2592,9 @@ function Live24({ knownDrivers = [] }) {
   useEffect(() => {
     let stop = false;
     const pull = () => {
-      fetch(`${LIVE_FILE}?t=${Date.now()}`)
+      fetch(`${LIVE_FILE}${LIVE_FILE.includes("?") ? "&" : "?"}t=${Date.now()}`)
         .then((r) => { if (!r.ok) throw new Error("no file"); return r.text(); })
-        .then((t) => { if (!stop) { setLive(JSON.parse(t.replace(/\uFFFD/g, "\u00b7"))); setLiveErr(""); } })
+        .then((t) => { if (!stop) { const d = JSON.parse(t.replace(/\uFFFD/g, "\u00b7")); setLive(d); setLiveErr(d && d.error ? "Feed error: " + d.error : ""); } })
         .catch(() => { if (!stop) setLiveErr("No live snapshot yet."); });
     };
     pull();
@@ -2962,7 +2962,9 @@ function Live24({ knownDrivers = [] }) {
       {sub === "timing" && (
         <Panel title="LIVE TIMING — FULL FIELD">
           {!liveModel ? (
-            <Empty msg={simOn ? "Loading…" : "No live feed yet. The board fills once the scraper is running (or turn on Test Mode). Works for practice, qualifying and the race — whatever session is being scraped."} />
+            <Empty msg={simOn ? "Loading…" : liveErr ? liveErr : `Waiting for a live ${LIVE_SITE.toUpperCase()} session. Standings appear automatically once a session goes live (practice, qualifying or race). Nothing showing during a live session? Open /api/live?site=${LIVE_SITE} to check the feed.`} />
+          ) : liveModel.field.length === 0 ? (
+            <Empty msg={`Connected to ${LIVE_SITE.toUpperCase()}, but no karts are out yet (session "${(liveModel.session && liveModel.session.label) || "—"}", ${(liveModel.session && liveModel.session.status) || "?"}).`} />
           ) : (
             <>
               <div className="mono" style={{ fontSize: 11.5, color: "#9aa8bb", marginBottom: 10 }}>
