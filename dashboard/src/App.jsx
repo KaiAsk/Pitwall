@@ -2512,7 +2512,7 @@ function Live24({ knownDrivers = [] }) {
     const n = String(num);
     fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ teamSync: { num: n, passcode: ownPass.current[n], ...extra } }) })
-      .then(() => setTimeout(pullNow, 500)).catch(() => {});
+      .then(() => { setTimeout(pullNow, 600); setTimeout(pullNow, 2500); }).catch(() => {});
   };
 
   // optimistic local mutators (used by every team tab + the all-teams board)
@@ -2546,14 +2546,14 @@ function Live24({ knownDrivers = [] }) {
     setCfg((c) => {
       let changed = false;
       const teams = (c.teams || []).map((t) => {
+        // The device that owns a team is the authority for it — never let an
+        // eventually-consistent server read clobber a pit stop just logged here.
+        if (ownedRef.current.has(String(t.num))) return t;
         const gt = (g.teams || []).find((x) => String(x.num) === String(t.num));
-        const guarded = Date.now() - (planGuardRef.current[String(t.num)] || 0) < 6000;
+        if (!gt) return t;
         const next = { ...t };
-        // plan from global unless we just edited it locally or global is empty
-        if (gt && (gt.stints || []).length && !guarded) { next.name = gt.name || t.name; next.drivers = gt.drivers || t.drivers; next.stints = gt.stints; }
-        // pit log: server log + our pending overlay
-        const merged = applyPending(gt ? gt.pitLog : t.pitLog, pendingRef.current[String(t.num)]);
-        next.pitLog = merged;
+        if ((gt.stints || []).length) { next.name = gt.name || t.name; next.drivers = gt.drivers || t.drivers; next.stints = gt.stints; }
+        next.pitLog = gt.pitLog || [];                 // viewers mirror the shared log
         if (JSON.stringify(next) !== JSON.stringify(t)) changed = true;
         return next;
       });
@@ -2592,7 +2592,7 @@ function Live24({ knownDrivers = [] }) {
   useEffect(() => {
     let stop = false;
     const pull = () => {
-      fetch(`${LIVE_FILE}${LIVE_FILE.includes("?") ? "&" : "?"}t=${Date.now()}`)
+      fetch(LIVE_FILE)
         .then((r) => { if (!r.ok) throw new Error("no file"); return r.text(); })
         .then((t) => { if (!stop) { const d = JSON.parse(t.replace(/\uFFFD/g, "\u00b7")); setLive(d); setLiveErr(d && d.error ? "Feed error: " + d.error : ""); } })
         .catch(() => { if (!stop) setLiveErr("No live snapshot yet."); });
