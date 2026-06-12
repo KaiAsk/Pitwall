@@ -6,9 +6,9 @@ import {
 } from "recharts";
 
 /* ---------- theme ---------- */
-const TEAM_COLORS = { A: "#ff3355", B: "#00e0c6", C: "#b06bff", D: "#43d977", E: "#ffa23a", F: "#5a8dee", G: "#e85bd0" };
+const TEAM_COLORS = { A: "#ff2d4d", B: "#00e0c6", C: "#b06bff", D: "#2fd372", E: "#ffa23a", F: "#5a8dee", G: "#e85bd0" };
 const DRIVER_PALETTE = [
-  "#ff3355", "#00e0c6", "#b06bff", "#43d977", "#ffce3a", "#ff7c2a",
+  "#ff2d4d", "#00e0c6", "#b06bff", "#2fd372", "#ffce3a", "#ff7c2a",
   "#38b6ff", "#e055a3", "#a8e63d", "#00bfa5", "#ff6b6b", "#c084fc",
 ];
 const AMBER = "#ffce3a";
@@ -94,7 +94,8 @@ const sd = (a) => {
   const m = mean(a);
   return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1));
 };
-const fmt = (t) => (t == null ? "—" : t.toFixed(3));
+const fmt = (t) => { if (t == null) return "—"; if (t < 60) return t.toFixed(3);
+  const m = Math.floor(t / 60), s = t - m * 60; return `${m}:${s < 10 ? "0" : ""}${s.toFixed(3)}`; };
 
 // Aggressive Anomaly Filter: Drops any lap >1.5s faster than the field median best lap
 const getValidFastest = (arr) => {
@@ -207,10 +208,10 @@ function ReportTable({ report, nameOf }) {
   const ticks = Array.from({ length: 6 }, (_, i) => lo + (i / 5) * (hi - lo));
   const col = (r) => (r.isLeeds ? (TEAM_COLORS[r.teamLetter] || AMBER) : "#48566a");
   const cell = { padding: "0 8px", textAlign: "right", color: "#c2cbd6" };
-  const head = { padding: "4px 8px", textAlign: "right", color: "#6b7685", fontWeight: 500, letterSpacing: "0.5px", cursor: "pointer", userSelect: "none" };
+  const head = { padding: "4px 8px", textAlign: "right", color: "#78889d", fontWeight: 500, letterSpacing: "0.5px", cursor: "pointer", userSelect: "none" };
   const [sort, setSort] = useState({ key: "avg", dir: "asc" });
   const arrow = (k) => (sort.key === k ? (sort.dir === "asc" ? " ▴" : " ▾") : "");
-  const hCol = (k) => (sort.key === k ? AMBER : "#6b7685");
+  const hCol = (k) => (sort.key === k ? AMBER : "#78889d");
   const clickSort = (k) => () => setSort((s) => ({ key: k, dir: s.key === k && s.dir === "asc" ? "desc" : "asc" }));
   const rows = [...report.rows].sort((a, b) => {
     const m = sort.dir === "asc" ? 1 : -1, k = sort.key;
@@ -222,12 +223,12 @@ function ReportTable({ report, nameOf }) {
     <div style={{ overflowX: "auto" }}>
       <div style={{ minWidth: 760 }}>
         <div className="mono" style={{ display: "grid", gridTemplateColumns: `28px 190px ${PW}px 64px 64px 56px 52px 64px`,
-          alignItems: "end", fontSize: 10.5, borderBottom: "1px solid #1e2733", paddingBottom: 4 }}>
+          alignItems: "end", fontSize: 11.5, borderBottom: "1px solid #1e2733", paddingBottom: 4 }}>
           <div style={head}>#</div>
           <div style={{ ...head, textAlign: "left", color: hCol("driver") }} onClick={clickSort("driver")}>DRIVER / KART{arrow("driver")}</div>
           <svg width={PW} height="16" style={{ overflow: "visible" }}>
             {ticks.map((tv, i) => (
-              <text key={i} x={x(tv)} y="12" textAnchor="middle" fill="#5b6776" fontSize="9.5" fontFamily="IBM Plex Mono">
+              <text key={i} x={x(tv)} y="12" textAnchor="middle" fill="#66758a" fontSize="9.5" fontFamily="Barlow Semi Condensed">
                 {tv.toFixed(1)}
               </text>
             ))}
@@ -248,12 +249,12 @@ function ReportTable({ report, nameOf }) {
               gridTemplateColumns: `28px 190px ${PW}px 64px 64px 56px 52px 64px`, alignItems: "center",
               fontSize: 11.5, padding: "3px 0", borderBottom: "1px solid #0e141c",
               background: r.isLeeds ? `${c}10` : "transparent" }}>
-              <div style={{ ...cell, textAlign: "center", color: "#5b6776" }}>{i + 1}</div>
+              <div style={{ ...cell, textAlign: "center", color: "#66758a" }}>{i + 1}</div>
               <div style={{ padding: "0 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 <span style={{ color: r.isLeeds ? c : "#c2cbd6", fontWeight: r.isLeeds ? 600 : 400 }}>
                   {driver || r.team}
                 </span>
-                <span style={{ color: "#5b6776" }}> #{r.num}</span>
+                <span style={{ color: "#66758a" }}> #{r.num}</span>
               </div>
               <svg width={PW} height="18" style={{ overflow: "visible" }}>
                 <line x1={x(s[0])} x2={x(s[s.length - 1])} y1="9" y2="9" stroke={c} strokeOpacity="0.5" strokeWidth="1" />
@@ -264,15 +265,15 @@ function ReportTable({ report, nameOf }) {
               <div style={{ ...cell, color: "#e6edf3" }}>{fmt(r.avg)}</div>
               <div style={cell}>{fmt(r.fastest)}</div>
               <div style={cell}>{r.sd.toFixed(3)}</div>
-              <div style={{ ...cell, color: r.z == null ? "#5b6776" : r.z <= 0 ? "#43d977" : "#ff8a5b" }}>
+              <div style={{ ...cell, color: r.z == null ? "#66758a" : r.z <= 0 ? "#2fd372" : "#ff8a5b" }}>
                 {r.z == null ? "—" : (r.z <= 0 ? "" : "+") + r.z.toFixed(2)}
               </div>
-              <div style={{ ...cell, color: "#8b97a7" }}>{r.shown}/{r.total}</div>
+              <div style={{ ...cell, color: "#9aa8bb" }}>{r.shown}/{r.total}</div>
             </div>
           );
         })}
       </div>
-      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
+      <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 12, lineHeight: 1.5 }}>
         Ranked on the fastest 50% of laps, excluding lap 1, within 110% of class fastest and 105% of the driver's own fastest.
       </div>
     </div>
@@ -307,13 +308,13 @@ function BoxPlot({ boxes, fieldMedian }) {
         {customGridTicks.map((tv, i) => (
           <g key={i}>
             <line x1={padL} x2={W - padR} y1={y(tv)} y2={y(tv)} stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
-            <text x={padL - 12} y={y(tv) + 4} textAnchor="end" fill="#64748b" fontSize="11" fontFamily="IBM Plex Mono">{tv.toFixed(1)}s</text>
+            <text x={padL - 12} y={y(tv) + 4} textAnchor="end" fill="#64748b" fontSize="11" fontFamily="Barlow Semi Condensed">{tv.toFixed(1)}s</text>
           </g>
         ))}
         {fieldMedian != null && y(fieldMedian) >= padT && y(fieldMedian) <= H - padB && (
           <g>
             <line x1={padL} x2={W - padR} y1={y(fieldMedian)} y2={y(fieldMedian)} stroke={AMBER} strokeWidth="2" strokeDasharray="6 4" opacity="0.9" />
-            <text x={W - padR - 6} y={y(fieldMedian) - 8} textAnchor="end" fill={AMBER} fontSize="11" fontWeight="600" fontFamily="IBM Plex Mono">FIELD MEDIAN {fieldMedian.toFixed(3)}s</text>
+            <text x={W - padR - 6} y={y(fieldMedian) - 8} textAnchor="end" fill={AMBER} fontSize="11" fontWeight="600" fontFamily="Barlow Semi Condensed">FIELD MEDIAN {fieldMedian.toFixed(3)}s</text>
           </g>
         )}
         {boxes.map((b, i) => {
@@ -350,7 +351,7 @@ function BoxPlot({ boxes, fieldMedian }) {
 }
 
 const Empty = ({ msg }) => (
-  <div style={{ padding: "48px 20px", textAlign: "center", color: "#5b6776", fontSize: 14 }}>{msg}</div>
+  <div style={{ padding: "48px 20px", textAlign: "center", color: "#66758a", fontSize: 14 }}>{msg}</div>
 );
 
 /* ---------- app ---------- */
@@ -456,13 +457,8 @@ export default function App() {
   const [gatePw, setGatePw] = useState("");
   const [gateMsg, setGateMsg] = useState("");
   const unlockTelemetry = async () => {
-    setGateMsg("Checking…");
-    try {
-      const res = await fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ verify: true, adminPassword: gatePw }) });
-      const d = await res.json();
-      if (res.ok && d.ok) { setTelemetryUnlocked(true); try { sessionStorage.setItem("pw_tele", "1"); } catch {} setGateMsg(""); }
-      else setGateMsg(d.error || "Wrong password.");
-    } catch { setGateMsg("Couldn't reach the server (live site only)."); }
+    if (gatePw === TELEMETRY_PW) { setTelemetryUnlocked(true); try { sessionStorage.setItem("pw_tele", "1"); } catch {} setGateMsg(""); }
+    else setGateMsg("Wrong password.");
   };
 
   useEffect(() => {
@@ -734,9 +730,9 @@ export default function App() {
 
   const colorOf = useCallback((key) => {
     const entry = entries.find((e) => e.key === key);
-    if (!entry) return "#8b97a7";
+    if (!entry) return "#9aa8bb";
     const driver = assign[key]?.trim();
-    return (driver && driverColorMap[driver]) || TEAM_COLORS[entry.teamLetter] || "#8b97a7";
+    return (driver && driverColorMap[driver]) || TEAM_COLORS[entry.teamLetter] || "#9aa8bb";
   }, [assign, driverColorMap, entries]);
 
   const fieldComparisonGroups = useMemo(() => {
@@ -780,7 +776,7 @@ export default function App() {
         const namedDriver = assign[db.key]?.trim();
         masterDriverBoxes.push({
           ...db,
-          color: namedDriver ? (driverColorMap[namedDriver] || "#fff") : (TEAM_COLORS[db.teamLetter] || "#8b97a7"),
+          color: namedDriver ? (driverColorMap[namedDriver] || "#fff") : (TEAM_COLORS[db.teamLetter] || "#9aa8bb"),
           best: db.clean.length ? Math.min(...db.clean) : null,
           avg: mean(db.clean), cons: sd(db.clean), inc: db.incidents.length,
         });
@@ -1121,29 +1117,32 @@ export default function App() {
   };
 
   return (
-    <div className="approot" style={{ minHeight: "100vh", background: "#07090d", color: "#e6edf3",
-      fontFamily: "IBM Plex Sans, system-ui, sans-serif" }}>
+    <div className="approot" style={{ minHeight: "100vh", background: "#05070b", color: "#e6edf3",
+      fontFamily: "Barlow, system-ui, sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
-        html, body, #root { margin: 0 !important; padding: 0 !important; max-width: none !important; width: 100% !important; display: block !important; place-items: initial !important; text-align: left !important; background: #07090d; overflow-x: hidden; }
+        @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600;700&display=swap');
+        html, body, #root { margin: 0 !important; padding: 0 !important; max-width: none !important; width: 100% !important; display: block !important; place-items: initial !important; text-align: left !important; background: #05070b; overflow-x: hidden; }
         * { box-sizing: border-box; }
         .approot { zoom: 1.18; }
-        .mono { font-family: 'IBM Plex Mono', monospace; }
-        .disp { font-family: 'Archivo', sans-serif; letter-spacing: 0.2px; }
+        .mono { font-family: 'Barlow Semi Condensed', sans-serif; font-variant-numeric: tabular-nums; line-height: 1.45; }
+        .disp { font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.6px; text-transform: uppercase; line-height: 1.2; }
+        .approot div { min-width: 0; }
         ::-webkit-scrollbar { height: 8px; width: 8px; }
-        ::-webkit-scrollbar-thumb { background:#1e2733; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background:#243042; border-radius: 4px; }
         .appwrap { padding: 24px 28px; max-width: 1380px; margin: 0 auto; }
-        .apphead { padding: 16px 28px; max-width: 1380px; margin: 0 auto; }
+        .apphead { padding: 14px 28px; max-width: 1380px; margin: 0 auto; }
+        .stripe { height: 3px; background: linear-gradient(90deg, #ffce3a 0 120px, #ff2d4d 120px 180px, transparent 180px); }
         .scrollx { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         table { max-width: 100%; }
         img, svg { max-width: 100%; }
+        button { font-family: inherit; }
         @media (max-width: 820px) {
           .approot { zoom: 1 !important; }
           .appwrap { padding: 12px 11px; }
-          .apphead { padding: 11px 13px; flex-wrap: wrap; gap: 10px; }
+          .apphead { padding: 10px 13px; flex-wrap: wrap; gap: 10px; }
           .apptabs { flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; max-width: 100%; }
           .apptabs::-webkit-scrollbar { display: none; }
-          .apptabs button { font-size: 12px !important; padding: 7px 11px !important; white-space: nowrap; flex: 0 0 auto; }
+          .apptabs button { font-size: 13px !important; padding: 7px 11px !important; white-space: nowrap; flex: 0 0 auto; }
           input, select, textarea { font-size: 16px !important; }
           .panelpad { padding: 13px !important; }
           .g2, .g3 { grid-template-columns: 1fr 1fr !important; }
@@ -1155,14 +1154,15 @@ export default function App() {
       `}</style>
 
       {/* header */}
-      <div className="apphead" style={{ borderBottom: "1px solid #161d27",
-        display: "flex", alignItems: "center", gap: 16, background: "linear-gradient(180deg,#0b0f15,#07090d)" }}>
-        <div style={{ width: 10, height: 30, background: AMBER, borderRadius: 2 }} />
+      <div className="stripe" />
+      <div className="apphead" style={{ borderBottom: "1px solid #1b2433",
+        display: "flex", alignItems: "center", gap: 16, background: "linear-gradient(180deg,#0b0f15,#05070b)" }}>
+        <div style={{ width: 10, height: 32, background: AMBER, borderRadius: 2, boxShadow: "0 0 14px #ffce3a33", flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
-          <div className="disp" style={{ fontSize: 23, fontWeight: 700, lineHeight: 1 }}>
+          <div className="disp" style={{ fontSize: 27, fontWeight: 700, lineHeight: 1 }}>
             LEEDS MOTORSPORT <span style={{ color: AMBER }}>· TELEMETRY</span>
           </div>
-          <div className="mono" style={{ fontSize: 11, color: loadError ? "#ff8a5b" : "#6b7685", marginTop: 4 }}>
+          <div className="mono" style={{ fontSize: 11, color: loadError ? "#ff8a5b" : "#78889d", marginTop: 4 }}>
             {appMode === "live24"
               ? "BUKC 24 HOUR 2026 · LIVE"
               : (scrapedEventData?.title ? scrapedEventData.title.toUpperCase() : (loadError || "BUKC PIPELINE ENGINE"))}
@@ -1173,22 +1173,22 @@ export default function App() {
         <div className="apptabs" style={{ display: "flex", gap: 6 }}>
           {[["telemetry", "SEASON TELEMETRY"], ["live24", "24 HOURS LIVE"]].map(([k, l]) => (
             <button key={k} onClick={() => setAppMode(k)} className="disp"
-              style={{ padding: "8px 14px", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer",
-                border: "1px solid", borderColor: appMode === k ? AMBER : "#222c38",
-                background: appMode === k ? "#1a160a" : "#0b1017", color: appMode === k ? AMBER : "#8b97a7",
-                boxShadow: k === "live24" && appMode === k ? "0 0 0 1px #ff335533" : "none" }}>
-              {k === "live24" && <span style={{ color: "#ff3355", marginRight: 5 }}>●</span>}{l}
+              style={{ padding: "8px 14px", borderRadius: 6, fontWeight: 700, fontSize: 15, cursor: "pointer",
+                border: "1px solid", borderColor: appMode === k ? AMBER : "#2b3a4e",
+                background: appMode === k ? "#1a160a" : "#0b1017", color: appMode === k ? AMBER : "#9aa8bb",
+                boxShadow: k === "live24" && appMode === k ? "0 0 0 1px #ff2d4d33" : "none" }}>
+              {k === "live24" && <span style={{ color: "#ff2d4d", marginRight: 5 }}>●</span>}{l}
             </button>
           ))}
         </div>
 
         {appMode === "telemetry" && (<>
         {/* round selector */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0d141c", border: "1px solid #222c38", padding: "5px 10px", borderRadius: 8 }}>
-          <span className="disp" style={{ fontSize: 11.5, color: "#6b7685", fontWeight: 600 }}>ROUND:</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0d141c", border: "1px solid #2b3a4e", padding: "5px 10px", borderRadius: 8 }}>
+          <span className="disp" style={{ fontSize: 11.5, color: "#78889d", fontWeight: 600 }}>ROUND:</span>
           <select className="mono" value={activeEventId || ""} onChange={(e) => setActiveEventId(e.target.value)}
-            style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 6, color: "#e6edf3",
-              padding: "5px 8px", fontSize: 12.5, fontFamily: "IBM Plex Mono, monospace", minWidth: 180, cursor: "pointer" }}>
+            style={{ background: "#11171f", border: "1px solid #2b3a4e", borderRadius: 6, color: "#e6edf3",
+              padding: "5px 8px", fontSize: 12.5, fontFamily: "Barlow Semi Condensed, sans-serif", minWidth: 180, cursor: "pointer" }}>
             {eventIndex.length === 0 && <option value="">no rounds — run scraper</option>}
             {["Mains", "Inters", "Other"].filter((cat) => eventIndex.some((e) => e.category === cat)).map((cat) => (
               <optgroup key={cat} label={cat === "Other" ? "Special Events" : cat}>
@@ -1204,17 +1204,17 @@ export default function App() {
           <div style={{ position: "relative" }}>
             <button onClick={() => setCompareOpen((o) => !o)} className="disp"
               style={{ display: "flex", alignItems: "center", gap: 8, background: "#0d141c",
-                border: `1px solid ${compareIds.length ? AMBER : "#222c38"}`, padding: "6px 12px", borderRadius: 8,
-                cursor: "pointer", color: compareIds.length ? AMBER : "#8b97a7", fontSize: 12, fontWeight: 600 }}>
+                border: `1px solid ${compareIds.length ? AMBER : "#2b3a4e"}`, padding: "6px 12px", borderRadius: 8,
+                cursor: "pointer", color: compareIds.length ? AMBER : "#9aa8bb", fontSize: 12, fontWeight: 600 }}>
               + COMPARE{compareIds.length ? ` (${compareIds.length})` : ""} ▾
             </button>
             {compareOpen && (
               <div style={{ position: "absolute", top: "112%", left: 0, zIndex: 50, background: "#0d141c",
-                border: "1px solid #222c38", borderRadius: 8, padding: 10, minWidth: 210, maxHeight: 300,
+                border: "1px solid #2b3a4e", borderRadius: 8, padding: 10, minWidth: 210, maxHeight: 300,
                 overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
                 {["Mains", "Inters"].filter((cat) => eventIndex.some((e) => e.category === cat && e.id !== activeEventId)).map((cat) => (
                   <div key={cat} style={{ marginBottom: 8 }}>
-                    <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginBottom: 4 }}>{cat.toUpperCase()}</div>
+                    <div className="mono" style={{ fontSize: 11, color: "#66758a", marginBottom: 4 }}>{cat.toUpperCase()}</div>
                     {eventIndex.filter((e) => e.category === cat && e.id !== activeEventId).sort((a, b) => a.round - b.round).map((e) => {
                       const on = compareIds.includes(e.id);
                       return (
@@ -1246,15 +1246,15 @@ export default function App() {
           <Live24 knownDrivers={[...new Set(Object.values(assign).map((v) => v && v.trim()).filter(Boolean))]} />
         )}
         {appMode === "telemetry" && telemetryLocked && !telemetryUnlocked && (
-          <div style={{ maxWidth: 380, margin: "60px auto", textAlign: "center", padding: 24, background: "#0b1017", border: "1px solid #222c38", borderRadius: 12 }}>
+          <div style={{ maxWidth: 380, margin: "60px auto", textAlign: "center", padding: 24, background: "#0b1017", border: "1px solid #2b3a4e", borderRadius: 12 }}>
             <div className="disp" style={{ fontSize: 16, fontWeight: 700, color: "#e6edf3" }}>🔒 Season telemetry is locked</div>
-            <div className="mono" style={{ fontSize: 12, color: "#6b7685", margin: "8px 0 16px" }}>Enter the admin password to view it. The 24 Hours Live section stays open.</div>
+            <div className="mono" style={{ fontSize: 12, color: "#78889d", margin: "8px 0 16px" }}>Enter the admin password to view it. The 24 Hours Live section stays open.</div>
             <input type="password" value={gatePw} onChange={(e) => setGatePw(e.target.value)} placeholder="admin password"
               onKeyDown={(e) => { if (e.key === "Enter") unlockTelemetry(); }}
-              style={{ ...inp(260), fontFamily: "IBM Plex Sans, sans-serif", margin: "0 auto", display: "block" }} />
+              style={{ ...inp(260), fontFamily: "Barlow, sans-serif", margin: "0 auto", display: "block" }} />
             <button onClick={unlockTelemetry} className="disp"
               style={{ marginTop: 12, background: AMBER, color: "#1a160a", border: "none", borderRadius: 8, padding: "10px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>UNLOCK</button>
-            {gateMsg && <div className="mono" style={{ fontSize: 12, color: gateMsg === "Checking…" ? "#8b97a7" : "#ff8a5b", marginTop: 10 }}>{gateMsg}</div>}
+            {gateMsg && <div className="mono" style={{ fontSize: 12, color: gateMsg === "Checking…" ? "#9aa8bb" : "#ff8a5b", marginTop: 10 }}>{gateMsg}</div>}
           </div>
         )}
         {appMode === "telemetry" && (!telemetryLocked || telemetryUnlocked) && (<>
@@ -1263,7 +1263,7 @@ export default function App() {
         {allEntries.length > 0 && (
           <Panel title="01 · ROSTER ASSIGNMENT">
             <div style={{ marginBottom: 14 }}>
-              <Label>EXTRA ENTRIES <span style={{ color: "#5b6776" }}>(paid seats under another uni — type a kart number or team, press Enter)</span></Label>
+              <Label>EXTRA ENTRIES <span style={{ color: "#66758a" }}>(paid seats under another uni — type a kart number or team, press Enter)</span></Label>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <input value={extraDraft} onChange={(e) => setExtraDraft(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addExtra(); } }}
@@ -1279,30 +1279,30 @@ export default function App() {
                 ))}
               </div>
             </div>
-            <Label>TEAM LINEUPS <span style={{ color: "#5b6776" }}>(name a driver once per heat — quali and race fill together)</span></Label>
+            <Label>TEAM LINEUPS <span style={{ color: "#66758a" }}>(name a driver once per heat — quali and race fill together)</span></Label>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
               <button onClick={() => csvRef.current?.click()} className="disp"
                 style={{ background: "#11233a", color: AMBER, border: `1px solid ${AMBER}55`, borderRadius: 7,
                   padding: "7px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
                 ⬆ IMPORT LINEUP CSV
               </button>
-              <span className="mono" style={{ fontSize: 11, color: "#5b6776" }}>
+              <span className="mono" style={{ fontSize: 11, color: "#66758a" }}>
                 columns: team, race, driver &nbsp;(e.g. Leeds A, Race 1, Sam)
               </span>
               <input ref={csvRef} type="file" accept=".csv,.txt" hidden
                 onChange={(ev) => onLineupCsv(ev.target.files?.[0])} />
-              {importMsg && <span className="mono" style={{ fontSize: 11.5, color: importMsg.includes("matched none") || importMsg.includes("Couldn't") ? "#ff8a5b" : "#43d977" }}>{importMsg}</span>}
+              {importMsg && <span className="mono" style={{ fontSize: 11.5, color: importMsg.includes("matched none") || importMsg.includes("Couldn't") ? "#ff8a5b" : "#2fd372" }}>{importMsg}</span>}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
               <input type="password" value={adminPw} onChange={(e) => setAdminPw(e.target.value)} placeholder="admin password"
-                style={{ ...inp(150), fontFamily: "IBM Plex Sans, sans-serif" }} />
+                style={{ ...inp(150), fontFamily: "Barlow, sans-serif" }} />
               <button onClick={syncRoster} disabled={syncing} className="disp"
                 style={{ background: "#11233a", color: "#3da9fc", border: "1px solid #3da9fc55", borderRadius: 7,
                   padding: "7px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
                 {syncing ? "SYNCING…" : "💾 SYNC GLOBAL ROSTER"}
               </button>
-              <span className="mono" style={{ fontSize: 11, color: "#5b6776" }}>pushes this roster to everyone (admin only)</span>
-              {syncMsg && <span className="mono" style={{ fontSize: 11.5, color: syncMsg.startsWith("✓") ? "#43d977" : "#ff8a5b" }}>{syncMsg}</span>}
+              <span className="mono" style={{ fontSize: 11, color: "#66758a" }}>pushes this roster to everyone (admin only)</span>
+              {syncMsg && <span className="mono" style={{ fontSize: 11.5, color: syncMsg.startsWith("✓") ? "#2fd372" : "#ff8a5b" }}>{syncMsg}</span>}
             </div>
             <datalist id="driverNames">
               {[...new Set(Object.values(assign).map((v) => v && v.trim()).filter(Boolean))].map((n) => <option key={n} value={n} />)}
@@ -1346,8 +1346,8 @@ export default function App() {
                     const allRemoved = teamEntries.every((e) => removed.has(e.key));
                     return (
                       <button onClick={() => setRemoved((prev) => { const n = new Set(prev); teamEntries.forEach((e) => allRemoved ? n.delete(e.key) : n.add(e.key)); return n; })}
-                        className="mono" style={{ marginBottom: 8, fontSize: 10.5, cursor: "pointer", background: "none",
-                          border: `1px solid ${allRemoved ? "#43d977" : "#3a2530"}`, borderRadius: 5, padding: "3px 9px", color: allRemoved ? "#43d977" : "#ff8a5b" }}>
+                        className="mono" style={{ marginBottom: 8, fontSize: 11.5, cursor: "pointer", background: "none",
+                          border: `1px solid ${allRemoved ? "#2fd372" : "#3a2530"}`, borderRadius: 5, padding: "3px 9px", color: allRemoved ? "#2fd372" : "#ff8a5b" }}>
                         {allRemoved ? "↺ restore this team this round" : "✕ not our team this round (remove)"}
                       </button>
                     );
@@ -1361,7 +1361,7 @@ export default function App() {
                           background: "#080d13", borderRadius: 7, padding: "6px 10px", borderLeft: `3px solid ${col}`,
                           opacity: isRemoved ? 0.4 : 1 }}>
                           <span className="disp" style={{ color: col, fontWeight: 700, width: 64 }}>{d.label}</span>
-                          <span className="mono" style={{ color: "#6b7685", fontSize: 10.5, width: 130 }}>{d.sub}</span>
+                          <span className="mono" style={{ color: "#78889d", fontSize: 11.5, width: 130 }}>{d.sub}</span>
                           <input list="driverNames" placeholder="driver name…" disabled={isRemoved}
                             value={assign[rows[0].key] || ""}
                             onChange={(ev) => {
@@ -1376,7 +1376,7 @@ export default function App() {
                               return n;
                             })}
                             className="mono" style={{ background: "none", border: "none", cursor: "pointer",
-                              color: isRemoved ? "#43d977" : "#ff6b6b", fontSize: 14, padding: "0 4px" }}>
+                              color: isRemoved ? "#2fd372" : "#ff6b6b", fontSize: 14, padding: "0 4px" }}>
                             {isRemoved ? "↺" : "✕"}
                           </button>
                         </div>
@@ -1408,9 +1408,9 @@ export default function App() {
                 ["h2h", "HEAD-TO-HEAD"]
               ].map(([k, l]) => (
                 <button key={k} onClick={() => setTab(k)} className="disp"
-                  style={{ padding: "8px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer",
-                    border: "1px solid", borderColor: tab === k ? AMBER : "#222c38",
-                    background: tab === k ? "#1a160a" : "#0b1017", color: tab === k ? AMBER : "#8b97a7" }}>
+                  style={{ padding: "8px 16px", borderRadius: 6, fontWeight: 600, fontSize: 15.5, cursor: "pointer",
+                    border: "1px solid", borderColor: tab === k ? AMBER : "#2b3a4e",
+                    background: tab === k ? "#1a160a" : "#0b1017", color: tab === k ? AMBER : "#9aa8bb" }}>
                   {l}
                 </button>
               ))}
@@ -1428,7 +1428,7 @@ export default function App() {
                       </div>
                       <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                         <thead>
-                          <tr style={{ color: "#6b7685", textAlign: "left" }}>
+                          <tr style={{ color: "#78889d", textAlign: "left" }}>
                             <th style={{ padding: "6px 8px", borderBottom: "1px solid #1e2733" }}>POS</th>
                             <th style={{ padding: "6px 8px", borderBottom: "1px solid #1e2733" }}>TEAM</th>
                             <th style={{ padding: "6px 8px", borderBottom: "1px solid #1e2733" }}>KART</th>
@@ -1441,9 +1441,9 @@ export default function App() {
                             <tr key={idx} style={{ borderBottom: "1px solid #1e2733" }}>
                               <td style={{ padding: "8px", color: AMBER, fontWeight: "700" }}>{row.position}</td>
                               <td style={{ padding: "8px", color: "#fff", fontWeight: "600" }}>{row.team}</td>
-                              <td style={{ padding: "8px", color: "#6b7685" }}>#{row.kart || "—"}</td>
+                              <td style={{ padding: "8px", color: "#78889d" }}>#{row.kart || "—"}</td>
                               <td style={{ padding: "8px", color: "#c2cbd6" }}>{row.total_laps}</td>
-                              <td style={{ padding: "8px", color: "#43d977", fontWeight: "700" }}>{row.total_points || "—"} pts</td>
+                              <td style={{ padding: "8px", color: "#2fd372", fontWeight: "700" }}>{row.total_points || "—"} pts</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1462,17 +1462,17 @@ export default function App() {
                     if (leedsSessionRows.length === 0) return null;
 
                     return (
-                      <div key={session.session_id} style={{ background: "#0b1017", borderRadius: 10, padding: "18px", border: "1px solid #161d27" }}>
+                      <div key={session.session_id} style={{ background: "#0b1017", borderRadius: 10, padding: "18px", border: "1px solid #1b2433" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, borderBottom: "1px solid #1e2733", paddingBottom: 6 }}>
                           <div className="disp" style={{ color: AMBER, fontSize: 14.5, fontWeight: 700 }}>
                             🏁 {session.label.toUpperCase()}
                           </div>
-                          <div className="mono" style={{ fontSize: 11, color: "#5b6776", display: "flex", alignItems: "center", gap: 10 }}>
+                          <div className="mono" style={{ fontSize: 11, color: "#66758a", display: "flex", alignItems: "center", gap: 10 }}>
                             START: {session.start_time || "—"} · LAPS: {session.total_laps || "—"}
                             {(() => { const sid = `scraped__${session.session_id}`; const wet = wetSessions.has(sid); return (
                               <button onClick={() => setWetSessions((prev) => { const n = new Set(prev); wet ? n.delete(sid) : n.add(sid); return n; })}
-                                style={{ cursor: "pointer", borderRadius: 5, padding: "3px 8px", fontSize: 10.5, fontWeight: 600,
-                                  border: `1px solid ${wet ? "#3da9fc" : "#2a3543"}`, background: wet ? "#0b2030" : "#0b1017", color: wet ? "#3da9fc" : "#5b6776" }}>
+                                style={{ cursor: "pointer", borderRadius: 5, padding: "3px 8px", fontSize: 11.5, fontWeight: 600,
+                                  border: `1px solid ${wet ? "#3da9fc" : "#2a3543"}`, background: wet ? "#0b2030" : "#0b1017", color: wet ? "#3da9fc" : "#66758a" }}>
                                 {wet ? "🌧 WET" : "DRY"}
                               </button>
                             ); })()}
@@ -1481,7 +1481,7 @@ export default function App() {
                         <div style={{ overflowX: "auto" }}>
                           <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
                             <thead>
-                              <tr style={{ color: "#6b7685", textAlign: "left" }}>
+                              <tr style={{ color: "#78889d", textAlign: "left" }}>
                                 <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>POS</th>
                                 {signedOverview && <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>+/-</th>}
                                 <th style={{ padding: "6px 8px", borderBottom: "1px solid #11171f" }}>TEAM</th>
@@ -1497,17 +1497,17 @@ export default function App() {
                                   <tr key={rIdx} style={{ borderBottom: "1px solid #11171f" }}>
                                     <td style={{ padding: "8px", color: AMBER, fontWeight: "700" }}>{row.position || "—"}</td>
                                     {signedOverview && (
-                                      <td style={{ padding: "8px", fontWeight: "600", color: row.position_change > 0 ? "#43d977" : row.position_change < 0 ? "#ff3355" : "#4b5563" }}>
+                                      <td style={{ padding: "8px", fontWeight: "600", color: row.position_change > 0 ? "#2fd372" : row.position_change < 0 ? "#ff2d4d" : "#4b5563" }}>
                                         {row.position_change > 0 ? `+${row.position_change}` : row.position_change < 0 ? row.position_change : row.position_change === 0 ? "0" : "—"}
                                       </td>
                                     )}
                                     <td style={{ padding: "8px", color: "#fff", fontWeight: "600" }}>
-                                      {row.team} {row.penalty && <span style={{ color: "#ff3355", fontSize: 10, marginLeft: 6 }}>[+PENALTY]</span>}
+                                      {row.team} {row.penalty && <span style={{ color: "#ff2d4d", fontSize: 11, marginLeft: 6 }}>[+PENALTY]</span>}
                                     </td>
-                                    <td style={{ padding: "8px", color: "#6b7685" }}>#{row.kart || "—"}</td>
-                                    <td style={{ padding: "8px", color: "#c2cbd6" }}>{row.best_lap_time ? `${row.best_lap_time}s` : "—"} <span style={{ fontSize: 10, color: "#5b6776" }}>{row.best_lap_number ? `(L${row.best_lap_number})` : ""}</span></td>
+                                    <td style={{ padding: "8px", color: "#78889d" }}>#{row.kart || "—"}</td>
+                                    <td style={{ padding: "8px", color: "#c2cbd6" }}>{row.best_lap_time ? `${row.best_lap_time}s` : "—"} <span style={{ fontSize: 11, color: "#66758a" }}>{row.best_lap_number ? `(L${row.best_lap_number})` : ""}</span></td>
                                     <td style={{ padding: "8px", color: "#c2cbd6" }}>{row.total_time || "—"}</td>
-                                    <td style={{ padding: "8px", color: "#43d977", fontWeight: "600" }}>{row.points || "0"} pts</td>
+                                    <td style={{ padding: "8px", color: "#2fd372", fontWeight: "600" }}>{row.points || "0"} pts</td>
                                   </tr>
                                 );
                               })}
@@ -1526,10 +1526,10 @@ export default function App() {
                             <div style={{ marginTop: 10, borderTop: "1px solid #11171f", paddingTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
                               <span className="disp" style={{ fontSize: 11, color: "#ff6b6b", fontWeight: 600, letterSpacing: "0.5px", alignSelf: "center" }}>⚑</span>
                               {sp.map((p, pi) => (
-                                <span key={pi} className="mono" style={{ background: "#1a0f12", border: "1px solid #ff335530", borderRadius: 6, padding: "4px 8px", fontSize: 11 }}>
+                                <span key={pi} className="mono" style={{ background: "#1a0f12", border: "1px solid #ff2d4d30", borderRadius: 6, padding: "4px 8px", fontSize: 11 }}>
                                   <span style={{ color: "#e6edf3", fontWeight: 600 }}>#{p.kart}</span>
                                   <span style={{ color: "#ff8a5b" }}> {p.penalty}</span>
-                                  <span style={{ color: "#6b7685" }}> · {String(p.reason || "").replace(/^\s*\d+\w*\.\s*/, "")}</span>
+                                  <span style={{ color: "#78889d" }}> · {String(p.reason || "").replace(/^\s*\d+\w*\.\s*/, "")}</span>
                                 </span>
                               ))}
                             </div>
@@ -1580,12 +1580,12 @@ export default function App() {
                       return (
                         <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 640 }}>
                           <thead>
-                            <tr style={{ color: "#6b7685" }}>
+                            <tr style={{ color: "#78889d" }}>
                               {cols.map(([h, key], i) => (
                                 <th key={h} onClick={() => clickSort(key)}
                                   style={{ textAlign: i < 2 ? "left" : "right", padding: "6px 10px", borderBottom: "1px solid #1e2733", 
                                     fontWeight: 500, cursor: key ? "pointer" : "default", 
-                                    color: summarySort.key === key ? AMBER : "#6b7685", userSelect: "none" }}>
+                                    color: summarySort.key === key ? AMBER : "#78889d", userSelect: "none" }}>
                                   {h}{summarySort.key === key ? (summarySort.dir === "desc" ? " ▾" : " ▴") : ""}
                                 </th>
                               ))}
@@ -1594,14 +1594,14 @@ export default function App() {
                           <tbody>
                             {sortedSummary.map((d, i) => (
                               <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
-                                <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
+                                <td style={{ padding: "7px 10px", color: "#66758a" }}>{i + 1}</td>
                                 <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
                                 <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER, fontWeight: 600 }}>{d.avgQpos != null ? "P" + d.avgQpos.toFixed(1) : "—"}</td>
                                 <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgQgap != null ? "+" + d.avgQgap.toFixed(3) + "s" : "—"}</td>
                                 <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgRgap != null ? "+" + d.avgRgap.toFixed(3) + "s" : "—"}</td>
                                 <td style={{ padding: "7px 10px", textAlign: "right", color: "#3da9fc", fontWeight: 600 }}>{d.avgPgap != null ? "+" + d.avgPgap.toFixed(3) + "s" : "—"}</td>
-                                <td style={{ padding: "7px 10px", textAlign: "right", color: d.penPos > 0 ? "#ff8a5b" : "#5b6776" }}>{d.penPos > 0 ? "-" + d.penPos : "0"}</td>
-                                <td style={{ padding: "7px 10px", textAlign: "right", color: d.pens > 0 ? "#ff6b6b" : "#5b6776" }}>{d.pens}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: d.penPos > 0 ? "#ff8a5b" : "#66758a" }}>{d.penPos > 0 ? "-" + d.penPos : "0"}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: d.pens > 0 ? "#ff6b6b" : "#66758a" }}>{d.pens}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1610,7 +1610,7 @@ export default function App() {
                     })()}
                   </div>
                 )}
-                <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
+                <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 12, lineHeight: 1.5 }}>
                   Race/Quali Gap = difference between your best lap and the session's ultimate lap. Pace Gap = difference between your best lap and the outright best lap of the entire weekend cluster. Anomalous transponder glitches (&gt;1.5s faster than the field median) are permanently removed from all baseline calculations. Wet races are ignored from gap metrics.
                 </div>
               </Panel>
@@ -1630,7 +1630,7 @@ export default function App() {
                   const isSummary = groupName.includes("SUMMARY");
                   return (
                     <Collapsible key={groupName} defaultOpen={isSummary}
-                      accent={isSummary ? AMBER : "#8b97a7"}
+                      accent={isSummary ? AMBER : "#9aa8bb"}
                       title={`${isSummary ? "🏆" : "📊"} ${tidyLabel(groupName)}`}
                       subtitle={`${groupBoxes.length} ${isSummary ? "drivers" : "entr" + (groupBoxes.length === 1 ? "y" : "ies")}`}>
                       <BoxPlot boxes={groupBoxes} fieldMedian={cleanOnly ? fieldMed : null} />
@@ -1647,7 +1647,7 @@ export default function App() {
                   {[["all", "ALL"], ["race", "RACE"], ["quali", "QUALI"], ["practice", "PRACTICE"]].map(([k, l]) => (
                     <button key={k} onClick={() => setTraceType(k)} className="disp"
                       style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
-                        border: `1px solid ${traceType === k ? AMBER : "#222c38"}`, background: traceType === k ? "#1a160a" : "#0b1017", color: traceType === k ? AMBER : "#8b97a7" }}>{l}</button>
+                        border: `1px solid ${traceType === k ? AMBER : "#2b3a4e"}`, background: traceType === k ? "#1a160a" : "#0b1017", color: traceType === k ? AMBER : "#9aa8bb" }}>{l}</button>
                   ))}
                 </div>
                 <div style={{ marginBottom: 14 }}>
@@ -1688,19 +1688,19 @@ export default function App() {
                 </div>
                 <ResponsiveContainer width="100%" height={400}>
                   <LineChart data={traceData} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
-                    <CartesianGrid stroke="#161d27" />
-                    <XAxis dataKey="lap" stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }}
-                      label={{ value: "LAP", position: "insideBottom", offset: -2, fill: "#5b6776", fontSize: 11 }} />
-                    <YAxis stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }}
+                    <CartesianGrid stroke="#1b2433" />
+                    <XAxis dataKey="lap" stroke="#66758a" tick={{ fontSize: 11, fontFamily: "Barlow Semi Condensed" }}
+                      label={{ value: "LAP", position: "insideBottom", offset: -2, fill: "#66758a", fontSize: 11 }} />
+                    <YAxis stroke="#66758a" tick={{ fontSize: 11, fontFamily: "Barlow Semi Condensed" }}
                       domain={["dataMin - 0.5", "dataMax + 0.5"]} width={52}
                       allowDecimals={false} interval={0} tickFormatter={(v) => v.toFixed(1)}
                       ticks={(() => { const all = traceData.flatMap((r) => Object.entries(r).filter(([k]) => k !== "lap").map(([, v]) => v)).filter((v) => typeof v === "number"); if (!all.length) return undefined; const lo = Math.floor(Math.min(...all) * 2) / 2, hi = Math.ceil(Math.max(...all) * 2) / 2; const t = []; for (let v = lo; v <= hi + 0.001; v += 0.5) t.push(Math.round(v * 2) / 2); return t; })()} />
                     <Tooltip formatter={(v) => (typeof v === "number" ? v.toFixed(3) + "s" : v)}
-                      contentStyle={{ background: "#0d141c", border: "1px solid #222c38", borderRadius: 8,
-                      fontFamily: "IBM Plex Mono", fontSize: 12 }} labelStyle={{ color: AMBER }} />
+                      contentStyle={{ background: "#0d141c", border: "1px solid #2b3a4e", borderRadius: 8,
+                      fontFamily: "Barlow Semi Condensed", fontSize: 12 }} labelStyle={{ color: AMBER }} />
                     {fieldMed != null && (
                       <ReferenceLine y={fieldMed} stroke={AMBER} strokeDasharray="6 5"
-                        label={{ value: "field median", fill: AMBER, fontSize: 10, position: "insideTopRight" }} />
+                        label={{ value: "field median", fill: AMBER, fontSize: 11, position: "insideTopRight" }} />
                     )}
                     {entries.filter((e) => activeTrace.includes(e.key)).map((e) => (
                       <Line key={e.key} dataKey={e.key} name={(assign[e.key]?.trim() || `${e.teamName}`)}
@@ -1735,15 +1735,15 @@ export default function App() {
                   </div>
                   <ResponsiveContainer width="100%" height={380}>
                     <LineChart data={progression.data} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
-                      <CartesianGrid stroke="#161d27" />
-                      <XAxis dataKey="round" stroke="#5b6776" tick={{ fontSize: 10, fontFamily: "IBM Plex Mono" }} />
-                      <YAxis stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }}
+                      <CartesianGrid stroke="#1b2433" />
+                      <XAxis dataKey="round" stroke="#66758a" tick={{ fontSize: 11, fontFamily: "Barlow Semi Condensed" }} />
+                      <YAxis stroke="#66758a" tick={{ fontSize: 11, fontFamily: "Barlow Semi Condensed" }}
                         domain={["dataMin - 0.3", "dataMax + 0.3"]} width={52} tickFormatter={(v) => v.toFixed(1)}
                         ticks={(() => { const all = progression.data.flatMap((r) => Object.entries(r).filter(([k]) => k !== "round").map(([, v]) => v)).filter((v) => typeof v === "number"); if (!all.length) return undefined; const lo = Math.floor(Math.min(...all) * 2) / 2, hi = Math.ceil(Math.max(...all) * 2) / 2; const t = []; for (let v = lo; v <= hi + 0.001; v += 0.5) t.push(Math.round(v * 2) / 2); return t; })()}
-                        label={{ value: "fastest lap vs field (s) — lower is better", angle: -90, position: "insideLeft", fill: "#5b6776", fontSize: 10 }} />
+                        label={{ value: "fastest lap vs field (s) — lower is better", angle: -90, position: "insideLeft", fill: "#66758a", fontSize: 10 }} />
                       <Tooltip formatter={(v) => (typeof v === "number" ? v.toFixed(2) + "s" : v)}
-                        contentStyle={{ background: "#0d141c", border: "1px solid #222c38", borderRadius: 8,
-                        fontFamily: "IBM Plex Mono", fontSize: 12 }} labelStyle={{ color: AMBER }} />
+                        contentStyle={{ background: "#0d141c", border: "1px solid #2b3a4e", borderRadius: 8,
+                        fontFamily: "Barlow Semi Condensed", fontSize: 12 }} labelStyle={{ color: AMBER }} />
                       {progression.drivers.map((d, di) => active.includes(d.driver) && (
                         <Line key={d.driver} dataKey={d.driver}
                           stroke={DRIVER_PALETTE[di % DRIVER_PALETTE.length]}
@@ -1767,7 +1767,7 @@ export default function App() {
               return (
                 <Panel title="DRIVER REPORT — FASTEST 50% OF LAPS">
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-                    <span className="mono" style={{ fontSize: 11, color: "#6b7685" }}>SESSION</span>
+                    <span className="mono" style={{ fontSize: 11, color: "#78889d" }}>SESSION</span>
                     <select value={rep.id} onChange={(e) => setReportSession(e.target.value)}
                       style={{ ...inp(280), flex: "0 1 320px" }}>
                       {races.map((s) => <option key={s.id} value={s.id}>{tidyLabel(s.raceLabel)}</option>)}
@@ -1784,8 +1784,8 @@ export default function App() {
                   {[["round", "THIS ROUND"], ["season", "WHOLE SEASON"]].map(([k, l]) => (
                     <button key={k} onClick={() => setRatingScope(k)} className="disp"
                       style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
-                        border: `1px solid ${ratingScope === k ? AMBER : "#222c38"}`,
-                        background: ratingScope === k ? "#1a160a" : "#0b1017", color: ratingScope === k ? AMBER : "#8b97a7" }}>
+                        border: `1px solid ${ratingScope === k ? AMBER : "#2b3a4e"}`,
+                        background: ratingScope === k ? "#1a160a" : "#0b1017", color: ratingScope === k ? AMBER : "#9aa8bb" }}>
                       {l}
                     </button>
                   ))}
@@ -1806,11 +1806,11 @@ export default function App() {
                       return (
                     <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 420 }}>
                       <thead>
-                        <tr style={{ color: "#6b7685" }}>
+                        <tr style={{ color: "#78889d" }}>
                           {cols.map(([h, key], i) => (
                             <th key={h} onClick={() => clickSort(key)}
                               style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733",
-                                fontWeight: 500, cursor: key ? "pointer" : "default", color: ratingSort.key === key ? AMBER : "#6b7685", userSelect: "none" }}>
+                                fontWeight: 500, cursor: key ? "pointer" : "default", color: ratingSort.key === key ? AMBER : "#78889d", userSelect: "none" }}>
                               {h}{ratingSort.key === key ? (ratingSort.dir === "desc" ? " ▾" : " ▴") : ""}
                             </th>
                           ))}
@@ -1818,22 +1818,22 @@ export default function App() {
                       </thead>
                       <tbody>
                         {sorted.map((d, i) => {
-                          const rc = (v) => v >= 7 ? "#43d977" : v >= 4.5 ? "#ffce3a" : "#ff8a5b";
+                          const rc = (v) => v >= 7 ? "#2fd372" : v >= 4.5 ? "#ffce3a" : "#ff8a5b";
                           const bar = (v) => (<span style={{ color: rc(v) }}>{v.toFixed(2)}</span>);
                           return (
                             <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
-                              <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
+                              <td style={{ padding: "7px 10px", color: "#66758a" }}>{i + 1}</td>
                               <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
-                              <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
+                              <td style={{ padding: "7px 10px", textAlign: "right", color: "#9aa8bb" }}>{d.races}</td>
                               <td style={{ padding: "7px 10px", textAlign: "right" }}>
                                 {d.hasPace ? bar(d.pace) : <span style={{ color: "#3a4655" }}>—</span>}
-                                {d.wetDelta != null && <span style={{ color: "#3da9fc", fontSize: 10.5 }}> ({d.wetDelta <= 0 ? "" : "+"}{d.wetDelta.toFixed(2)})</span>}
+                                {d.wetDelta != null && <span style={{ color: "#3da9fc", fontSize: 11.5 }}> ({d.wetDelta <= 0 ? "" : "+"}{d.wetDelta.toFixed(2)})</span>}
                               </td>
                               <td style={{ padding: "7px 10px", textAlign: "right" }}>{d.hasCons ? bar(d.cons) : <span style={{ color: "#3a4655" }}>—</span>}</td>
                               {showRace && (
                                 <td style={{ padding: "7px 10px", textAlign: "right" }}>
                                   {d.hasRace ? (
-                                    <>{bar(d.race)} <span style={{ color: d.netGain >= 0 ? "#43d977" : "#ff8a5b", fontSize: 10.5 }}>({d.netGain >= 0 ? "+" : ""}{d.netGain})</span></>
+                                    <>{bar(d.race)} <span style={{ color: d.netGain >= 0 ? "#2fd372" : "#ff8a5b", fontSize: 11.5 }}>({d.netGain >= 0 ? "+" : ""}{d.netGain})</span></>
                                   ) : <span style={{ color: "#3a4655" }}>—</span>}
                                 </td>
                               )}
@@ -1844,7 +1844,7 @@ export default function App() {
                       </tbody>
                     </table>
                     ); })()}
-                    <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
+                    <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 12, lineHeight: 1.5 }}>
                       Pace (dry races) is measured against the rest of the Leeds squad at the same track. Wet races are pulled out of
                       the pace score; the blue bracket shows seconds vs the wet field median (negative = faster than the wet field).
                       Consistency is your own clean-lap spread (sd vs lap average) — tighter is always a higher score, matching the field comparison. (dry only)
@@ -1858,10 +1858,10 @@ export default function App() {
               <Panel title="AI DEBRIEF — KAI ASKEY, DRIVER COACH">
                 {(() => {
                   const sel = (label, val, set, opts) => (
-                    <label className="mono" style={{ fontSize: 11, color: "#6b7685", display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label className="mono" style={{ fontSize: 11, color: "#78889d", display: "flex", flexDirection: "column", gap: 4 }}>
                       {label}
                       <select value={val} onChange={(e) => set(e.target.value)}
-                        style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 6, color: "#e6edf3", padding: "6px 8px", fontSize: 12.5, fontFamily: "IBM Plex Mono, monospace" }}>
+                        style={{ background: "#11171f", border: "1px solid #2b3a4e", borderRadius: 6, color: "#e6edf3", padding: "6px 8px", fontSize: 12.5, fontFamily: "Barlow Semi Condensed, sans-serif" }}>
                         {opts.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
                       </select>
                     </label>
@@ -1908,7 +1908,7 @@ export default function App() {
                         </button>
                       </div>
                       {debrief && (
-                        <div style={{ background: "#0b0f15", borderLeft: `3px solid ${AMBER}`, border: "1px solid #222c38", borderRadius: 8, padding: "18px 20px", whiteSpace: "pre-wrap", fontSize: 13.5, lineHeight: 1.7, color: "#dbe2ea" }}>
+                        <div style={{ background: "#0b0f15", borderLeft: `3px solid ${AMBER}`, border: "1px solid #2b3a4e", borderRadius: 8, padding: "18px 20px", whiteSpace: "pre-wrap", fontSize: 13.5, lineHeight: 1.7, color: "#dbe2ea" }}>
                           {debrief}
                         </div>
                       )}
@@ -1925,7 +1925,7 @@ export default function App() {
                   const o = stats.overall;
                   const Stat = ({ label, value, color }) => (
                     <div style={{ flex: "1 1 0", minWidth: 92 }}>
-                      <div className="mono" style={{ fontSize: 9.5, color: "#5b6776", letterSpacing: "0.5px" }}>{label}</div>
+                      <div className="mono" style={{ fontSize: 11, color: "#66758a", letterSpacing: "0.5px" }}>{label}</div>
                       <div className="mono" style={{ fontSize: 17, fontWeight: 600, color: color || "#e6edf3", marginTop: 2 }}>{value}</div>
                     </div>
                   );
@@ -1936,10 +1936,10 @@ export default function App() {
                       <div style={{ background: "linear-gradient(135deg,#11160f,#0b1017)", border: `1px solid ${AMBER}40`, borderRadius: 12, padding: "16px 20px", marginBottom: 18 }}>
                         <div className="disp" style={{ fontSize: 14, color: AMBER, fontWeight: 700, letterSpacing: "1px", marginBottom: 12 }}>🦁 LEEDS OVERALL — SEASON</div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-                          <Stat label="POINTS" value={o.points} color="#43d977" />
+                          <Stat label="POINTS" value={o.points} color="#2fd372" />
                           <Stat label="RACES" value={o.races} />
                           <Stat label="AVG FINISH" value={o.avgFinish != null ? o.avgFinish.toFixed(1) : "—"} />
-                          <Stat label="NET +/-" value={posCh(o.totalPosCh)} color={o.totalPosCh >= 0 ? "#43d977" : "#ff8a5b"} />
+                          <Stat label="NET +/-" value={posCh(o.totalPosCh)} color={o.totalPosCh >= 0 ? "#2fd372" : "#ff8a5b"} />
                           <Stat label="BEST LAP" value={o.bestLap != null ? fmt(o.bestLap) : "—"} color={AMBER} />
                           <Stat label="RACE PACE" value={o.racePace != null ? fmt(o.racePace) : "—"} />
                         </div>
@@ -1949,29 +1949,29 @@ export default function App() {
                         {[["drivers", "BY DRIVER"], ["teams", "BY TEAM"]].map(([k, l]) => (
                           <button key={k} onClick={() => setStatsView(k)} className="disp"
                             style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
-                              border: `1px solid ${statsView === k ? AMBER : "#222c38"}`, background: statsView === k ? "#1a160a" : "#0b1017", color: statsView === k ? AMBER : "#8b97a7" }}>{l}</button>
+                              border: `1px solid ${statsView === k ? AMBER : "#2b3a4e"}`, background: statsView === k ? "#1a160a" : "#0b1017", color: statsView === k ? AMBER : "#9aa8bb" }}>{l}</button>
                         ))}
                         <span style={{ width: 14 }} />
                         {[["all", "ALL"], ["mains", "MAINS"], ["inters", "INTERS"], ...leedsTeamNames.map((t) => [t, t.toUpperCase()])].map(([k, l]) => (
                           <button key={k} onClick={() => setStatsCat(k)} className="disp"
                             style={{ padding: "6px 12px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
-                              border: `1px solid ${statsCat === k ? "#b06bff" : "#222c38"}`, background: statsCat === k ? "#1a0f2a" : "#0b1017", color: statsCat === k ? "#b06bff" : "#8b97a7" }}>{l}</button>
+                              border: `1px solid ${statsCat === k ? "#b06bff" : "#2b3a4e"}`, background: statsCat === k ? "#1a0f2a" : "#0b1017", color: statsCat === k ? "#b06bff" : "#9aa8bb" }}>{l}</button>
                         ))}
                         <span style={{ flex: 1 }} />
                         {[["cards", "CARDS"], ["chart", "CHART"], ["table", "TABLE"]].map(([k, l]) => (
                           <button key={k} onClick={() => setStatsMode(k)} className="disp"
                             style={{ padding: "6px 14px", borderRadius: 7, fontWeight: 600, fontSize: 12.5, cursor: "pointer",
-                              border: `1px solid ${statsMode === k ? "#3da9fc" : "#222c38"}`, background: statsMode === k ? "#0b2030" : "#0b1017", color: statsMode === k ? "#3da9fc" : "#8b97a7" }}>{l}</button>
+                              border: `1px solid ${statsMode === k ? "#3da9fc" : "#2b3a4e"}`, background: statsMode === k ? "#0b2030" : "#0b1017", color: statsMode === k ? "#3da9fc" : "#9aa8bb" }}>{l}</button>
                         ))}
                       </div>
 
                       {list.length === 0 ? <Empty msg="Name drivers in the roster to build stats." /> : statsMode === "chart" ? (
                         <ResponsiveContainer width="100%" height={Math.max(260, list.length * 34)}>
                           <BarChart data={list} layout="vertical" margin={{ top: 4, right: 30, bottom: 4, left: 10 }}>
-                            <CartesianGrid stroke="#161d27" horizontal={false} />
-                            <XAxis type="number" stroke="#5b6776" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} />
-                            <YAxis type="category" dataKey="name" width={110} stroke="#5b6776" tick={{ fontSize: 12, fontFamily: "IBM Plex Sans" }} />
-                            <Tooltip cursor={{ fill: "#ffffff08" }} contentStyle={{ background: "#0d141c", border: "1px solid #222c38", borderRadius: 8, fontFamily: "IBM Plex Mono", fontSize: 12 }} labelStyle={{ color: AMBER }} />
+                            <CartesianGrid stroke="#1b2433" horizontal={false} />
+                            <XAxis type="number" stroke="#66758a" tick={{ fontSize: 11, fontFamily: "Barlow Semi Condensed" }} />
+                            <YAxis type="category" dataKey="name" width={110} stroke="#66758a" tick={{ fontSize: 12, fontFamily: "Barlow" }} />
+                            <Tooltip cursor={{ fill: "#ffffff08" }} contentStyle={{ background: "#0d141c", border: "1px solid #2b3a4e", borderRadius: 8, fontFamily: "Barlow Semi Condensed", fontSize: 12 }} labelStyle={{ color: AMBER }} />
                             <Bar dataKey="points" name="Points" radius={[0, 4, 4, 0]}>
                               {list.map((e, i) => <Cell key={i} fill={i === 0 ? AMBER : "#3da9fc"} />)}
                             </Bar>
@@ -1991,10 +1991,10 @@ export default function App() {
                             return (
                           <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 640 }}>
                             <thead>
-                              <tr style={{ color: "#6b7685" }}>
+                              <tr style={{ color: "#78889d" }}>
                                 {cols.map(([h, key], i) => (
                                   <th key={h} onClick={() => clickSort(key)} style={{ padding: "6px 10px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #1e2733",
-                                    fontWeight: 500, cursor: key ? "pointer" : "default", color: statsSort.key === key ? AMBER : "#6b7685", userSelect: "none" }}>
+                                    fontWeight: 500, cursor: key ? "pointer" : "default", color: statsSort.key === key ? AMBER : "#78889d", userSelect: "none" }}>
                                     {h}{statsSort.key === key ? (statsSort.dir === "desc" ? " ▾" : " ▴") : ""}
                                   </th>
                                 ))}
@@ -2003,15 +2003,15 @@ export default function App() {
                             <tbody>
                               {sorted.map((d, i) => (
                                 <tr key={d.name} style={{ borderBottom: "1px solid #11171f" }}>
-                                  <td style={{ padding: "7px 10px", color: "#5b6776" }}>{i + 1}</td>
+                                  <td style={{ padding: "7px 10px", color: "#66758a" }}>{i + 1}</td>
                                   <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{d.name}</td>
-                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.races}</td>
-                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#43d977", fontWeight: 700 }}>{d.points}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#9aa8bb" }}>{d.races}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#2fd372", fontWeight: 700 }}>{d.points}</td>
                                   <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.avgFinish != null ? d.avgFinish.toFixed(1) : "—"}</td>
-                                  <td style={{ padding: "7px 10px", textAlign: "right", color: d.totalPosCh == null ? "#5b6776" : d.totalPosCh >= 0 ? "#43d977" : "#ff8a5b" }}>{posCh(d.totalPosCh)}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: d.totalPosCh == null ? "#66758a" : d.totalPosCh >= 0 ? "#2fd372" : "#ff8a5b" }}>{posCh(d.totalPosCh)}</td>
                                   <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER }}>{d.bestLap != null ? fmt(d.bestLap) : "—"}</td>
                                   <td style={{ padding: "7px 10px", textAlign: "right", color: "#c2cbd6" }}>{d.racePace != null ? fmt(d.racePace) : "—"}</td>
-                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{d.bestQualiPos != null ? "P" + d.bestQualiPos : "—"}</td>
+                                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#9aa8bb" }}>{d.bestQualiPos != null ? "P" + d.bestQualiPos : "—"}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -2025,14 +2025,14 @@ export default function App() {
                             <div key={d.name} style={{ background: "#0b1017", border: "1px solid #1b2430", borderRadius: 10, padding: "14px 16px" }}>
                               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
                                 <span className="disp" style={{ fontSize: 17, fontWeight: 700, color: "#e6edf3" }}>
-                                  <span style={{ color: "#5b6776", fontSize: 13 }}>{i + 1}. </span>{d.name}
+                                  <span style={{ color: "#66758a", fontSize: 13 }}>{i + 1}. </span>{d.name}
                                 </span>
-                                <span className="mono" style={{ fontSize: 19, fontWeight: 700, color: "#43d977" }}>{d.points}<span style={{ fontSize: 11, color: "#5b6776" }}> pts</span></span>
+                                <span className="mono" style={{ fontSize: 19, fontWeight: 700, color: "#2fd372" }}>{d.points}<span style={{ fontSize: 11, color: "#66758a" }}> pts</span></span>
                               </div>
                               <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                                 <Stat label="RACES" value={d.races} />
                                 <Stat label="AVG FINISH" value={d.avgFinish != null ? d.avgFinish.toFixed(1) : "—"} />
-                                <Stat label="NET +/-" value={posCh(d.totalPosCh)} color={d.totalPosCh == null ? "#5b6776" : d.totalPosCh >= 0 ? "#43d977" : "#ff8a5b"} />
+                                <Stat label="NET +/-" value={posCh(d.totalPosCh)} color={d.totalPosCh == null ? "#66758a" : d.totalPosCh >= 0 ? "#2fd372" : "#ff8a5b"} />
                                 <Stat label="BEST LAP" value={d.bestLap != null ? fmt(d.bestLap) : "—"} color={AMBER} />
                                 <Stat label="RACE PACE" value={d.racePace != null ? fmt(d.racePace) : "—"} />
                                 <Stat label="BEST QUALI" value={d.bestQualiPos != null ? "P" + d.bestQualiPos : "—"} />
@@ -2041,7 +2041,7 @@ export default function App() {
                           ))}
                         </div>
                       )}
-                      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 14, lineHeight: 1.5 }}>
+                      <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 14, lineHeight: 1.5 }}>
                         Whole season, races only. Points and finishes from results; net +/- is total positions gained/lost; best lap and race pace are clean laps;
                         best quali is the driver's best qualifying finishing position (Inters). By driver counts named drivers; by team sums each Leeds entry.
                       </div>
@@ -2053,7 +2053,7 @@ export default function App() {
 
             {tab === "special" && (
               <Panel title="SPECIAL EVENTS">
-                <div className="mono" style={{ fontSize: 11, color: "#5b6776", marginBottom: 16 }}>
+                <div className="mono" style={{ fontSize: 11, color: "#66758a", marginBottom: 16 }}>
                   One-off events (Drivers Championship, Qualifiers, testing). Shown on their own and never counted in the round ratings or stats.
                 </div>
                 {specialEvents.length === 0 ? (
@@ -2065,7 +2065,7 @@ export default function App() {
                         <div key={si} style={{ background: "#080d13", borderRadius: 7, padding: "8px 12px" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                             <span className="disp" style={{ color: "#e6edf3", fontWeight: 600, fontSize: 13 }}>{s.label}</span>
-                            {s.winner && <span className="mono" style={{ fontSize: 11.5, color: "#8b97a7" }}>Winner: <span style={{ color: AMBER }}>{s.winner}</span></span>}
+                            {s.winner && <span className="mono" style={{ fontSize: 11.5, color: "#9aa8bb" }}>Winner: <span style={{ color: AMBER }}>{s.winner}</span></span>}
                           </div>
                           {s.ours.length > 0 && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
@@ -2097,11 +2097,11 @@ export default function App() {
                 .map((k) => ({ num: k.num, name: assign[`${rep.id}|${k.num}`]?.trim() || k.teamName, ...(sb[k.num] || {}) }))
                 .filter((o) => o.best != null || o.s1 != null);
               const dCell = (v, best) => v == null ? <span style={{ color: "#3a4655" }}>—</span> :
-                <span style={{ color: best != null && v <= best + 0.001 ? "#b06bff" : "#c2cbd6" }}>{v.toFixed(3)}{best != null && v > best + 0.001 ? <span style={{ color: "#5b6776", fontSize: 10 }}> +{(v - best).toFixed(2)}</span> : ""}</span>;
+                <span style={{ color: best != null && v <= best + 0.001 ? "#b06bff" : "#c2cbd6" }}>{v.toFixed(3)}{best != null && v > best + 0.001 ? <span style={{ color: "#66758a", fontSize: 10 }}> +{(v - best).toFixed(2)}</span> : ""}</span>;
               return (
                 <Panel title="SECTOR ANALYSIS — BEST SECTORS & ULTIMATE-LAP GAP">
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-                    <span className="mono" style={{ fontSize: 11, color: "#6b7685" }}>SESSION</span>
+                    <span className="mono" style={{ fontSize: 11, color: "#78889d" }}>SESSION</span>
                     <select value={rep.id} onChange={(e) => setSectorSession(e.target.value)} style={{ ...inp(300) }}>
                       {races.map((s) => <option key={s.id} value={s.id}>{tidyLabel(s.raceLabel)}</option>)}
                     </select>
@@ -2109,7 +2109,7 @@ export default function App() {
                   {ours.length === 0 ? <Empty msg="No Leeds sector data in this race." /> : (
                     <div style={{ overflowX: "auto" }}>
                       <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 560 }}>
-                        <thead><tr style={{ color: "#6b7685" }}>
+                        <thead><tr style={{ color: "#78889d" }}>
                           {["DRIVER", "S1", "S2", "S3", "THEORETICAL", "BEST LAP", "GAP"].map((h, i) => (
                             <th key={h} style={{ padding: "6px 10px", textAlign: i === 0 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>
                           ))}
@@ -2119,19 +2119,19 @@ export default function App() {
                             const gap = (o.best != null && o.ult != null) ? o.best - o.ult : null;
                             return (
                               <tr key={o.num} style={{ borderBottom: "1px solid #11171f" }}>
-                                <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{o.name} <span style={{ color: "#5b6776" }}>#{o.num}</span></td>
+                                <td style={{ padding: "7px 10px", color: "#e6edf3", fontWeight: 600 }}>{o.name} <span style={{ color: "#66758a" }}>#{o.num}</span></td>
                                 <td style={{ padding: "7px 10px", textAlign: "right" }}>{dCell(o.s1, fb.s1)}</td>
                                 <td style={{ padding: "7px 10px", textAlign: "right" }}>{dCell(o.s2, fb.s2)}</td>
                                 <td style={{ padding: "7px 10px", textAlign: "right" }}>{dCell(o.s3, fb.s3)}</td>
-                                <td style={{ padding: "7px 10px", textAlign: "right", color: "#8b97a7" }}>{o.ult != null ? fmt(o.ult) : "—"}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: "#9aa8bb" }}>{o.ult != null ? fmt(o.ult) : "—"}</td>
                                 <td style={{ padding: "7px 10px", textAlign: "right", color: AMBER }}>{o.best != null ? fmt(o.best) : "—"}</td>
-                                <td style={{ padding: "7px 10px", textAlign: "right", color: gap == null ? "#5b6776" : gap > 0.3 ? "#ff8a5b" : "#43d977" }}>{gap == null ? "—" : "+" + gap.toFixed(3)}</td>
+                                <td style={{ padding: "7px 10px", textAlign: "right", color: gap == null ? "#66758a" : gap > 0.3 ? "#ff8a5b" : "#2fd372" }}>{gap == null ? "—" : "+" + gap.toFixed(3)}</td>
                               </tr>
                             );
                           })}
                         </tbody>
                       </table>
-                      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
+                      <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 12, lineHeight: 1.5 }}>
                         Purple = matched the field's best sector. THEORETICAL is their ultimate lap (sum of their own best sectors); GAP is best lap minus theoretical —
                         how much they left on the table by not stringing the sectors together. A big gap = the speed's there, the lap isn't.
                       </div>
@@ -2159,16 +2159,16 @@ export default function App() {
                         const c = catOf(d.name);
                         const promote = c === "I" && d.overall > lowestMains && mainsScores.length > 0;
                         return (
-                          <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 12, background: "#0b1017", border: `1px solid ${promote ? "#43d97755" : "#1b2430"}`, borderRadius: 8, padding: "8px 12px" }}>
-                            <span className="mono" style={{ color: "#5b6776", width: 24 }}>{i + 1}</span>
+                          <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 12, background: "#0b1017", border: `1px solid ${promote ? "#2fd37255" : "#1b2430"}`, borderRadius: 8, padding: "8px 12px" }}>
+                            <span className="mono" style={{ color: "#66758a", width: 24 }}>{i + 1}</span>
                             <span className="disp" style={{ fontWeight: 700, color: "#e6edf3", flex: 1 }}>{d.name}</span>
-                            <span className="mono" style={{ fontSize: 10.5, padding: "2px 7px", borderRadius: 5, border: "1px solid #2a3543", color: c === "M" ? AMBER : "#3da9fc" }}>{c === "M" ? "MAINS" : c === "I" ? "INTERS" : "—"}</span>
-                            {promote && <span className="mono" style={{ fontSize: 10.5, padding: "2px 7px", borderRadius: 5, background: "#0e2018", border: "1px solid #43d97755", color: "#43d977" }}>↑ PROMOTE</span>}
-                            <span className="mono" style={{ fontSize: 15, fontWeight: 700, color: d.overall >= 7 ? "#43d977" : d.overall >= 4.5 ? "#ffce3a" : "#ff8a5b", width: 48, textAlign: "right" }}>{d.overall.toFixed(2)}</span>
+                            <span className="mono" style={{ fontSize: 11.5, padding: "2px 7px", borderRadius: 5, border: "1px solid #2a3543", color: c === "M" ? AMBER : "#3da9fc" }}>{c === "M" ? "MAINS" : c === "I" ? "INTERS" : "—"}</span>
+                            {promote && <span className="mono" style={{ fontSize: 11.5, padding: "2px 7px", borderRadius: 5, background: "#0e2018", border: "1px solid #2fd37255", color: "#2fd372" }}>↑ PROMOTE</span>}
+                            <span className="mono" style={{ fontSize: 15, fontWeight: 700, color: d.overall >= 7 ? "#2fd372" : d.overall >= 4.5 ? "#ffce3a" : "#ff8a5b", width: 48, textAlign: "right" }}>{d.overall.toFixed(2)}</span>
                           </div>
                         );
                       })}
-                      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 8, lineHeight: 1.5 }}>
+                      <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 8, lineHeight: 1.5 }}>
                         Ranked on overall rating (follows the rating tab's round/season scope). Drivers tagged by the category they race most.
                         An Inters driver flagged ↑ PROMOTE is rated above your weakest Mains driver — a case to move them up.
                       </div>
@@ -2197,7 +2197,7 @@ export default function App() {
               ];
               const sel = (val, set, other) => (
                 <select value={val} onChange={(e) => set(e.target.value)} className="disp"
-                  style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 7, color: "#e6edf3", padding: "8px 10px", fontSize: 16, fontWeight: 700, fontFamily: "Archivo, sans-serif", width: "100%" }}>
+                  style={{ background: "#11171f", border: "1px solid #2b3a4e", borderRadius: 7, color: "#e6edf3", padding: "8px 10px", fontSize: 16, fontWeight: 700, fontFamily: "Barlow Condensed, sans-serif", width: "100%" }}>
                   {names.map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>
               );
@@ -2205,7 +2205,7 @@ export default function App() {
                 <Panel title="HEAD-TO-HEAD">
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 1fr", gap: 10, alignItems: "center", marginBottom: 14 }}>
                     <div>{sel(A, setH2hA)}</div>
-                    <div className="disp" style={{ textAlign: "center", color: "#5b6776", fontWeight: 700 }}>VS</div>
+                    <div className="disp" style={{ textAlign: "center", color: "#66758a", fontWeight: 700 }}>VS</div>
                     <div>{sel(B, setH2hB)}</div>
                   </div>
                   <div style={{ display: "grid", gap: 6 }}>
@@ -2214,20 +2214,20 @@ export default function App() {
                       const aWin = valid && (higher ? av > bv : av < bv);
                       const bWin = valid && (higher ? bv > av : bv < av);
                       const cell = (v, win) => (
-                        <div style={{ textAlign: "center", padding: "10px", borderRadius: 8, background: win ? "#0e2018" : "#0b1017", border: `1px solid ${win ? "#43d97755" : "#1b2430"}` }}>
-                          <span className="mono" style={{ fontSize: 17, fontWeight: 700, color: win ? "#43d977" : "#c2cbd6" }}>{f(v) ?? "—"}</span>
+                        <div style={{ textAlign: "center", padding: "10px", borderRadius: 8, background: win ? "#0e2018" : "#0b1017", border: `1px solid ${win ? "#2fd37255" : "#1b2430"}` }}>
+                          <span className="mono" style={{ fontSize: 17, fontWeight: 700, color: win ? "#2fd372" : "#c2cbd6" }}>{f(v) ?? "—"}</span>
                         </div>
                       );
                       return (
                         <div key={label} style={{ display: "grid", gridTemplateColumns: "1fr 120px 1fr", gap: 10, alignItems: "center" }}>
                           {cell(av, aWin)}
-                          <div className="mono" style={{ textAlign: "center", fontSize: 10.5, color: "#6b7685", letterSpacing: "0.5px" }}>{label}</div>
+                          <div className="mono" style={{ textAlign: "center", fontSize: 11.5, color: "#78889d", letterSpacing: "0.5px" }}>{label}</div>
                           {cell(bv, bWin)}
                         </div>
                       );
                     })}
                   </div>
-                  <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12 }}>
+                  <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 12 }}>
                     Green = the better of the two on that metric. Ratings/points: higher wins. Avg finish, best lap, best quali: lower wins. Whole season.
                   </div>
                 </Panel>
@@ -2238,7 +2238,7 @@ export default function App() {
         )}
 
         {!hasData && (
-          <div className="mono" style={{ color: "#5b6776", fontSize: 13, textAlign: "center", padding: "40px 0" }}>
+          <div className="mono" style={{ color: "#66758a", fontSize: 13, textAlign: "center", padding: "40px 0" }}>
             Type an event identifier at the top and select load to populate dashboard layout
           </div>
         )}
@@ -2272,7 +2272,12 @@ const DEFAULT_LIVE = { v: LIVE_SCHEMA, raceStartISO: "2026-06-13T15:03", raceHou
 const CLASH_MIN = 4;   // two of our teams pitting within this many minutes = a crew clash
 // Teams that get their own dedicated command tab. Add { num, label } here to give
 // another team the same page Leeds A has (e.g. { num: "20", label: "◈ CARTEL" }).
-const COMMAND_TEAMS = [{ num: "18", label: "◈ LEEDS A" }];
+const COMMAND_TEAMS = [
+  { num: "18", label: "◈ LEEDS A" }, { num: "19", label: "LEEDS B" }, { num: "20", label: "LEEDS C" },
+  { num: "21", label: "LEEDS D" }, { num: "57", label: "GRADS A" }, { num: "58", label: "GRADS B" },
+];
+const TEAM_PASSCODES = { "18": "huZZ", "19": "bee", "20": "cunty", "21": "wth", "57": "unc", "58": "free" };
+const TELEMETRY_PW = "footjob";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -2457,29 +2462,92 @@ function Live24({ knownDrivers = [] }) {
   const [syncing, setSyncing] = useState(false);
   const [importMsg, setImportMsg] = useState("");
   const [teleLocked, setTeleLocked] = useState(false);
-  const [simOn, setSimOn] = useState(false);
-  const [simFast, setSimFast] = useState(false);
+  const [simLocked, setSimLocked] = useState(false);
+  const [simOn, setSimOn] = useState(() => LS("live24_sim", false));
+  const [simFast, setSimFast] = useState(() => LS("live24_simfast", false));
   const [testClock, setTestClock] = useState(false);
   const [clockStartAt, setClockStartAt] = useState(null);
   const [simModel, setSimModel] = useState(null);
+  const [owned, setOwned] = useState(() => new Set(LS("live24_owned", [])));   // team nums this device can edit
+  const ownPass = useRef(LS("live24_pass", {}));                                // num -> passcode
   const xlsxRef = useRef();
 
   useEffect(() => { saveLS("live24", cfg); }, [cfg]);
+  useEffect(() => { saveLS("live24_sim", simOn); }, [simOn]);
+  useEffect(() => { saveLS("live24_simfast", simFast); }, [simFast]);
+  useEffect(() => { saveLS("live24_owned", [...owned]); }, [owned]);
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
 
-  // adopt a shared plan only on a fresh device — never clobber local stints or
-  // pit logs already on this device (that was wiping pit data on refresh)
+  // GLOBAL SAVE — everyone pulls all teams every 20s (spectators + other Leeds
+  // teams see live pit status); a device only keeps its OWN teams local so its
+  // edits aren't clobbered.
+  const ownedRef = useRef(owned); ownedRef.current = owned;
   useEffect(() => {
-    fetch("/api/roster").then((r) => r.json())
-      .then((d) => {
-        if (d && d.stintPlan && d.stintPlan.teams) setCfg((c) => {
-          const hasLocal = (c.teams || []).some((t) => (t.stints || []).length || (t.pitLog || []).length);
-          return hasLocal ? c : { ...DEFAULT_LIVE, ...d.stintPlan };
+    let stop = false;
+    const pull = () => fetch("/api/roster").then((r) => r.json()).then((d) => {
+      if (stop || !d) return;
+      setTeleLocked(!!d.telemetryLocked);
+      setSimLocked(!!d.simLocked);
+      if (d.simLocked) { setSimOn(false); setTestClock(false); }
+      const gteams = d.stintPlan && d.stintPlan.teams;
+      if (!gteams) return;
+      setCfg((c) => {
+        let changed = false;
+        const sig = (t) => JSON.stringify({ n: t.name, d: t.drivers, s: (t.stints || []).map((x) => [x.driver, x.len, x.note, x.lead, x.seat, x.pedals, x.radio, x.assist]), p: (t.pitLog || []).map((x) => x.atMin) });
+        const teams = (c.teams || []).map((t) => {
+          if (ownedRef.current.has(String(t.num))) return t;               // this device owns it — keep local
+          const g = gteams.find((x) => String(x.num) === String(t.num));
+          if (!g || !(g.stints || []).length) return t;                    // don't wipe with empty
+          const next = { ...t, name: g.name || t.name, drivers: g.drivers || t.drivers, stints: g.stints || [], pitLog: g.pitLog || [] };
+          if (sig(next) === sig(t)) return t;                              // identical content — no churn
+          changed = true;
+          return next;
         });
-        if (d) setTeleLocked(!!d.telemetryLocked);
-      })
-      .catch(() => {});
+        return changed ? { ...c, teams } : c;
+      });
+    }).catch(() => {});
+    pull();
+    const iv = setInterval(pull, 20000);
+    return () => { stop = true; clearInterval(iv); };
   }, []);
+
+  // push owned teams to the global save when they change (debounced)
+  const pushRef = useRef({ timer: null, last: {} });
+  useEffect(() => {
+    if (!owned.size) return;
+    clearTimeout(pushRef.current.timer);
+    pushRef.current.timer = setTimeout(() => {
+      cfg.teams.forEach((t) => {
+        const n = String(t.num);
+        if (!owned.has(n)) return;
+        const payload = JSON.stringify({ name: t.name, drivers: t.drivers, stints: t.stints, pitLog: t.pitLog || [] });
+        if (pushRef.current.last[n] === payload) return;
+        pushRef.current.last[n] = payload;
+        fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ teamSync: { num: n, passcode: ownPass.current[n], team: JSON.parse(payload) } }) }).catch(() => {});
+      });
+    }, 1500);
+    return () => clearTimeout(pushRef.current.timer);
+  }, [cfg, owned]);
+
+  const unlockTeam = async (num, code) => {
+    const n = String(num);
+    if (!(TEAM_PASSCODES[n] && TEAM_PASSCODES[n] === code)) return false;
+    // adopt the latest global copy of this team BEFORE owning it, so stale local
+    // data on this device can't overwrite the team's live state
+    try {
+      const d = await fetch("/api/roster").then((r) => r.json());
+      const g = d && d.stintPlan && (d.stintPlan.teams || []).find((x) => String(x.num) === n);
+      if (g && (g.stints || []).length) {
+        setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === n
+          ? { ...t, name: g.name || t.name, drivers: g.drivers || t.drivers, stints: g.stints, pitLog: g.pitLog || [] } : t) }));
+      }
+    } catch {}
+    ownPass.current = { ...ownPass.current, [n]: code }; saveLS("live24_pass", ownPass.current);
+    setOwned((s) => new Set([...s, n]));
+    return true;
+  };
+  const lockTeam = (num) => { const n = String(num); setOwned((s) => { const ns = new Set(s); ns.delete(n); return ns; }); };
 
   // poll the live snapshot
   useEffect(() => {
@@ -2544,6 +2612,7 @@ function Live24({ knownDrivers = [] }) {
         const withExtras = got.filter((k) => byKart[k].stints.some((s) => s.lead != null || s.seat || s.note)).length;
         let msg = `✓ Imported ${got.length} team${got.length === 1 ? "" : "s"} (${got.map((k) => "#" + k).join(", ")}); lead/seat/notes captured for ${withExtras}.`;
         if (sc) msg += ` Start set to ${sc} from the sheet.` + (sc !== "15:03" ? " Timing site says 15:03 — change Race Start above if that's the real start." : "");
+        msg += " Now press SYNC PLAN TO TEAM below so every device gets it.";
         if (warn.length) msg += "  (" + warn.join("; ") + ")";
         setImportMsg(msg);
       } catch (err) { setImportMsg("Couldn't read that file: " + err.message); }
@@ -2575,44 +2644,61 @@ function Live24({ knownDrivers = [] }) {
       const stintStart = st.boundaries.length ? st.boundaries[st.boundaries.length - 1] + 1 : 0;
       const stintLaps = laps.slice(stintStart).filter((x) => x != null);
       const stintSecs = stintLaps.reduce((a, b) => a + b, 0);
+      const pens = (s.penalties || []).filter((p) => String(p.kart) === r.kart).map((p) => {
+        const m = String(p.penalty || p.time || "").match(/(\d+(?:\.\d+)?)\s*s/i); return { reason: p.reason || p.penalty || "Penalty", sec: m ? parseFloat(m[1]) : null, lap: p.lap != null ? Number(p.lap) : null, raw: p.penalty };
+      });
       return { ...r, lapArr: laps, bestClean: getValidFastest(clean), recent: last5.length ? mean(last5) : null,
-        stintLapCount: stintLaps.length, stintMin: stintSecs / 60, changeovers: st.boundaries.length };
+        stintLapCount: stintLaps.length, stintMin: stintSecs / 60, changeovers: st.boundaries.length, penalties: pens };
     });
-    return { session: s, field, leeds, scrapedAt: live.scraped_at || null };
+    const allClean = field.flatMap((r) => splitClean(lapMap[r.kart] || []).clean);
+    const fieldAvg = allClean.length ? mean(allClean) : null;
+    const bests = field.map((r) => ({ kart: r.kart, b: getValidFastest(splitClean(lapMap[r.kart] || []).clean) ?? r.best })).filter((x) => x.b != null).sort((a, b) => a.b - b.b);
+    return { session: s, field, leeds, scrapedAt: live.scraped_at || null, fieldAvg, fastestOverall: bests[0] || null };
   }, [live, ourNums]);
 
   const liveModel = simOn ? simModel : realLiveModel;
 
   // ---- TEST MODE: simulate a live race entirely in the browser ----
+  const simFastRef = useRef(simFast); simFastRef.current = simFast;
   useEffect(() => {
     if (!simOn) { setSimModel(null); return; }
     const rivals = [["12", "Fastest House"], ["64", "Liverpool A"], ["50", "Loughborough A"], ["2", "Imp"], ["44", "Salford A"]];
     const ours = (cfg.teams || []).map((t) => [String(t.num), t.name]).filter((o) => o[0]);
     const seen = new Set(); const karts = [];
-    [...ours, ...rivals].forEach(([num, name]) => { if (!seen.has(num)) { seen.add(num); karts.push({ kart: num, team: name, base: 27.6 + Math.random() * 1.8, frac: Math.random(), laps: 0, lapArr: [], pitEvery: 38 + Math.floor(Math.random() * 16) }); } });
+    [...ours, ...rivals].forEach(([num, name]) => { if (!seen.has(num)) { seen.add(num); karts.push({ kart: num, team: name, base: 66 + Math.random() * 5, frac: Math.random(), laps: 0, lapArr: [], pitEvery: 70 + Math.floor(Math.random() * 25), lastPit: 0, pen: [] }); } });
     const ourSet = new Set(ours.map((o) => o[0]));
     const bestOf = (arr) => getValidFastest(splitClean(arr).clean);
+    const PENR = ["Contact", "Track limits", "Jump start", "Pit lane speeding"];
     let last = Date.now();
     const tick = () => {
-      const t = Date.now(); let dt = (t - last) / 1000; last = t; if (simFast) dt *= 12;
+      const t = Date.now(); let dt = (t - last) / 1000; last = t; if (simFastRef.current) dt *= 12;
       karts.forEach((k) => {
         const lapSec = k.base + Math.sin(t / 9000 + k.kart.length) * 0.4;
         k.frac += dt / lapSec;
-        while (k.frac >= 1) { k.frac -= 1; k.laps++; const pit = k.laps % k.pitEvery === 0; k.lapArr.push(pit ? lapSec * 1.8 + 24 : lapSec + (Math.random() * 0.8 - 0.2)); }
+        while (k.frac >= 1) {
+          k.frac -= 1; k.laps++;
+          const pit = k.laps % k.pitEvery === 0; if (pit) k.lastPit = k.laps;
+          k.lapArr.push(pit ? lapSec * 1.8 + 24 : lapSec + (Math.random() * 0.8 - 0.2));
+          if (ourSet.has(k.kart) && Math.random() < 0.015) k.pen.push({ lap: k.laps, reason: PENR[Math.floor(Math.random() * PENR.length)], sec: [3, 5, 10][Math.floor(Math.random() * 3)] });
+        }
       });
       const prog = (k) => k.laps + k.frac;
       const sorted = [...karts].sort((a, b) => prog(b) - prog(a));
       const lead = prog(sorted[0]);
-      const field = sorted.map((k, i) => { const d = lead - prog(k); return { pos: i + 1, kart: k.kart, team: k.team, gap: i === 0 ? "" : (d >= 1 ? `+${Math.floor(d)} lap${Math.floor(d) > 1 ? "s" : ""}` : `+${(d * k.base).toFixed(1)}s`), best: bestOf(k.lapArr), laps: k.laps, penalty: false }; });
+      const field = sorted.map((k, i) => { const d = lead - prog(k); return { pos: i + 1, kart: k.kart, team: k.team, gap: i === 0 ? "" : (d >= 1 ? `+${Math.floor(d)} lap${Math.floor(d) > 1 ? "s" : ""}` : `+${(d * k.base).toFixed(1)}s`), best: bestOf(k.lapArr), laps: k.laps, penalty: k.pen.length > 0 }; });
       const posOf = (num) => field.find((f) => f.kart === num) || {};
-      const leeds = sorted.filter((k) => ourSet.has(k.kart)).map((k) => { const clean = splitClean(k.lapArr).clean; const last5 = clean.slice(-5); const st = detectStints(k.lapArr); const p = posOf(k.kart);
-        return { kart: k.kart, team: k.team, pos: p.pos, gap: p.gap, laps: k.laps, lapArr: k.lapArr, bestClean: bestOf(k.lapArr), recent: last5.length ? mean(last5) : null, changeovers: st.boundaries.length, stintLapCount: 0, stintMin: 0, penalty: false, lapFrac: k.frac, sector: Math.floor(k.frac * 3) + 1 }; });
-      setSimModel({ session: { status: "sim" }, field, leeds, scrapedAt: new Date().toISOString() });
+      const allClean = karts.flatMap((k) => splitClean(k.lapArr).clean);
+      const fieldAvg = allClean.length ? mean(allClean) : null;
+      const bests = karts.map((k) => ({ kart: k.kart, b: bestOf(k.lapArr) })).filter((x) => x.b != null).sort((a, b) => a.b - b.b);
+      const fastestOverall = bests[0] || null;
+      const leeds = sorted.filter((k) => ourSet.has(k.kart)).map((k) => { const clean = splitClean(k.lapArr).clean; const last5 = clean.slice(-5); const st = detectStints(k.lapArr); const p = posOf(k.kart); const slc = k.laps - k.lastPit;
+        return { kart: k.kart, team: k.team, pos: p.pos, gap: p.gap, laps: k.laps, lapArr: k.lapArr, bestClean: bestOf(k.lapArr), recent: last5.length ? mean(last5) : null, changeovers: st.boundaries.length, stintLapCount: slc, stintMin: slc * k.base / 60, penalties: k.pen.slice(), penalty: k.pen.length > 0, lapFrac: k.frac, sector: Math.floor(k.frac * 3) + 1 }; });
+      setSimModel({ session: { status: "sim" }, field, leeds, scrapedAt: new Date().toISOString(), fieldAvg, fastestOverall });
     };
     tick();
     const iv = setInterval(tick, 600);
     return () => clearInterval(iv);
-  }, [simOn, simFast]);
+  }, [simOn]);
 
   const staleMin = liveModel && liveModel.scrapedAt ? (Date.now() - new Date(liveModel.scrapedAt).getTime()) / 60000 : null;
 
@@ -2621,18 +2707,23 @@ function Live24({ knownDrivers = [] }) {
   return (
     <div>
       {/* race clock banner */}
-      <div style={{ background: "linear-gradient(135deg,#1a0a0e,#0b1017)", border: "1px solid #ff335530",
+      <div style={{ background: "linear-gradient(135deg,#1a0a0e,#0b1017)", border: "1px solid #ff2d4d30",
         borderRadius: 12, padding: "16px 18px", marginBottom: 14, display: "flex", flexWrap: "wrap",
         alignItems: "center", gap: 20 }}>
         <div>
-          <div className="disp" style={{ fontSize: 11, color: "#8b97a7", letterSpacing: 1, fontWeight: 600 }}>RACE CLOCK</div>
-          <div className="mono" style={{ fontSize: 26, fontWeight: 700, color: finished ? "#43d977" : started ? "#ff3355" : AMBER }}>
+          <div className="disp" style={{ fontSize: 11, color: "#9aa8bb", letterSpacing: 1, fontWeight: 600 }}>RACE CLOCK</div>
+          <div className="mono" style={{ fontSize: 26, fontWeight: 700, color: finished ? "#2fd372" : started ? "#ff2d4d" : AMBER }}>
             {finished ? "FINISHED" : started
               ? fmtGap(Math.min(elapsedMin, totalMin) * 60000) + " / " + cfg.raceHours + "h"
               : "T- " + fmtGap((raceStart - now))}
           </div>
+          {started && !finished && (
+            <div style={{ marginTop: 6, height: 5, width: 200, maxWidth: "60vw", borderRadius: 3, background: "#11171f", border: "1px solid #1b2433", overflow: "hidden" }}>
+              <div style={{ width: `${Math.min(100, (elapsedMin / totalMin) * 100)}%`, height: "100%", background: `linear-gradient(90deg, ${AMBER}, #ff2d4d)` }} />
+            </div>
+          )}
         </div>
-        <div className="mono" style={{ fontSize: 11.5, color: "#6b7685", lineHeight: 1.7 }}>
+        <div className="mono" style={{ fontSize: 11.5, color: "#78889d", lineHeight: 1.7 }}>
           {testClock ? <span style={{ color: "#ff8a5b" }}>TEST CLOCK (started now)<br /></span> : null}
           START {fmtClock(raceStart)} ({raceStart.toLocaleDateString("en-GB")})<br />
           FINISH {fmtClockDay(raceEnd, raceStart)} · {cfg.raceHours}h
@@ -2641,22 +2732,42 @@ function Live24({ knownDrivers = [] }) {
         {simOn ? (
           <div className="mono" style={{ fontSize: 11, color: "#ff8a5b", textAlign: "right", fontWeight: 700 }}>
             ● TEST DATA (simulated)<br />
-            <span style={{ color: "#6b7685", fontWeight: 400 }}>not the real race</span>
+            <span style={{ color: "#78889d", fontWeight: 400 }}>not the real race</span>
           </div>
         ) : liveModel && (
-          <div className="mono" style={{ fontSize: 11, color: staleMin != null && staleMin > 2 ? "#ff8a5b" : "#43d977", textAlign: "right" }}>
+          <div className="mono" style={{ fontSize: 11, color: staleMin != null && staleMin > 2 ? "#ff8a5b" : "#2fd372", textAlign: "right" }}>
             ● LIVE DATA<br />
-            <span style={{ color: "#6b7685" }}>updated {staleMin == null ? "—" : staleMin < 1 ? "just now" : Math.round(staleMin) + "m ago"}</span>
+            <span style={{ color: "#78889d" }}>updated {staleMin == null ? "—" : staleMin < 1 ? "just now" : Math.round(staleMin) + "m ago"}</span>
           </div>
         )}
       </div>
 
+      {/* always-visible next-pits strip */}
+      {started && !finished && (() => {
+        const ups = cfg.teams.map((t) => ({ t, rs: teamRaceState(t, raceStart, now) }))
+          .filter((x) => x.rs.minsToPit != null && !x.rs.finished && x.rs.rows.length)
+          .sort((a, b) => a.rs.minsToPit - b.rs.minsToPit).slice(0, 4);
+        return ups.length ? (
+          <div className="apptabs" style={{ display: "flex", gap: 8, marginBottom: 12, overflowX: "auto" }}>
+            {ups.map(({ t, rs }) => {
+              const late = rs.minsToPit < 0;
+              const c = late || rs.minsToPit <= 5 ? "#ff2d4d" : rs.minsToPit <= 15 ? "#ff8a5b" : "#2fd372";
+              return (
+                <div key={t.num} className="mono" style={{ flex: "0 0 auto", fontSize: 11.5, background: "#0b1017", border: `1px solid ${c}44`, borderRadius: 7, padding: "6px 10px", whiteSpace: "nowrap" }}>
+                  <b style={{ color: c }}>#{t.num}</b> <span style={{ color: "#9aa8bb" }}>{late ? "PIT DUE" : "pit in"}</span> <b style={{ color: c }}>{late ? fmtDur(-rs.minsToPit) + " ago" : fmtDur(Math.max(0, rs.minsToPit))}</b>{rs.incoming ? <span style={{ color: "#78889d" }}> → {rs.incoming}</span> : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : null;
+      })()}
+
       <div className="apptabs" style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
         {tabs.map(([k, l]) => (
           <button key={k} onClick={() => setSub(k)} className="disp"
-            style={{ padding: "8px 16px", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer",
-              border: "1px solid", borderColor: sub === k ? AMBER : "#222c38",
-              background: sub === k ? "#1a160a" : "#0b1017", color: sub === k ? AMBER : "#8b97a7" }}>
+            style={{ padding: "8px 16px", borderRadius: 6, fontWeight: 600, fontSize: 15.5, cursor: "pointer",
+              border: "1px solid", borderColor: sub === k ? AMBER : "#2b3a4e",
+              background: sub === k ? "#1a160a" : "#0b1017", color: sub === k ? AMBER : "#9aa8bb" }}>
             {l}
           </button>
         ))}
@@ -2667,12 +2778,13 @@ function Live24({ knownDrivers = [] }) {
         const ti = cfg.teams.findIndex((t) => String(t.num) === num);
         const team = ti >= 0 ? cfg.teams[ti] : null;
         const live = liveModel && team ? liveModel.leeds.find((l) => l.kart === String(team.num)) : null;
-        return team ? <TeamCommand team={team} teamIdx={ti} raceStart={raceStart} totalMin={totalMin} now={now} live={live} setCfg={setCfg} />
+        return team ? <TeamCommand team={team} teamIdx={ti} raceStart={raceStart} totalMin={totalMin} now={now} live={live} setCfg={setCfg}
+          model={liveModel} owned={owned.has(num)} onUnlock={unlockTeam} onLock={lockTeam} />
           : <Panel title="TEAM COMMAND"><Empty msg="That team isn't in the plan." /></Panel>;
       })()}
 
       {sub === "board" && (
-        <PitBoard cfg={cfg} setCfg={setCfg} raceStart={raceStart} totalMin={totalMin} now={now} liveModel={liveModel} />
+        <PitBoard cfg={cfg} setCfg={setCfg} raceStart={raceStart} totalMin={totalMin} now={now} liveModel={liveModel} owned={owned} />
       )}
 
       {sub === "track" && <TrackMap model={liveModel} teams={cfg.teams} simOn={simOn} speedMul={simOn && simFast ? 12 : 1} onSim={() => { setSimOn(true); }} />}
@@ -2685,7 +2797,7 @@ function Live24({ knownDrivers = [] }) {
                 <Label>RACE START</Label>
                 <input type="datetime-local" value={cfg.raceStartISO}
                   onChange={(e) => setCfgField("raceStartISO", e.target.value)}
-                  style={{ ...inp(210), fontFamily: "IBM Plex Mono, monospace" }} />
+                  style={{ ...inp(210), fontFamily: "Barlow Semi Condensed, sans-serif" }} />
               </div>
               <div>
                 <Label>DURATION (HOURS)</Label>
@@ -2707,46 +2819,46 @@ function Live24({ knownDrivers = [] }) {
                 ⬆ IMPORT MASTER SPREADSHEET
               </button>
               <input ref={xlsxRef} type="file" accept=".xlsx,.xlsm" hidden onChange={(ev) => { onMaster(ev.target.files?.[0]); ev.target.value = ""; }} />
-              <span className="mono" style={{ fontSize: 11, color: "#5b6776" }}>reads each team tab (Leeds A-D, Grads A-B) into stints, drivers and pit notes</span>
-              {importMsg && <span className="mono" style={{ fontSize: 11.5, color: importMsg.startsWith("✓") ? "#43d977" : "#ff8a5b", flexBasis: "100%" }}>{importMsg}</span>}
+              <span className="mono" style={{ fontSize: 11, color: "#66758a" }}>reads each team tab (Leeds A-D, Grads A-B) into stints, drivers and pit notes</span>
+              {importMsg && <span className="mono" style={{ fontSize: 11.5, color: importMsg.startsWith("✓") ? "#2fd372" : "#ff8a5b", flexBasis: "100%" }}>{importMsg}</span>}
             </div>
 
             {/* test / simulation mode */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap", padding: "10px 12px", borderRadius: 8, background: simOn ? "#1a0a0e" : "#0b1017", border: `1px solid ${simOn ? "#ff8a5b" : "#222c38"}` }}>
-              <button onClick={() => { if (simOn) { setSimOn(false); setTestClock(false); } else { setSimOn(true); } }} className="disp"
-                style={{ background: simOn ? "#ff3355" : "#11233a", color: simOn ? "#fff" : "#43d977", border: `1px solid ${simOn ? "#ff3355" : "#43d97755"}`, borderRadius: 7, padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                {simOn ? "■ STOP TEST" : "▶ TEST MODE (simulate a live race)"}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap", padding: "10px 12px", borderRadius: 8, background: simOn ? "#1a0a0e" : "#0b1017", border: `1px solid ${simOn ? "#ff8a5b" : "#2b3a4e"}` }}>
+              <button disabled={simLocked} onClick={() => { if (simLocked) return; if (simOn) { setSimOn(false); setTestClock(false); } else { setSimOn(true); } }} className="disp"
+                style={{ background: simLocked ? "#0b1017" : simOn ? "#ff2d4d" : "#11233a", color: simLocked ? "#66758a" : simOn ? "#fff" : "#2fd372", border: `1px solid ${simLocked ? "#2b3a4e" : simOn ? "#ff2d4d" : "#2fd37255"}`, borderRadius: 7, padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: simLocked ? "not-allowed" : "pointer" }}>
+                {simLocked ? "🔒 TEST MODE LOCKED (race day)" : simOn ? "■ STOP TEST" : "▶ TEST MODE (simulate a live race)"}
               </button>
               {simOn && (
                 <button onClick={() => setSimFast((f) => !f)} className="disp"
-                  style={{ background: simFast ? "#1a160a" : "#0b1017", color: simFast ? AMBER : "#8b97a7", border: `1px solid ${simFast ? AMBER : "#2a3543"}`, borderRadius: 7, padding: "8px 12px", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+                  style={{ background: simFast ? "#1a160a" : "#0b1017", color: simFast ? AMBER : "#9aa8bb", border: `1px solid ${simFast ? AMBER : "#2a3543"}`, borderRadius: 7, padding: "8px 12px", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
                   {simFast ? "FAST ×12 ON" : "speed ×12"}
                 </button>
               )}
               {simOn && (
                 <button onClick={() => { if (testClock) { setTestClock(false); } else { setClockStartAt(Date.now()); setTestClock(true); } }} className="disp"
-                  style={{ background: testClock ? "#1a160a" : "#0b1017", color: testClock ? AMBER : "#8b97a7", border: `1px solid ${testClock ? AMBER : "#2a3543"}`, borderRadius: 7, padding: "8px 12px", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+                  style={{ background: testClock ? "#1a160a" : "#0b1017", color: testClock ? AMBER : "#9aa8bb", border: `1px solid ${testClock ? AMBER : "#2a3543"}`, borderRadius: 7, padding: "8px 12px", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
                   {testClock ? "TEST CLOCK ON (race running now)" : "run test clock (rehearse pit stops)"}
                 </button>
               )}
               <button onClick={() => { if (confirm("Clear all logged pit stops for every team?")) setCfg((c) => ({ ...c, teams: c.teams.map((t) => ({ ...t, pitLog: [] })) })); }} className="mono"
-                style={{ background: "none", color: "#8b97a7", border: "1px solid #2a3543", borderRadius: 7, padding: "8px 12px", fontSize: 12, cursor: "pointer" }}>
+                style={{ background: "none", color: "#9aa8bb", border: "1px solid #2a3543", borderRadius: 7, padding: "8px 12px", fontSize: 12, cursor: "pointer" }}>
                 clear pit logs
               </button>
-              <span className="mono" style={{ fontSize: 11, color: simOn ? "#ffb3a0" : "#5b6776", flexBasis: "100%" }}>
+              <span className="mono" style={{ fontSize: 11, color: simOn ? "#ffb3a0" : "#66758a", flexBasis: "100%" }}>
                 {simOn ? "Fake cars are running — open Track Map / Live to watch them. The real race start (12:30) is unchanged. To rehearse PIT STOP NOW + the reflow, turn on the test clock (it starts the race from now). Clear pit logs + stop test before race day." : "Rehearse the whole system with made-up cars before race day. Doesn't touch your plan or the real race clock."}
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
               <input type="password" value={adminPw} onChange={(e) => setAdminPw(e.target.value)} placeholder="admin password"
-                style={{ ...inp(150), fontFamily: "IBM Plex Sans, sans-serif" }} />
+                style={{ ...inp(150), fontFamily: "Barlow, sans-serif" }} />
               <button onClick={syncPlan} disabled={syncing} className="disp"
                 style={{ background: "#11233a", color: "#3da9fc", border: "1px solid #3da9fc55", borderRadius: 7,
                   padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
                 {syncing ? "SYNCING…" : "💾 SYNC PLAN TO TEAM"}
               </button>
-              <span className="mono" style={{ fontSize: 11, color: "#5b6776" }}>shares this stint plan with everyone (admin only)</span>
-              {syncMsg && <span className="mono" style={{ fontSize: 11.5, color: syncMsg.startsWith("✓") ? "#43d977" : "#ff8a5b" }}>{syncMsg}</span>}
+              <span className="mono" style={{ fontSize: 11, color: "#66758a" }}>shares this stint plan with everyone (admin only)</span>
+              {syncMsg && <span className="mono" style={{ fontSize: 11.5, color: syncMsg.startsWith("✓") ? "#2fd372" : "#ff8a5b" }}>{syncMsg}</span>}
               <button onClick={async () => {
                   const next = !teleLocked;
                   try {
@@ -2756,8 +2868,20 @@ function Live24({ knownDrivers = [] }) {
                     else setSyncMsg(d.error || "Failed.");
                   } catch { setSyncMsg("Couldn't reach the server (live site only)."); }
                 }} className="disp"
-                style={{ background: teleLocked ? "#1a0a0e" : "#0b1017", color: teleLocked ? "#ff8a5b" : "#8b97a7", border: `1px solid ${teleLocked ? "#ff8a5b55" : "#2a3543"}`, borderRadius: 7, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                style={{ background: teleLocked ? "#1a0a0e" : "#0b1017", color: teleLocked ? "#ff8a5b" : "#9aa8bb", border: `1px solid ${teleLocked ? "#ff8a5b55" : "#2a3543"}`, borderRadius: 7, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
                 {teleLocked ? "🔒 TELEMETRY LOCKED" : "🔓 LOCK SEASON TELEMETRY"}
+              </button>
+              <button onClick={async () => {
+                  const next = !simLocked;
+                  try {
+                    const res = await fetch("/api/roster", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ simLocked: next, adminPassword: adminPw }) });
+                    const d = await res.json();
+                    if (res.ok && d.ok) { setSimLocked(next); if (next) { setSimOn(false); setTestClock(false); } setSyncMsg(next ? "✓ Test mode locked for everyone (race day)." : "✓ Test mode unlocked."); }
+                    else setSyncMsg(d.error || "Failed.");
+                  } catch { setSyncMsg("Couldn't reach the server (live site only)."); }
+                }} className="disp"
+                style={{ background: simLocked ? "#1a0a0e" : "#0b1017", color: simLocked ? "#ff8a5b" : "#9aa8bb", border: `1px solid ${simLocked ? "#ff8a5b55" : "#2b3a4e"}`, borderRadius: 7, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                {simLocked ? "🔒 TEST MODE LOCKED" : "🔓 LOCK TEST MODE (race day)"}
               </button>
             </div>
           </Panel>
@@ -2767,10 +2891,9 @@ function Live24({ knownDrivers = [] }) {
           </datalist>
 
           {cfg.teams.map((team, ti) => (
-            <StintTeamCard key={ti} team={team} ti={ti} raceStart={raceStart} totalMin={totalMin}
+            <StintTeamCard key={team.num || ti} team={team} ti={ti} raceStart={raceStart} totalMin={totalMin}
               defaultStintLen={cfg.defaultStintLen} now={now} started={started}
-              onUpdate={(patch) => updateTeam(ti, patch)}
-              onRemove={() => setCfg((c) => ({ ...c, teams: c.teams.filter((_, i) => i !== ti) }))} />
+              onUpdate={(patch) => updateTeam(ti, patch)} />
           ))}
         </>
       )}
@@ -2783,35 +2906,47 @@ function Live24({ knownDrivers = [] }) {
             <Empty msg="No Leeds karts found in the live feed yet." />
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 260px),1fr))", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%, 270px),1fr))", gap: 12 }}>
                 {liveModel.leeds.sort((a, b) => (a.pos || 999) - (b.pos || 999)).map((r) => {
                   const planTeam = cfg.teams.find((t) => t.num === r.kart);
+                  const isFastest = liveModel.fastestOverall && r.bestClean != null && Math.abs(r.bestClean - liveModel.fastestOverall.b) < 0.001;
+                  const penSec = (r.penalties || []).reduce((a, p) => a + (p.sec || 0), 0);
+                  const frac = r.lapFrac;
                   return (
-                    <div key={r.kart} style={{ background: "#0b1017", border: "1px solid #161d27", borderLeft: "3px solid #ff3355",
-                      borderRadius: 10, padding: 14 }}>
+                    <div key={r.kart} style={{ background: "#0b1017", border: "1px solid #1b2433", borderLeft: "3px solid #ff2d4d", borderRadius: 10, padding: 14 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <span className="disp" style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>
-                          #{r.kart} {planTeam ? planTeam.name : r.team}
-                        </span>
+                        <span className="disp" style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>#{r.kart} {planTeam ? planTeam.name : r.team}</span>
                         <span className="mono" style={{ color: AMBER, fontWeight: 700, fontSize: 18 }}>P{r.pos || "—"}</span>
                       </div>
-                      <div className="mono" style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px 10px", fontSize: 12 }}>
+                      {/* lap position line from S/F */}
+                      {frac != null && (
+                        <div style={{ marginTop: 9 }}>
+                          <div style={{ position: "relative", height: 8, borderRadius: 4, background: "#11171f", border: "1px solid #1e2733" }}>
+                            <div style={{ position: "absolute", left: 0, top: -2, bottom: -2, width: 2, background: "#fff" }} />
+                            <div style={{ position: "absolute", left: `calc(${Math.min(98, frac * 100)}% )`, top: -3, width: 11, height: 11, borderRadius: "50%", background: "#ff2d4d", border: "2px solid #05070b" }} />
+                          </div>
+                          <div className="mono" style={{ fontSize: 11, color: "#66758a", display: "flex", justifyContent: "space-between", marginTop: 2 }}><span>S/F</span><span>{Math.round(frac * 100)}% of lap</span></div>
+                        </div>
+                      )}
+                      <div className="mono" style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 14px", fontSize: 12 }}>
                         <Stat label="LAPS" v={r.laps ?? "—"} />
                         <Stat label="GAP" v={r.gap || "—"} />
-                        <Stat label="BEST" v={r.bestClean != null ? fmt(r.bestClean) : "—"} />
-                        <Stat label="RECENT 5" v={r.recent != null ? fmt(r.recent) : "—"} c={r.recent != null && r.bestClean != null ? (r.recent <= r.bestClean * 1.03 ? "#43d977" : "#ff8a5b") : "#c2cbd6"} />
+                        <Stat label="BEST LAP" v={r.bestClean != null ? fmt(r.bestClean) : "—"} c={isFastest ? "#b06bff" : "#e6edf3"} />
+                        <Stat label="LAST 5" v={r.recent != null ? fmt(r.recent) : "—"} c={r.recent != null && liveModel.fieldAvg ? (r.recent <= liveModel.fieldAvg ? "#2fd372" : "#ff8a5b") : "#c2cbd6"} />
                         <Stat label="STINT LAPS" v={r.stintLapCount || 0} />
                         <Stat label="THIS STINT" v={fmtDur(r.stintMin)} />
                       </div>
-                      {r.penalty && <div className="mono" style={{ marginTop: 8, color: "#ff3355", fontSize: 11 }}>[+PENALTY]</div>}
+                      {isFastest && <div className="mono" style={{ marginTop: 8, color: "#b06bff", fontSize: 11, fontWeight: 700 }}>★ FASTEST LAP OF THE FIELD</div>}
+                      {penSec > 0 && <div className="mono" style={{ marginTop: 6, color: "#ff2d4d", fontSize: 11 }}>⚑ {r.penalties.length} penalt{r.penalties.length === 1 ? "y" : "ies"} · +{penSec}s</div>}
                     </div>
                   );
                 })}
               </div>
+              {liveModel.fieldAvg != null && <div className="mono" style={{ fontSize: 11, color: "#78889d", marginTop: 10 }}>Field average lap {fmt(liveModel.fieldAvg)} · fastest overall {liveModel.fastestOverall ? fmt(liveModel.fastestOverall.b) + " (#" + liveModel.fastestOverall.kart + ")" : "—"}. Green = at or under field average. Purple = fastest lap of the whole field.</div>}
               <Collapsible title="FULL FIELD" subtitle={`${liveModel.field.length} karts`} accent="#3da9fc">
                 <div style={{ overflowX: "auto" }}>
                   <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead><tr style={{ color: "#6b7685", textAlign: "left" }}>
+                    <thead><tr style={{ color: "#78889d", textAlign: "left" }}>
                       {["POS", "KART", "TEAM", "LAPS", "GAP", "BEST"].map((h) => (
                         <th key={h} style={{ padding: "6px 8px", borderBottom: "1px solid #1e2733" }}>{h}</th>))}
                     </tr></thead>
@@ -2819,13 +2954,13 @@ function Live24({ knownDrivers = [] }) {
                       {liveModel.field.sort((a, b) => (a.pos || 999) - (b.pos || 999)).map((r) => {
                         const ours = ourNums.has(r.kart) || isOurTeam(r.team);
                         return (
-                          <tr key={r.kart} style={{ borderBottom: "1px solid #11171f", background: ours ? "#ff335510" : "transparent" }}>
+                          <tr key={r.kart} style={{ borderBottom: "1px solid #11171f", background: ours ? "#ff2d4d10" : "transparent" }}>
                             <td style={{ padding: "6px 8px", color: AMBER, fontWeight: 600 }}>{r.pos || "—"}</td>
-                            <td style={{ padding: "6px 8px", color: "#6b7685" }}>#{r.kart}</td>
-                            <td style={{ padding: "6px 8px", color: ours ? "#ff3355" : "#c2cbd6", fontWeight: ours ? 600 : 400 }}>{r.team}</td>
+                            <td style={{ padding: "6px 8px", color: "#78889d" }}>#{r.kart}</td>
+                            <td style={{ padding: "6px 8px", color: ours ? "#ff2d4d" : "#c2cbd6", fontWeight: ours ? 600 : 400 }}>{r.team}</td>
                             <td style={{ padding: "6px 8px", color: "#c2cbd6" }}>{r.laps ?? "—"}</td>
-                            <td style={{ padding: "6px 8px", color: "#8b97a7" }}>{r.gap || "—"}</td>
-                            <td style={{ padding: "6px 8px", color: "#c2cbd6" }}>{r.best != null ? fmt(r.best) : "—"}</td>
+                            <td style={{ padding: "6px 8px", color: "#9aa8bb" }}>{r.gap || "—"}</td>
+                            <td style={{ padding: "6px 8px", color: liveModel.fastestOverall && r.best != null && Math.abs(r.best - liveModel.fastestOverall.b) < 0.001 ? "#b06bff" : "#c2cbd6", fontWeight: liveModel.fastestOverall && r.best != null && Math.abs(r.best - liveModel.fastestOverall.b) < 0.001 ? 700 : 400 }}>{r.best != null ? fmt(r.best) : "—"}</td>
                           </tr>
                         );
                       })}
@@ -2845,7 +2980,7 @@ function Live24({ knownDrivers = [] }) {
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-                <thead><tr style={{ color: "#6b7685", textAlign: "right" }}>
+                <thead><tr style={{ color: "#78889d", textAlign: "right" }}>
                   {["TEAM", "LAPS", "BEST", "CLEAN AVG", "CONSISTENCY", "RECENT 5", "CHANGEOVERS"].map((h, i) => (
                     <th key={h} style={{ padding: "6px 10px", textAlign: i === 0 ? "left" : "right", borderBottom: "1px solid #1e2733", fontWeight: 500 }}>{h}</th>))}
                 </tr></thead>
@@ -2854,7 +2989,7 @@ function Live24({ knownDrivers = [] }) {
                     const clean = splitClean(r.lapArr).clean;
                     return (
                       <tr key={r.kart} style={{ borderBottom: "1px solid #11171f" }}>
-                        <td style={{ padding: "6px 10px", color: "#ff3355", fontWeight: 600, textAlign: "left" }}>#{r.kart} {(cfg.teams.find((t) => t.num === r.kart) || {}).name || r.team}</td>
+                        <td style={{ padding: "6px 10px", color: "#ff2d4d", fontWeight: 600, textAlign: "left" }}>#{r.kart} {(cfg.teams.find((t) => t.num === r.kart) || {}).name || r.team}</td>
                         <td style={td}>{r.laps ?? "—"}</td>
                         <td style={td}>{r.bestClean != null ? fmt(r.bestClean) : "—"}</td>
                         <td style={td}>{clean.length ? fmt(mean(clean)) : "—"}</td>
@@ -2866,7 +3001,7 @@ function Live24({ knownDrivers = [] }) {
                   })}
                 </tbody>
               </table>
-              <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 12, lineHeight: 1.5 }}>
+              <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 12, lineHeight: 1.5 }}>
                 Clean laps exclude anything above 110% of the kart's own median (incidents and changeover laps).
                 Changeovers are inferred from laps over 1.6x median, so they're an estimate, not the official stint log.
               </div>
@@ -2878,10 +3013,27 @@ function Live24({ knownDrivers = [] }) {
   );
 }
 
-function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg }) {
-  const logPit = (atMin) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === teamIdx ? { ...t, pitLog: [...(t.pitLog || []), { atMin, t: new Date().toISOString() }] } : t) }));
-  const undoPit = () => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === teamIdx ? { ...t, pitLog: (t.pitLog || []).slice(0, -1) } : t) }));
-  const setLastPit = (atMin) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => { if (i !== teamIdx) return t; const pl = [...(t.pitLog || [])]; if (pl.length) pl[pl.length - 1] = { ...pl[pl.length - 1], atMin }; return { ...t, pitLog: pl }; }) }));
+function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, model, owned, onUnlock, onLock }) {
+  const [code, setCode] = useState("");
+  const [codeErr, setCodeErr] = useState("");
+  const [armed, setArmed] = useState(false);
+  const armRef = useRef(null);
+  const [alertsOn, setAlertsOn] = useState(() => LS("live24_alerts", true));
+  useEffect(() => { saveLS("live24_alerts", alertsOn); }, [alertsOn]);
+  const firedRef = useRef({});
+  const pitAlert = () => {
+    try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch {}
+    try {
+      const ctx = window.__pwAudio || (window.__pwAudio = new (window.AudioContext || window.webkitAudioContext)());
+      [0, 0.25].forEach((d) => { const o = ctx.createOscillator(), g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination); o.frequency.value = 880;
+        g.gain.setValueAtTime(0.15, ctx.currentTime + d); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + d + 0.2);
+        o.start(ctx.currentTime + d); o.stop(ctx.currentTime + d + 0.22); });
+    } catch {}
+  };
+  const logPit = (atMin) => owned && setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === teamIdx ? { ...t, pitLog: [...(t.pitLog || []), { atMin, t: new Date().toISOString() }] } : t) }));
+  const undoPit = () => owned && setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === teamIdx ? { ...t, pitLog: (t.pitLog || []).slice(0, -1) } : t) }));
+  const setLastPit = (atMin) => owned && setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => { if (i !== teamIdx) return t; const pl = [...(t.pitLog || [])]; if (pl.length) pl[pl.length - 1] = { ...pl[pl.length - 1], atMin }; return { ...t, pitLog: pl }; }) }));
   const clockToMin = (hhmm) => { const m = String(hhmm).match(/(\d{1,2}):(\d{2})/); if (!m) return null; const base = raceStart.getHours() * 60 + raceStart.getMinutes(); let d = (+m[1] * 60 + +m[2]) - base; if (d < 0) d += 1440; return d; };
 
   if (!team || !(team.stints || []).length) {
@@ -2893,7 +3045,7 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg }) 
   const inc = rs.onKartIdx >= 0 ? rs.rows[rs.onKartIdx + 1] : null;
   const toPit = rs.minsToPit;
   const overdue = rs.started && toPit != null && toPit < 0;
-  const pitC = toPit == null ? "#5b6776" : overdue || toPit <= 5 ? "#ff3355" : toPit <= 15 ? "#ff8a5b" : "#43d977";
+  const pitC = toPit == null ? "#66758a" : overdue || toPit <= 5 ? "#ff2d4d" : toPit <= 15 ? "#ff8a5b" : "#2fd372";
   const clockOf = (m) => fmtClockDay(new Date(raceStart.getTime() + m * 60000), raceStart);
   const projStart = (i) => { if (rs.onKartIdx < 0 || i < rs.onKartIdx) return null; let a = rs.onKartStart; for (let k = rs.onKartIdx; k < i; k++) a += rs.rows[k].len; return a; };
   const spare = totalMin - rs.projFinish;
@@ -2904,59 +3056,82 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg }) 
   const heavy = (v) => v && String(v).toUpperCase().includes("M/H");
   const planDrivers = [...new Set(rs.rows.map((r) => r.driver).filter(Boolean))];
   const anyHeavy = rs.rows.some((r) => heavy(r.seat));
+  const card = { background: "#0b1017", border: "1px solid #1b2433", borderRadius: 12, padding: 16 };
 
-  // plain-English changeover lines for the next stop
-  const leadLine = () => {
-    if (inc?.lead == null) return null;
-    if (leadDelta == null) return `Set lead to ${inc.lead} kg`;
-    if (leadDelta > 0) return `Add ${leadDelta} kg of lead  (total ${inc.lead} kg)`;
-    if (leadDelta < 0) return `Remove ${Math.abs(leadDelta)} kg of lead  (total ${inc.lead} kg)`;
-    return `No lead change  (stays ${inc.lead} kg)`;
-  };
-  const seatLine = () => {
-    if (!inc?.seat) return null;
-    const changed = cur && cur.seat && cur.seat !== inc.seat;
-    return `${changed ? "Change to" : "Keep"} ${inc.seat} insert${heavy(inc.seat) ? " (heavy)" : ""}`;
+  // --- per-driver pace: split the lap list at detected stints, assign by plan order ---
+  const lapArr = (live && live.lapArr) || [];
+  const segs = (() => {
+    const b = detectStints(lapArr).boundaries;
+    const cuts = [0, ...b, lapArr.length];
+    const out = [];
+    for (let k = 0; k < cuts.length - 1; k++) out.push(lapArr.slice(cuts[k], cuts[k + 1]).filter((x) => x != null));
+    return out;
+  })();
+  const byDriver = {};
+  segs.forEach((seg, k) => { const drv = rs.rows[k]?.driver; if (!drv) return; (byDriver[drv] = byDriver[drv] || []).push(...splitClean(seg).clean); });
+  const driverStats = planDrivers.map((d) => { const c = byDriver[d] || []; return { d, n: c.length, fastest: c.length ? Math.min(...c) : null, consist: c.length > 1 ? sd(c) : null }; });
+  const teamFastest = driverStats.reduce((m, x) => (x.fastest != null && (m == null || x.fastest < m) ? x.fastest : m), null);
+
+  // --- pit window by laps (live) ---
+  const recentSec = (live && live.recent) || (cur && cur.len ? cur.len * 60 / 14 : 30);
+  const targetLaps = cur ? Math.max(1, Math.round((cur.len * 60) / recentSec)) : null;
+  const stintLaps = live && live.stintLapCount != null ? live.stintLapCount : null;
+  let windowState = null;
+  if (targetLaps != null && stintLaps != null && rs.started && !rs.finished) {
+    const openAt = Math.max(1, targetLaps - 2);
+    if (stintLaps < openAt) windowState = { txt: `opens in ${openAt - stintLaps} lap${openAt - stintLaps === 1 ? "" : "s"} (lap ${openAt})`, c: "#9aa8bb" };
+    else if (stintLaps <= targetLaps) windowState = { txt: `OPEN — pit by lap ${targetLaps} (${Math.max(0, targetLaps - stintLaps)} left)`, c: "#2fd372" };
+    else windowState = { txt: `PAST WINDOW — ${stintLaps - targetLaps} lap${stintLaps - targetLaps === 1 ? "" : "s"} over`, c: "#ff2d4d" };
+  }
+
+  // --- penalties ---
+  const pens = (live && live.penalties) || [];
+  const totalPen = pens.reduce((a, p) => a + (p.sec || 0), 0);
+  const penDriver = (p) => {
+    if (p.lap == null) return null;                  // attribute by which stint segment the lap falls in
+    let acc = 0; for (let k = 0; k < segs.length; k++) { acc += segs[k].length; if (p.lap <= acc) return rs.rows[k]?.driver || null; }
+    return rs.currentDriver;
   };
 
   const Row = ({ label, value, accent, strong }) => (
     <div style={{ padding: "9px 0", borderBottom: "1px solid #11171f" }}>
-      <div className="disp" style={{ fontSize: 10.5, color: "#6b7685", letterSpacing: 0.5, fontWeight: 600, marginBottom: 2 }}>{label}</div>
+      <div className="disp" style={{ fontSize: 11.5, color: "#78889d", letterSpacing: 0.5, fontWeight: 600, marginBottom: 2 }}>{label}</div>
       <div className="mono" style={{ fontSize: strong ? 16 : 14, color: accent || "#e6edf3", fontWeight: strong ? 700 : 500 }}>{value}</div>
     </div>
   );
-  const card = { background: "#0b1017", border: "1px solid #161d27", borderRadius: 12, padding: 16 };
+  const leadLine = () => { if (inc?.lead == null) return null; if (leadDelta == null) return `Set lead to ${inc.lead} kg`; if (leadDelta > 0) return `Add ${leadDelta} kg of lead  (total ${inc.lead} kg)`; if (leadDelta < 0) return `Remove ${Math.abs(leadDelta)} kg of lead  (total ${inc.lead} kg)`; return `No lead change  (stays ${inc.lead} kg)`; };
+  const seatLine = () => { if (!inc?.seat) return null; const changed = cur && cur.seat && cur.seat !== inc.seat; return `${changed ? "Change to" : "Keep"} ${inc.seat} insert${heavy(inc.seat) ? " (heavy)" : ""}`; };
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
       {/* status */}
-      <div className="panelpad" style={{ ...card, background: "linear-gradient(135deg,#11233a22,#0b1017)", border: "1px solid #222c38", borderLeft: "4px solid " + AMBER }}>
+      <div className="panelpad" style={{ ...card, background: "linear-gradient(135deg,#11233a22,#0b1017)", border: "1px solid #2b3a4e", borderLeft: "4px solid " + AMBER }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
           <span className="disp" style={{ fontSize: 15, color: "#fff", fontWeight: 800 }}>{team.name} <span style={{ color: AMBER }}>#{team.num}</span></span>
-          <span className="mono" style={{ fontSize: 12, color: "#6b7685" }}>{live && live.pos ? "Position P" + live.pos : ""}{live && live.gap ? " · " + live.gap : ""}</span>
+          <span className="mono" style={{ fontSize: 11, color: owned ? "#2fd372" : "#78889d" }}>{owned ? "● you can log for this team" : "view only"}</span>
         </div>
 
         {rs.finished ? (
-          <div className="disp" style={{ fontSize: 22, fontWeight: 800, color: "#43d977", marginTop: 12 }}>RACE DONE · {rs.completed} pit stops made</div>
+          <div className="disp" style={{ fontSize: 22, fontWeight: 800, color: "#2fd372", marginTop: 12 }}>RACE DONE · {rs.completed} pit stops made</div>
         ) : (
           <>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 }}>
               <div>
-                <div className="disp" style={{ fontSize: 10.5, color: "#5b6776", letterSpacing: 0.5 }}>DRIVING NOW</div>
-                <div className="disp" style={{ fontSize: 23, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>{rs.currentDriver || "—"}</div>
+                <div className="disp" style={{ fontSize: 11, color: "#66758a", letterSpacing: 0.5 }}>DRIVING NOW</div>
+                <div className="disp" style={{ fontSize: 24, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>{rs.currentDriver || "—"}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div className="disp" style={{ fontSize: 10.5, color: "#5b6776", letterSpacing: 0.5 }}>{rs.started ? "NEXT PIT STOP" : "RACE START"}</div>
-                <div className="mono" style={{ fontSize: 23, fontWeight: 800, color: pitC, lineHeight: 1.1 }}>{rs.nextPitMin != null ? clockOf(rs.nextPitMin) : "—"}</div>
-                <div className="mono" style={{ fontSize: 12.5, color: pitC, fontWeight: 600 }}>{rs.started && toPit != null ? (overdue ? fmtDur(-toPit) + " LATE" : "in " + fmtDur(Math.max(0, toPit))) : ""}</div>
+                <div className="disp" style={{ fontSize: 11, color: "#66758a", letterSpacing: 0.5 }}>{overdue ? "PIT DUE" : rs.started ? "NEXT PIT" : "RACE START"}</div>
+                <div className="mono" style={{ fontSize: 24, fontWeight: 800, color: pitC, lineHeight: 1.1 }}>{rs.nextPitMin != null ? clockOf(rs.nextPitMin) : "—"}</div>
+                <div className="mono" style={{ fontSize: 12, color: pitC }}>{rs.started && toPit != null ? (overdue ? fmtDur(-toPit) + " LATE" : "in " + fmtDur(Math.max(0, toPit))) : ""}</div>
               </div>
             </div>
 
             {cur && rs.started && (
               <div style={{ marginTop: 12 }}>
-                <div className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6b7685" }}>
-                  <span>stint {rs.onKartIdx + 1} of {rs.rows.length}</span>
-                  <span>driven {fmtDur(Math.max(0, rs.stintElapsed))} of {fmtDur(cur.len)}</span>
+                <div className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#78889d" }}>
+                  <span>stint {rs.onKartIdx + 1} of {rs.rows.length}{stintLaps != null ? ` · ${stintLaps} laps` : ""}</span>
+                  <span>{fmtDur(Math.max(0, rs.stintElapsed))} of {fmtDur(cur.len)}</span>
                 </div>
                 <div style={{ height: 7, borderRadius: 4, background: "#11171f", marginTop: 5, overflow: "hidden" }}>
                   <div style={{ width: `${stintPct * 100}%`, height: "100%", background: pitC }} />
@@ -2964,46 +3139,77 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg }) 
               </div>
             )}
 
-            <button onClick={() => logPit((Date.now() - raceStart.getTime()) / 60000)} className="disp"
-              style={{ width: "100%", marginTop: 14, background: "#ff3355", color: "#fff", border: "none", borderRadius: 10, padding: "16px", fontWeight: 800, fontSize: 17, cursor: "pointer", letterSpacing: 0.5 }}>
-              ◉ PIT STOP NOW{rs.currentDriver ? " — " + rs.currentDriver + " comes in" : ""}
-            </button>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, flexWrap: "wrap", gap: 8 }}>
-              {rs.completed > 0 ? (
-                <button onClick={undoPit} className="mono" style={{ background: "none", border: "1px solid #2a3543", color: "#8b97a7", borderRadius: 7, padding: "7px 12px", cursor: "pointer", fontSize: 12 }}>↩ undo last stop</button>
-              ) : <span />}
-              {rs.lastActual != null && (
-                <span className="mono" style={{ fontSize: 11.5, color: "#8b97a7", textAlign: "right" }}>
-                  Last stint: {rs.lastDriver} drove {fmtDur(rs.lastActual)}<br />
-                  <span style={{ color: rs.lastActual <= rs.lastPlanned ? "#43d977" : "#ff8a5b" }}>{fmtDur(Math.abs(rs.lastActual - rs.lastPlanned))} {rs.lastActual <= rs.lastPlanned ? "shorter" : "longer"} than planned</span>
-                </span>
-              )}
-            </div>
+            {windowState && <div className="mono" style={{ marginTop: 8, fontSize: 12 }}><span style={{ color: "#78889d" }}>PIT WINDOW: </span><span style={{ color: windowState.c, fontWeight: 600 }}>{windowState.txt}</span></div>}
+
+            {owned && (() => {
+              // pit alerts: buzz + beep once at 5 min and 1 min before the planned stop
+              if (alertsOn && rs.started && !rs.finished && toPit != null && toPit > -2) {
+                const k = rs.onKartIdx;
+                if (toPit <= 5 && !firedRef.current["5:" + k]) { firedRef.current["5:" + k] = 1; pitAlert(); }
+                if (toPit <= 1 && !firedRef.current["1:" + k]) { firedRef.current["1:" + k] = 1; pitAlert(); }
+              }
+              return (
+                <button onClick={() => setAlertsOn((a) => !a)} className="mono"
+                  style={{ marginTop: 8, background: "none", border: `1px solid ${alertsOn ? "#2fd37255" : "#2b3a4e"}`, color: alertsOn ? "#2fd372" : "#78889d", borderRadius: 7, padding: "6px 11px", fontSize: 11.5, cursor: "pointer" }}>
+                  {alertsOn ? "🔔 pit alerts ON — phone buzzes at 5 min and 1 min" : "🔕 pit alerts off"}
+                </button>
+              );
+            })()}
+
+            {owned ? (
+              <button onClick={() => {
+                  if (!armed) { setArmed(true); clearTimeout(armRef.current); armRef.current = setTimeout(() => setArmed(false), 4000); return; }
+                  setArmed(false); clearTimeout(armRef.current);
+                  logPit((Date.now() - raceStart.getTime()) / 60000);
+                }} className="disp"
+                style={{ width: "100%", marginTop: 12, background: armed ? "#fff" : "#ff2d4d", color: armed ? "#ff2d4d" : "#fff", border: armed ? "2px solid #ff2d4d" : "none", borderRadius: 10, padding: "16px", fontWeight: 800, fontSize: 17, cursor: "pointer", letterSpacing: 0.5 }}>
+                {armed ? "TAP AGAIN TO CONFIRM PIT STOP" : "◉ PIT STOP NOW" + (rs.currentDriver ? " — " + rs.currentDriver + " comes in" : "")}
+              </button>
+            ) : (
+              <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <input type="password" value={code} onChange={(e) => setCode(e.target.value)} placeholder="team passcode to log pits"
+                  style={{ ...inp(200), fontFamily: "Barlow, sans-serif" }} onKeyDown={(e) => { if (e.key === "Enter") onUnlock(team.num, code).then((ok) => setCodeErr(ok ? "" : "Wrong passcode.")); }} />
+                <button onClick={() => onUnlock(team.num, code).then((ok) => setCodeErr(ok ? "" : "Wrong passcode."))} className="disp"
+                  style={{ background: "#11233a", color: "#2fd372", border: "1px solid #2fd37255", borderRadius: 7, padding: "9px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>UNLOCK</button>
+                {codeErr && <span className="mono" style={{ fontSize: 11.5, color: "#ff8a5b" }}>{codeErr}</span>}
+              </div>
+            )}
+            {owned && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, flexWrap: "wrap", gap: 8 }}>
+                {rs.completed > 0 ? <button onClick={undoPit} className="mono" style={{ background: "none", border: "1px solid #2a3543", color: "#9aa8bb", borderRadius: 7, padding: "7px 12px", cursor: "pointer", fontSize: 12 }}>↩ undo last stop</button> : <span />}
+                {rs.lastActual != null && (
+                  <span className="mono" style={{ fontSize: 11.5, color: "#9aa8bb", textAlign: "right" }}>
+                    Last: {rs.lastDriver} {fmtDur(rs.lastActual)}
+                    <span style={{ color: rs.lastActual <= rs.lastPlanned ? "#2fd372" : "#ff8a5b" }}> ({fmtDur(Math.abs(rs.lastActual - rs.lastPlanned))} {rs.lastActual <= rs.lastPlanned ? "shorter" : "longer"})</span>
+                  </span>
+                )}
+              </div>
+            )}
 
             {rs.started && (
               <div className="mono" style={{ marginTop: 12, fontSize: 12.5, color: "#c2cbd6", background: "#080d13", borderRadius: 8, padding: "9px 11px" }}>
-                {isFinal ? (
-                  <span>Last stint of the race — <b style={{ color: pitC }}>{fmtDur(Math.max(0, toFlag))} until the finish</b></span>
-                ) : (
-                  <span>Expected to finish at <b>{clockOf(rs.projFinish)}</b> — <b style={{ color: spare >= 0 ? "#43d977" : "#ff8a5b" }}>{spare >= 0 ? "about " + fmtDur(spare) + " before the flag" : "about " + fmtDur(-spare) + " after the flag, shorten stints"}</b></span>
-                )}
+                {isFinal ? <span>Last stint — <b style={{ color: pitC }}>{fmtDur(Math.max(0, toFlag))} until the finish</b></span>
+                  : <span>Finish ~<b>{clockOf(rs.projFinish)}</b> · <b style={{ color: spare >= 0 ? "#2fd372" : "#ff8a5b" }}>{spare >= 0 ? fmtDur(spare) + " spare before flag" : fmtDur(-spare) + " over the flag"}</b></span>}
+                <br />
+                <span style={{ color: "#9aa8bb" }}>Schedule: </span>
+                <b style={{ color: rs.driftMin <= 0.5 ? "#2fd372" : "#ff8a5b" }}>{Math.abs(rs.driftMin) < 0.5 ? "on plan" : rs.driftMin < 0 ? fmtDur(-rs.driftMin) + " AHEAD of plan" : fmtDur(rs.driftMin) + " BEHIND plan"}</b>
               </div>
             )}
           </>
         )}
       </div>
 
-      {/* next stop checklist */}
+      {/* next stop — what to change */}
       {inc && !rs.finished && (
-        <div className="panelpad" style={{ ...card, border: "1px solid #ff335540" }}>
-          <div className="disp" style={{ fontSize: 12, color: "#ff3355", fontWeight: 800, letterSpacing: 0.5 }}>WHAT TO CHANGE AT THE NEXT STOP</div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 4 }}>
+        <div className="panelpad" style={{ ...card, border: "1px solid #ff2d4d40" }}>
+          <div className="disp" style={{ fontSize: 12, color: "#ff2d4d", fontWeight: 800, letterSpacing: 0.5 }}>WHAT TO CHANGE AT THE NEXT STOP</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 4, flexWrap: "wrap", gap: "2px 10px" }}>
             <span className="disp" style={{ fontSize: 21, fontWeight: 800, color: "#fff" }}>Next driver: {inc.driver}</span>
-            <span className="mono" style={{ fontSize: 12.5, color: "#8b97a7" }}>{clockOf(rs.nextPitMin)}</span>
+            <span className="mono" style={{ fontSize: 12.5, color: "#9aa8bb" }}>{clockOf(rs.nextPitMin)}</span>
           </div>
           <div style={{ marginTop: 6 }}>
             {inc.note && !inc.auto && <Row label="PIT NOTE FROM YOUR SHEET" value={inc.note} accent={AMBER} strong />}
-            {(!inc.note || inc.auto) && leadLine() && <Row label="LEAD WEIGHT (BALLAST)" value={leadLine()} accent={leadDelta ? (leadDelta > 0 ? "#ff8a5b" : "#43d977") : "#e6edf3"} strong={!!leadDelta} />}
+            {(!inc.note || inc.auto) && leadLine() && <Row label="LEAD WEIGHT (BALLAST)" value={leadLine()} accent={leadDelta ? (leadDelta > 0 ? "#ff8a5b" : "#2fd372") : "#e6edf3"} strong={!!leadDelta} />}
             {seatLine() && <Row label="SEAT INSERT" value={seatLine()} accent={cur && inc.seat && cur.seat !== inc.seat ? AMBER : "#e6edf3"} strong={!!(cur && inc.seat && cur.seat !== inc.seat)} />}
             {inc.pedals && <Row label="PEDAL POSITION" value={inc.pedals} />}
             {inc.assist && <Row label="WHO HELPS THE STOP" value={inc.assist} accent="#3da9fc" />}
@@ -3012,7 +3218,72 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg }) 
         </div>
       )}
 
-      {/* drivers */}
+      {/* lead & seat for every driver (always visible) */}
+      <div className="panelpad" style={card}>
+        <Label>LEAD &amp; SEAT BY DRIVER</Label>
+        {rs.rows.some((r) => r.lead != null || r.seat) ? (
+          <div style={{ display: "grid", gap: 4 }}>
+            {planDrivers.map((d) => { const st = rs.rows.find((r) => r.driver === d) || {}; return (
+              <div key={d} className="mono" style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13, background: "#080d13", borderRadius: 7, padding: "7px 10px" }}>
+                <span style={{ color: "#e6edf3", fontWeight: 600, flex: "0 0 auto" }}>{d}</span>
+                <span style={{ color: "#9aa8bb", textAlign: "right" }}>{st.lead != null ? <b style={{ color: "#fff" }}>{st.lead} kg</b> : "— kg"}{st.seat ? " · " + st.seat + (heavy(st.seat) ? " (heavy)" : "") : ""}{st.pedals ? " · " + st.pedals : ""}</span>
+              </div>
+            ); })}
+          </div>
+        ) : (
+          <div className="mono" style={{ fontSize: 12, color: "#ff8a5b", padding: "6px 0" }}>No lead/seat data on this plan — re-import the master spreadsheet (the import message will confirm it was captured).</div>
+        )}
+        {anyHeavy && <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 8 }}>M/H = the heavy seat insert. Lead = ballast added to the kart for that driver.</div>}
+      </div>
+
+      {/* penalties */}
+      {pens.length > 0 && (
+        <div className="panelpad" style={{ ...card, border: "1px solid #ff2d4d40" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <span className="disp" style={{ fontSize: 12, color: "#ff2d4d", fontWeight: 800 }}>⚑ PENALTIES</span>
+            <span className="mono" style={{ fontSize: 14, color: "#ff2d4d", fontWeight: 700 }}>+{totalPen}s total</span>
+          </div>
+          <div style={{ display: "grid", gap: 3, marginTop: 8 }}>
+            {pens.map((p, i) => { const drv = penDriver(p); return (
+              <div key={i} className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 4px" }}>
+                <span style={{ color: "#c2cbd6" }}>{p.reason}{drv ? <span style={{ color: "#9aa8bb" }}> — {drv}</span> : ""}{p.lap != null ? <span style={{ color: "#66758a" }}> (lap {p.lap})</span> : ""}</span>
+                <span style={{ color: "#ff8a5b" }}>{p.sec != null ? "+" + p.sec + "s" : (p.raw || "—")}</span>
+              </div>
+            ); })}
+          </div>
+        </div>
+      )}
+
+      {/* pace vs field + per driver */}
+      {live && (
+        <div className="panelpad" style={card}>
+          <Label>PACE vs FIELD</Label>
+          <div className="mono g3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px 14px", fontSize: 13 }}>
+            <Stat label="OUR LAST 5" v={live.recent != null ? fmt(live.recent) : "—"} c={live.recent != null && model?.fieldAvg ? (live.recent <= model.fieldAvg ? "#2fd372" : "#ff8a5b") : "#e6edf3"} />
+            <Stat label="FIELD AVG" v={model?.fieldAvg != null ? fmt(model.fieldAvg) : "—"} />
+            <Stat label="vs FIELD" v={live.recent != null && model?.fieldAvg != null ? (live.recent <= model.fieldAvg ? "-" : "+") + (Math.abs(live.recent - model.fieldAvg)).toFixed(2) + "s" : "—"} c={live.recent != null && model?.fieldAvg ? (live.recent <= model.fieldAvg ? "#2fd372" : "#ff8a5b") : "#e6edf3"} />
+            <Stat label="OUR BEST" v={live.bestClean != null ? fmt(live.bestClean) : "—"} c={model?.fastestOverall && live.bestClean != null && Math.abs(live.bestClean - model.fastestOverall.b) < 0.001 ? "#b06bff" : "#e6edf3"} />
+            <Stat label="FASTEST (FIELD)" v={model?.fastestOverall ? fmt(model.fastestOverall.b) : "—"} c="#b06bff" />
+            <Stat label="ON" v={model?.fastestOverall ? "#" + model.fastestOverall.kart : "—"} />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <Label>EACH DRIVER (this kart)</Label>
+            <div style={{ display: "grid", gap: 3 }}>
+              {driverStats.map((s) => (
+                <div key={s.d} className="mono" style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, padding: "5px 8px", background: "#080d13", borderRadius: 6 }}>
+                  <span style={{ color: "#e6edf3" }}>{s.d}</span>
+                  <span style={{ color: "#9aa8bb" }}>
+                    {s.n} laps · best <b style={{ color: s.fastest != null && teamFastest != null && Math.abs(s.fastest - teamFastest) < 0.001 ? "#b06bff" : "#c2cbd6" }}>{s.fastest != null ? fmt(s.fastest) : "—"}</b> · consistency {s.consist != null ? "±" + s.consist.toFixed(2) + "s" : "—"}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 6 }}>Purple = holds the kart's fastest lap. Lower consistency number = more consistent. Laps split by stint, assigned in driver order.</div>
+          </div>
+        </div>
+      )}
+
+      {/* drivers + wake */}
       <div className="panelpad" style={card}>
         {inc && !rs.finished && (
           <div style={{ background: "#1a160a", border: "1px solid " + AMBER + "55", borderRadius: 8, padding: "10px 12px", marginBottom: 12 }}>
@@ -3030,84 +3301,58 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg }) 
             const nextOut = dsi.find((x) => x.i > rs.onKartIdx);
             const nextMin = nextOut ? projStart(nextOut.i) : null;
             const rest = nextMin != null && rs.started ? nextMin - rs.nowMin : null;
-            const status = isOn ? "DRIVING NOW"
-              : nextMin != null ? `drives at ${clockOf(nextMin)}${rest != null ? ` · can rest ${fmtDur(Math.max(0, rest))}` : ""}`
-              : rs.started ? "finished — no more stints" : "waiting to start";
+            const status = isOn ? "DRIVING NOW" : nextMin != null ? `drives at ${clockOf(nextMin)}${rest != null ? ` · rest ${fmtDur(Math.max(0, rest))}` : ""}` : rs.started ? "finished" : "waiting to start";
             return (
-              <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 7,
-                background: isOn ? "#ff335518" : isNext ? AMBER + "15" : "#080d13" }}>
-                <div className="mono" style={{ fontSize: 13, fontWeight: isOn || isNext ? 700 : 500, color: isOn ? "#ff3355" : isNext ? AMBER : "#e6edf3" }}>
-                  {isOn ? "● " : isNext ? "▶ " : ""}{d}
-                </div>
-                <div className="mono" style={{ fontSize: 11, color: "#8b97a7", textAlign: "right" }}>
-                  {status}<br /><span style={{ color: "#5b6776" }}>{dsi.length} stints · {fmtDur(total)} total</span>
-                </div>
+              <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 7, background: isOn ? "#ff2d4d18" : isNext ? AMBER + "15" : "#080d13" }}>
+                <div className="mono" style={{ fontSize: 13, fontWeight: isOn || isNext ? 700 : 500, color: isOn ? "#ff2d4d" : isNext ? AMBER : "#e6edf3" }}>{isOn ? "● " : isNext ? "▶ " : ""}{d}</div>
+                <div className="mono" style={{ fontSize: 11, color: "#9aa8bb", textAlign: "right" }}>{status}<br /><span style={{ color: "#66758a" }}>{dsi.length} stints · {fmtDur(total)} total</span></div>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* live + log + reference */}
+      {/* live + log */}
       <div className="panelpad" style={card}>
         <Label>LIVE TIMING</Label>
-        <div className="mono g3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "10px 12px", fontSize: 13 }}>
+        <div className="mono g3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px 14px", fontSize: 13 }}>
           <Stat label="POSITION" v={live && live.pos ? "P" + live.pos : "—"} />
           <Stat label="LAPS DONE" v={live && live.laps != null ? live.laps : "—"} />
-          <Stat label="BEST LAP" v={live && live.bestClean != null ? fmt(live.bestClean) : "—"} />
-          <Stat label="LAST 5 LAPS" v={live && live.recent != null ? fmt(live.recent) : "—"} c={live && live.recent != null && live.bestClean != null ? (live.recent <= live.bestClean * 1.03 ? "#43d977" : "#ff8a5b") : "#e6edf3"} />
+          <Stat label="GAP" v={live && live.gap ? live.gap : "—"} />
+          <Stat label="STINT LAPS" v={live && live.stintLapCount != null ? live.stintLapCount : "—"} />
+          <Stat label="EST. FINAL LAPS" v={live && live.laps != null && live.recent != null && rs.started && !rs.finished && toFlag > 0 ? "~" + (live.laps + Math.floor((toFlag * 60) / live.recent)) : "—"} c="#9aa8bb" />
+          <Stat label="AVG LAP (RACE)" v={live && live.lapArr ? (() => { const c = splitClean(live.lapArr).clean; return c.length ? fmt(mean(c)) : "—"; })() : "—"} />
         </div>
-        <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 6 }}>Live timing fills once the race is running. Best/last-5 are the kart's clean lap times.</div>
-
         {rs.completed > 0 && (
-          <Collapsible title={`PIT STOP LOG — ${rs.completed} made`} accent="#ff3355">
+          <Collapsible title={`PIT STOP LOG — ${rs.completed} made`} accent="#ff2d4d">
             <div style={{ display: "grid", gap: 3 }}>
               {rs.rows.slice(0, rs.completed).map((r, i) => {
-                const atMin = (team.pitLog || [])[i]?.atMin;
-                const isLast = i === rs.completed - 1;
+                const atMin = (team.pitLog || [])[i]?.atMin; const isLast = i === rs.completed - 1;
                 return (
                   <div key={i} className="mono" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, padding: "3px 4px" }}>
-                    <span style={{ color: "#8b97a7" }}>{i + 1}. {r.driver} out, {rs.rows[i + 1]?.driver || "—"} in</span>
-                    {isLast ? (
+                    <span style={{ color: "#9aa8bb" }}>{i + 1}. {r.driver} out, {rs.rows[i + 1]?.driver || "—"} in</span>
+                    {isLast && owned ? (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                        <span style={{ color: "#5b6776", fontSize: 10 }}>fix time</span>
+                        <span style={{ color: "#66758a", fontSize: 10 }}>fix</span>
                         <input type="time" defaultValue={`${pad2(Math.floor((((atMin % 1440) + 1440) % 1440) / 60))}:${pad2(Math.round(((atMin % 60) + 60) % 60))}`}
                           onChange={(e) => { const v = clockToMin(e.target.value); if (v != null) setLastPit(v); }}
-                          style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 5, color: "#e6edf3", padding: "3px 6px", fontSize: 12, fontFamily: "IBM Plex Mono, monospace" }} />
+                          style={{ background: "#11171f", border: "1px solid #2b3a4e", borderRadius: 5, color: "#e6edf3", padding: "3px 6px", fontSize: 12, fontFamily: "Barlow Semi Condensed, sans-serif" }} />
                       </span>
-                    ) : <span style={{ color: "#5b6776" }}>{atMin != null ? clockOf(atMin) : "—"}</span>}
+                    ) : <span style={{ color: "#66758a" }}>{atMin != null ? clockOf(atMin) : "—"}</span>}
                   </div>
                 );
               })}
             </div>
           </Collapsible>
         )}
-
-        <Collapsible title="LEAD & SEAT BY DRIVER" accent="#3da9fc">
-          <div style={{ display: "grid", gap: 3 }}>
-            {planDrivers.map((d) => {
-              const st = rs.rows.find((r) => r.driver === d) || {};
-              return (
-                <div key={d} className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 6px" }}>
-                  <span style={{ color: "#c2cbd6" }}>{d}</span>
-                  <span style={{ color: "#6b7685" }}>{st.lead != null ? st.lead + " kg lead" : "—"}{st.seat ? " · " + st.seat + " seat" : ""}{st.pedals ? " · " + st.pedals + " pedals" : ""}</span>
-                </div>
-              );
-            })}
-          </div>
-        </Collapsible>
-
-        <div className="mono" style={{ fontSize: 10.5, color: "#5b6776", marginTop: 10, lineHeight: 1.6 }}>
-          <b>Lead</b> = the lead weight (ballast) added to the kart for that driver.{anyHeavy ? " M/H = the heavy seat insert." : ""}<br />
-          Press <b>PIT STOP NOW</b> the moment the driver comes in. Next pit time, wake-up times and the finish time all update from the real time, so a short or long stint moves everything after it.
+        {owned && <div style={{ marginTop: 10 }}><button onClick={() => onLock(team.num)} className="mono" style={{ background: "none", border: "1px solid #2a3543", color: "#78889d", borderRadius: 7, padding: "6px 11px", fontSize: 11, cursor: "pointer" }}>lock this team (stop editing on this device)</button></div>}
+        <div className="mono" style={{ fontSize: 11.5, color: "#66758a", marginTop: 10, lineHeight: 1.6 }}>
+          Press PIT STOP NOW when the driver comes in — next pit, wake-ups and finish all update from the real time. Everything syncs to the shared save so other Leeds teams and spectators see it.
         </div>
       </div>
     </div>
   );
 }
-
-const TRACK_PATH = "M408.0,185.0 L364.0,185.0 L350.0,190.0 L339.0,201.0 L242.0,384.0 L231.0,400.0 L221.0,410.0 L213.0,414.0 L196.0,412.0 L176.0,393.0 L104.0,256.0 L103.0,246.0 L106.0,239.0 L125.0,224.0 L135.0,211.0 L136.0,203.0 L134.0,195.0 L126.0,187.0 L115.0,183.0 L60.0,183.0 L49.0,178.0 L42.0,171.0 L38.0,163.0 L37.0,146.0 L42.0,132.0 L53.0,119.0 L72.0,107.0 L154.0,89.0 L253.0,72.0 L317.0,72.0 L382.0,78.0 L463.0,90.0 L475.0,96.0 L488.0,114.0 L500.0,124.0 L506.0,126.0 L537.0,124.0 L542.0,126.0 L548.0,133.0 L551.0,152.0 L561.0,159.0 L591.0,167.0 L628.0,172.0 L636.0,171.0 L645.0,164.0 L648.0,152.0 L646.0,142.0 L638.0,133.0 L633.0,131.0 L592.0,128.0 L573.0,124.0 L565.0,115.0 L564.0,102.0 L571.0,90.0 L582.0,85.0 L810.0,111.0 L835.0,119.0 L847.0,126.0 L860.0,139.0 L868.0,156.0 L870.0,180.0 L867.0,199.0 L859.0,219.0 L845.0,236.0 L830.0,244.0 L816.0,247.0 L785.0,246.0 L748.0,235.0 L729.0,226.0 L723.0,219.0 L720.0,209.0 L722.0,197.0 L725.0,192.0 L734.0,183.0 L742.0,180.0 L754.0,180.0 L798.0,191.0 L807.0,192.0 L818.0,189.0 L824.0,182.0 L826.0,176.0 L824.0,160.0 L815.0,151.0 L793.0,144.0 L760.0,144.0 L729.0,152.0 L717.0,158.0 L701.0,170.0 L671.0,200.0 L659.0,206.0 L646.0,208.0 L602.0,205.0 L556.0,194.0 L542.0,186.0 L521.0,162.0 L507.0,157.0 L500.0,157.0 L487.0,162.0 L467.0,179.0 L455.0,185.0 L442.0,187.0 L409.0,186.0 Z";
-const TRACK_VIEWBOX = "0 0 928 482";
 
 function TrackMap({ model, teams, simOn, speedMul = 1, onSim }) {
   const pathRef = useRef(null);
@@ -3155,7 +3400,7 @@ function TrackMap({ model, teams, simOn, speedMul = 1, onSim }) {
       <Panel title="TRACK MAP \u2014 TEESSIDE">
         <Empty msg={simOn ? "Waiting for data\u2026" : "No live data yet. Start Test Mode to watch the cars move, or wait for the race feed."} />
         {!simOn && <div style={{ textAlign: "center", marginTop: 12 }}>
-          <button onClick={onSim} className="disp" style={{ background: "#11233a", color: "#43d977", border: "1px solid #43d97755", borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>\u25B6 START TEST MODE</button>
+          <button onClick={onSim} className="disp" style={{ background: "#11233a", color: "#2fd372", border: "1px solid #2fd37255", borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>\u25B6 START TEST MODE</button>
         </div>}
       </Panel>
     );
@@ -3164,24 +3409,24 @@ function TrackMap({ model, teams, simOn, speedMul = 1, onSim }) {
   const sf = pt(0);
   return (
     <Panel title="TRACK MAP \u2014 TEESSIDE">
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,300px),1fr))", gap: 16, alignItems: "start" }}>
-        <div style={{ background: "#080d13", borderRadius: 12, padding: 10 }}>
+      <div style={{ display: "grid", gap: 14 }}>
+        <div style={{ background: "#080d13", borderRadius: 12, padding: 10, maxWidth: 660, width: "100%", margin: "0 auto" }}>
           <svg viewBox={TRACK_VIEWBOX} style={{ width: "100%", height: "auto", display: "block" }}>
             <path ref={pathRef} d={TRACK_PATH} fill="none" stroke="#16202c" strokeWidth="13" strokeLinejoin="round" strokeLinecap="round" />
             <path d={TRACK_PATH} fill="none" stroke="#2a3a4d" strokeWidth="9" strokeLinejoin="round" strokeLinecap="round" />
             <path d={TRACK_PATH} fill="none" stroke="#3da9fc" strokeWidth="1.4" strokeDasharray="2 7" />
             {sf && <g>
               <circle cx={sf.x} cy={sf.y} r="6" fill="none" stroke="#fff" strokeWidth="2.5" />
-              <text x={sf.x} y={sf.y - 11} fill="#fff" fontSize="13" fontWeight="700" fontFamily="IBM Plex Mono" textAnchor="middle">S/F</text>
+              <text x={sf.x} y={sf.y - 11} fill="#fff" fontSize="13" fontWeight="700" fontFamily="Barlow Semi Condensed" textAnchor="middle">S/F</text>
             </g>}
             {len > 0 && karts.map((k) => { const p = pt(stateRef.current[k.kart]?.frac ?? 0); if (!p) return null; const c = colorOf(k.kart); return (
               <g key={k.kart}>
-                <circle cx={p.x} cy={p.y} r="11" fill={c} stroke="#07090d" strokeWidth="2.5" />
-                <text x={p.x} y={p.y + 4} fill="#07090d" fontSize="11" fontWeight="800" fontFamily="IBM Plex Mono" textAnchor="middle">{k.kart}</text>
+                <circle cx={p.x} cy={p.y} r="11" fill={c} stroke="#05070b" strokeWidth="2.5" />
+                <text x={p.x} y={p.y + 4} fill="#05070b" fontSize="11" fontWeight="800" fontFamily="Barlow Semi Condensed" textAnchor="middle">{k.kart}</text>
               </g>
             ); })}
           </svg>
-          <div className="mono" style={{ fontSize: 10, color: "#5b6776", textAlign: "center", marginTop: 4 }}>
+          <div className="mono" style={{ fontSize: 11, color: "#66758a", textAlign: "center", marginTop: 4 }}>
             Teesside Autodrome, clockwise from S/F. Cars move at their own pace \u2014 there's no live sector data, so position around the lap is predicted from lap times, not exact.
           </div>
         </div>
@@ -3193,9 +3438,9 @@ function TrackMap({ model, teams, simOn, speedMul = 1, onSim }) {
               <div key={k.kart} className="mono" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, background: "#080d13", borderRadius: 7, padding: "7px 10px" }}>
                 <span style={{ width: 12, height: 12, borderRadius: "50%", background: colorOf(k.kart), flex: "0 0 auto" }} />
                 <span style={{ color: "#fff", fontWeight: 600 }}>#{k.kart}</span>
-                <span style={{ color: "#8b97a7", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(teams.find((t) => String(t.num) === String(k.kart)) || {}).name || k.team}</span>
+                <span style={{ color: "#9aa8bb", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(teams.find((t) => String(t.num) === String(k.kart)) || {}).name || k.team}</span>
                 <span style={{ color: AMBER }}>{k.pos ? "P" + k.pos : "\u2014"}</span>
-                <span style={{ color: "#6b7685" }}>{k.laps != null ? k.laps + " laps" : ""}</span>
+                <span style={{ color: "#78889d" }}>{k.laps != null ? k.laps + " laps" : ""}</span>
               </div>
             ))}
           </div>
@@ -3205,7 +3450,8 @@ function TrackMap({ model, teams, simOn, speedMul = 1, onSim }) {
   );
 }
 
-function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
+function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel, owned }) {
+  const canEdit = (num) => owned && owned.has(String(num));
   const teams = cfg.teams || [];
   const states = teams.map((t, i) => {
     const rs = teamRaceState(t, raceStart, now);
@@ -3226,7 +3472,7 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
     }
   }
 
-  const condColor = { dry: "#43d977", damp: "#3da9fc", wet: "#ff8a5b" };
+  const condColor = { dry: "#2fd372", damp: "#3da9fc", wet: "#ff8a5b" };
   const pitClockOf = (s) => s.rs.nextPitMin != null ? fmtClockDay(new Date(raceStart.getTime() + s.rs.nextPitMin * 60000), raceStart) : "—";
 
   const logPit = (ti, atMin) => setCfg((c) => ({ ...c, teams: c.teams.map((t, i) => i === ti ? { ...t, pitLog: [...(t.pitLog || []), { atMin, t: new Date().toISOString() }] } : t) }));
@@ -3247,16 +3493,16 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
               {["dry", "damp", "wet"].map((c) => (
                 <button key={c} onClick={() => setCfg((p) => ({ ...p, trackCond: c }))} className="disp"
                   style={{ padding: "6px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: "pointer", textTransform: "uppercase",
-                    border: `1px solid ${cfg.trackCond === c ? condColor[c] : "#222c38"}`,
+                    border: `1px solid ${cfg.trackCond === c ? condColor[c] : "#2b3a4e"}`,
                     background: cfg.trackCond === c ? condColor[c] + "22" : "#0b1017",
-                    color: cfg.trackCond === c ? condColor[c] : "#6b7685" }}>{c}</button>
+                    color: cfg.trackCond === c ? condColor[c] : "#78889d" }}>{c}</button>
               ))}
             </div>
           </div>
           <div style={{ flex: 1 }} />
           {clashPairs.length > 0 && (
-            <div style={{ background: "#1a0a0e", border: "1px solid #ff3355", borderRadius: 8, padding: "8px 12px", maxWidth: 460 }}>
-              <span className="disp" style={{ color: "#ff3355", fontWeight: 700, fontSize: 12 }}>⚠ PIT CLASH</span>
+            <div style={{ background: "#1a0a0e", border: "1px solid #ff2d4d", borderRadius: 8, padding: "8px 12px", maxWidth: 460 }}>
+              <span className="disp" style={{ color: "#ff2d4d", fontWeight: 700, fontSize: 12 }}>⚠ PIT CLASH</span>
               {clashPairs.map(([a, b], i) => (
                 <div key={i} className="mono" style={{ fontSize: 11, color: "#ffb3a0", marginTop: 3 }}>
                   #{a.team.num} &amp; #{b.team.num} both due ~{pitClockOf(a)} / {pitClockOf(b)} — only one crew can swap at a time
@@ -3273,7 +3519,7 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
             {[0, 30, 60, 90, 120].map((m) => (
               <div key={m} style={{ position: "absolute", left: `${(m / 120) * 100}%`, top: -1, height: 56 }}>
                 <div style={{ width: 1, height: 8, background: "#1e2733" }} />
-                <span className="mono" style={{ fontSize: 9.5, color: "#5b6776", position: "absolute", top: 10, transform: "translateX(-50%)" }}>+{m}m</span>
+                <span className="mono" style={{ fontSize: 11, color: "#66758a", position: "absolute", top: 10, transform: "translateX(-50%)" }}>+{m}m</span>
               </div>
             ))}
             {upcoming.map((s) => {
@@ -3282,12 +3528,12 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
                 <div key={s.team.num} title={`#${s.team.num} ${s.team.name} — pit ${pitClockOf(s)}`}
                   style={{ position: "absolute", left: `${Math.min(99, (s.rs.minsToPit / 120) * 100)}%`, top: 22, transform: "translateX(-50%)", textAlign: "center" }}>
                   <div style={{ width: 13, height: 13, borderRadius: "50%", background: s.color,
-                    border: clash ? "2px solid #ff3355" : "2px solid #07090d", boxShadow: clash ? "0 0 6px #ff3355" : "none" }} />
-                  <span className="mono" style={{ fontSize: 9, color: s.color, position: "absolute", top: 15, left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap" }}>#{s.team.num}</span>
+                    border: clash ? "2px solid #ff2d4d" : "2px solid #05070b", boxShadow: clash ? "0 0 6px #ff2d4d" : "none" }} />
+                  <span className="mono" style={{ fontSize: 11, color: s.color, position: "absolute", top: 15, left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap" }}>#{s.team.num}</span>
                 </div>
               );
             })}
-            {upcoming.length === 0 && <span className="mono" style={{ fontSize: 11, color: "#5b6776", position: "absolute", top: 20 }}>No pits scheduled in the next 2 hours.</span>}
+            {upcoming.length === 0 && <span className="mono" style={{ fontSize: 11, color: "#66758a", position: "absolute", top: 20 }}>No pits scheduled in the next 2 hours.</span>}
           </div>
         </div>
       </Panel>
@@ -3299,7 +3545,7 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
           const clash = clashNums.has(s.team.num);
           const toPit = rs.minsToPit;
           const overdue = rs.started && toPit != null && toPit < 0;
-          const pitC = toPit == null ? "#5b6776" : overdue ? "#ff3355" : toPit <= 5 ? "#ff3355" : toPit <= 15 ? "#ff8a5b" : "#43d977";
+          const pitC = toPit == null ? "#66758a" : overdue ? "#ff2d4d" : toPit <= 5 ? "#ff2d4d" : toPit <= 15 ? "#ff8a5b" : "#2fd372";
           const stintPct = rs.onKart && rs.stintElapsed != null ? Math.max(0, Math.min(1, rs.stintElapsed / rs.onKart.len)) : 0;
           const clockOf = (min) => fmtClockDay(new Date(raceStart.getTime() + min * 60000), raceStart);
           const projStart = (i) => { if (rs.onKartIdx < 0 || i < rs.onKartIdx) return null; let a = rs.onKartStart; for (let k = rs.onKartIdx; k < i; k++) a += rs.rows[k].len; return a; };
@@ -3307,34 +3553,34 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
           const isFinal = rs.onKartIdx === rs.rows.length - 1 && rs.onKartIdx >= 0;
           const toFlag = totalMin - rs.nowMin;
           return (
-            <div key={s.team.num} style={{ background: "#0b1017", border: `1px solid ${clash ? "#ff3355" : "#161d27"}`,
+            <div key={s.team.num} style={{ background: "#0b1017", border: `1px solid ${clash ? "#ff2d4d" : "#1b2433"}`,
               borderLeft: `4px solid ${color}`, borderRadius: 10, padding: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <span className="disp" style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>
                   <span style={{ color }}>#{s.team.num}</span> {s.team.name}
                 </span>
                 <span className="mono" style={{ color: AMBER, fontWeight: 700, fontSize: 16 }}>
-                  {live && live.pos ? "P" + live.pos : "—"}{live && live.penalty ? <span style={{ color: "#ff3355", fontSize: 11 }}> ⚑</span> : null}
+                  {live && live.pos ? "P" + live.pos : "—"}{live && live.penalty ? <span style={{ color: "#ff2d4d", fontSize: 11 }}> ⚑</span> : null}
                 </span>
               </div>
 
               {/* next pit hero */}
               <div style={{ marginTop: 10, background: "#080d13", borderRadius: 8, padding: "10px 12px" }}>
                 {rs.rows.length === 0 ? (
-                  <span className="mono" style={{ fontSize: 12, color: "#5b6776" }}>No stint plan yet — set one in the planner or import the sheet.</span>
+                  <span className="mono" style={{ fontSize: 12, color: "#66758a" }}>No stint plan yet — set one in the planner or import the sheet.</span>
                 ) : rs.finished ? (
-                  <span className="disp" style={{ fontSize: 16, fontWeight: 700, color: "#43d977" }}>FINISHED · {rs.completed} stops</span>
+                  <span className="disp" style={{ fontSize: 16, fontWeight: 700, color: "#2fd372" }}>FINISHED · {rs.completed} stops</span>
                 ) : (
                   <>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
-                        <div className="disp" style={{ fontSize: 9.5, color: "#5b6776", letterSpacing: 0.5 }}>{rs.started ? (overdue ? "PIT DUE" : "NEXT PIT") : "STARTS"}</div>
+                        <div className="disp" style={{ fontSize: 11, color: "#66758a", letterSpacing: 0.5 }}>{rs.started ? (overdue ? "PIT DUE" : "NEXT PIT") : "STARTS"}</div>
                         <div className="mono" style={{ fontSize: 20, fontWeight: 700, color: pitC }}>
-                          {pitClockOf(s)}{rs.started && toPit != null ? <span style={{ fontSize: 13, color: overdue ? "#ff3355" : "#8b97a7" }}>  ({overdue ? "+" + fmtDur(-toPit) + " over" : Math.max(0, Math.ceil(toPit)) + "m"})</span> : null}
+                          {pitClockOf(s)}{rs.started && toPit != null ? <span style={{ fontSize: 13, color: overdue ? "#ff2d4d" : "#9aa8bb" }}>  ({overdue ? "+" + fmtDur(-toPit) + " over" : Math.max(0, Math.ceil(toPit)) + "m"})</span> : null}
                         </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
-                        <div className="disp" style={{ fontSize: 9.5, color: "#5b6776", letterSpacing: 0.5 }}>{rs.started ? "→ IN" : "ON GRID"}</div>
+                        <div className="disp" style={{ fontSize: 11, color: "#66758a", letterSpacing: 0.5 }}>{rs.started ? "→ IN" : "ON GRID"}</div>
                         <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: "#e6edf3" }}>{rs.started ? (rs.incoming || "—") : (rs.currentDriver || "—")}</div>
                       </div>
                     </div>
@@ -3347,24 +3593,26 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
                 )}
               </div>
 
-              {/* PIT IN — manual changeover log */}
+              {/* PIT IN — manual changeover log (only the team's own device) */}
               {rs.rows.length > 0 && !rs.finished && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                  <button onClick={() => logPit(s.idx, (Date.now() - raceStart.getTime()) / 60000)} className="disp"
-                    style={{ background: "#ff3355", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px",
-                      fontWeight: 800, fontSize: 14, cursor: "pointer", letterSpacing: 0.5 }}>
-                    ◉ PIT IN
-                  </button>
-                  {rs.completed > 0 && (
+                  {canEdit(s.team.num) && (
+                    <button onClick={() => logPit(s.idx, (Date.now() - raceStart.getTime()) / 60000)} className="disp"
+                      style={{ background: "#ff2d4d", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px",
+                        fontWeight: 800, fontSize: 14, cursor: "pointer", letterSpacing: 0.5 }}>
+                      ◉ PIT IN
+                    </button>
+                  )}
+                  {canEdit(s.team.num) && rs.completed > 0 && (
                     <button onClick={() => undoPit(s.idx)} className="mono" title="undo last pit"
-                      style={{ background: "none", border: "1px solid #2a3543", color: "#8b97a7", borderRadius: 7, padding: "8px 11px", cursor: "pointer", fontSize: 12 }}>
+                      style={{ background: "none", border: "1px solid #2a3543", color: "#9aa8bb", borderRadius: 7, padding: "8px 11px", cursor: "pointer", fontSize: 12 }}>
                       ↩ undo
                     </button>
                   )}
                   {rs.lastActual != null && (
-                    <span className="mono" style={{ fontSize: 11, color: "#8b97a7" }}>
+                    <span className="mono" style={{ fontSize: 11, color: "#9aa8bb" }}>
                       last: <span style={{ color: "#c2cbd6" }}>{rs.lastDriver}</span> {fmtDur(rs.lastActual)}
-                      <span style={{ color: rs.lastActual <= rs.lastPlanned ? "#43d977" : "#ff8a5b" }}> ({rs.lastActual <= rs.lastPlanned ? "-" : "+"}{fmtDur(Math.abs(rs.lastActual - rs.lastPlanned))} vs plan)</span>
+                      <span style={{ color: rs.lastActual <= rs.lastPlanned ? "#2fd372" : "#ff8a5b" }}> ({rs.lastActual <= rs.lastPlanned ? "-" : "+"}{fmtDur(Math.abs(rs.lastActual - rs.lastPlanned))} vs plan)</span>
                     </span>
                   )}
                 </div>
@@ -3372,11 +3620,11 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
 
               {/* projected finish / margin */}
               {rs.rows.length > 0 && !rs.finished && rs.started && (
-                <div className="mono" style={{ marginTop: 8, fontSize: 11.5, color: "#8b97a7" }}>
+                <div className="mono" style={{ marginTop: 8, fontSize: 11.5, color: "#9aa8bb" }}>
                   {isFinal ? (
                     <span>FINAL STINT · <span style={{ color: pitC }}>{fmtDur(Math.max(0, toFlag))} to flag</span></span>
                   ) : (
-                    <span>PROJ. FINISH {clockOf(rs.projFinish)} · <span style={{ color: spare >= 0 ? "#43d977" : "#ff8a5b" }}>{spare >= 0 ? fmtDur(spare) + " in hand" : fmtDur(-spare) + " over"}</span></span>
+                    <span>PROJ. FINISH {clockOf(rs.projFinish)} · <span style={{ color: spare >= 0 ? "#2fd372" : "#ff8a5b" }}>{spare >= 0 ? fmtDur(spare) + " in hand" : fmtDur(-spare) + " over"}</span></span>
                   )}
                 </div>
               )}
@@ -3385,8 +3633,8 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
               {rs.started && !rs.finished && rs.currentDriver && (
                 <div style={{ marginTop: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }} className="mono">
-                    <span style={{ color: "#8b97a7" }}>IN KART: <span style={{ color, fontWeight: 600 }}>{rs.currentDriver}</span></span>
-                    <span style={{ color: "#5b6776" }}>{fmtDur(Math.max(0, rs.stintElapsed))} / {fmtDur(rs.onKart.len)}</span>
+                    <span style={{ color: "#9aa8bb" }}>IN KART: <span style={{ color, fontWeight: 600 }}>{rs.currentDriver}</span></span>
+                    <span style={{ color: "#66758a" }}>{fmtDur(Math.max(0, rs.stintElapsed))} / {fmtDur(rs.onKart.len)}</span>
                   </div>
                   <div style={{ height: 5, borderRadius: 3, background: "#11171f", marginTop: 5, overflow: "hidden" }}>
                     <div style={{ width: `${stintPct * 100}%`, height: "100%", background: pitC }} />
@@ -3396,7 +3644,7 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
 
               {/* up next (projected, anchored to actual) */}
               {!rs.finished && rs.onKartIdx >= 0 && rs.rows.slice(rs.onKartIdx + 1, rs.onKartIdx + 3).length > 0 && (
-                <div className="mono" style={{ marginTop: 10, fontSize: 11, color: "#6b7685" }}>
+                <div className="mono" style={{ marginTop: 10, fontSize: 11, color: "#78889d" }}>
                   UP NEXT: {rs.rows.slice(rs.onKartIdx + 1, rs.onKartIdx + 3).map((r, i) => {
                     const ps = projStart(rs.onKartIdx + 1 + i);
                     return <span key={r.id}>{i ? "  ·  " : " "}<span style={{ color: "#c2cbd6" }}>{r.driver || "—"}</span> {ps != null ? clockOf(ps) : ""}</span>;
@@ -3405,31 +3653,31 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
               )}
 
               {/* stats */}
-              <div className="mono" style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px 10px", fontSize: 12, borderTop: "1px solid #11171f", paddingTop: 10 }}>
+              <div className="mono" style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "11px 14px", fontSize: 12, borderTop: "1px solid #11171f", paddingTop: 10 }}>
                 <Stat label="PIT STOPS" v={`${rs.plannedPitsDone}/${rs.totalPits}`} />
                 <Stat label="LAPS" v={live && live.laps != null ? live.laps : "—"} />
                 <Stat label="GAP" v={live && live.gap ? live.gap : "—"} />
-                <Stat label="STINT PACE" v={live && live.recent != null ? fmt(live.recent) : "—"} c={live && live.recent != null && live.bestClean != null ? (live.recent <= live.bestClean * 1.03 ? "#43d977" : "#ff8a5b") : "#e6edf3"} />
+                <Stat label="STINT PACE" v={live && live.recent != null ? fmt(live.recent) : "—"} c={live && live.recent != null && live.bestClean != null ? (live.recent <= live.bestClean * 1.03 ? "#2fd372" : "#ff8a5b") : "#e6edf3"} />
                 <Stat label="BEST" v={live && live.bestClean != null ? fmt(live.bestClean) : "—"} />
                 <Stat label="POS" v={live && live.pos ? "P" + live.pos : "—"} />
               </div>
 
               {/* pit log */}
               {rs.completed > 0 && (
-                <Collapsible title={`PIT LOG (${rs.completed})`} accent="#ff3355">
+                <Collapsible title={`PIT LOG (${rs.completed})`} accent="#ff2d4d">
                   <div style={{ display: "grid", gap: 3 }}>
                     {rs.rows.slice(0, rs.completed).map((r, i) => {
                       const atMin = (s.team.pitLog || [])[i]?.atMin;
                       const isLast = i === rs.completed - 1;
                       return (
                         <div key={i} className="mono" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5, padding: "2px 4px" }}>
-                          <span style={{ color: "#8b97a7" }}>{i + 1}. <span style={{ color: "#c2cbd6" }}>{r.driver}</span> out, <span style={{ color: "#c2cbd6" }}>{rs.rows[i + 1]?.driver || "—"}</span> in</span>
-                          {isLast ? (
+                          <span style={{ color: "#9aa8bb" }}>{i + 1}. <span style={{ color: "#c2cbd6" }}>{r.driver}</span> out, <span style={{ color: "#c2cbd6" }}>{rs.rows[i + 1]?.driver || "—"}</span> in</span>
+                          {isLast && canEdit(s.team.num) ? (
                             <input type="time" defaultValue={`${pad2(Math.floor(((atMin % 1440) + 1440) % 1440 / 60))}:${pad2(Math.round(((atMin % 60) + 60) % 60))}`}
                               onChange={(e) => { const v = clockToMin(e.target.value); if (v != null) setLastPit(s.idx, v); }}
-                              style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 5, color: "#e6edf3", padding: "2px 5px", fontSize: 11, fontFamily: "IBM Plex Mono, monospace" }} />
+                              style={{ background: "#11171f", border: "1px solid #2b3a4e", borderRadius: 5, color: "#e6edf3", padding: "2px 5px", fontSize: 11, fontFamily: "Barlow Semi Condensed, sans-serif" }} />
                           ) : (
-                            <span style={{ color: "#5b6776" }}>{atMin != null ? clockOf(atMin) : "—"}</span>
+                            <span style={{ color: "#66758a" }}>{atMin != null ? clockOf(atMin) : "—"}</span>
                           )}
                         </div>
                       );
@@ -3453,7 +3701,7 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
                         <div key={d} className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5,
                           padding: "3px 6px", borderRadius: 5, background: isOn ? color + "18" : "transparent" }}>
                           <span style={{ color: isOn ? color : "#c2cbd6", fontWeight: isOn ? 700 : 400 }}>{isOn ? "● " : ""}{d}</span>
-                          <span style={{ color: "#6b7685" }}>
+                          <span style={{ color: "#78889d" }}>
                             {dsi.length} stints · {fmtDur(total)}
                             {isOn ? " · IN" : nextMin != null ? ` · next ${clockOf(nextMin)}${rest != null ? ` (rest ${fmtDur(Math.max(0, rest))})` : ""}` : rs.started ? " · done" : ""}
                           </span>
@@ -3467,7 +3715,7 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
           );
         })}
       </div>
-      <div className="mono" style={{ fontSize: 10, color: "#5b6776", marginTop: 4, lineHeight: 1.5 }}>
+      <div className="mono" style={{ fontSize: 11, color: "#66758a", marginTop: 4, lineHeight: 1.5 }}>
         Tap PIT IN the moment a driver comes in — everything below reflows off the actual time, so a short or long stint shifts the next pit and the finish margin automatically. Fix a mistap with the time field in PIT LOG, or undo. Teams are in your order of importance; the timing feed never gives pit times, so this log is the source of truth for stints.
       </div>
     </>
@@ -3477,13 +3725,13 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel }) {
 function Stat({ label, v, c }) {
   return (
     <div>
-      <div style={{ color: "#5b6776", fontSize: 9.5, letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ color: "#66758a", fontSize: 11, letterSpacing: 0.5, marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
       <div style={{ color: c || "#e6edf3", fontWeight: 600 }}>{v}</div>
     </div>
   );
 }
 
-function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, started, onUpdate, onRemove }) {
+function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, started, onUpdate }) {
   const [driverDraft, setDriverDraft] = useState("");
   const stints = team.stints || [];
   // cumulative start times
@@ -3507,6 +3755,12 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
     setStints(out);
   };
   const addDriver = () => { const d = driverDraft.trim(); if (d && !team.drivers.includes(d)) onUpdate({ drivers: [...team.drivers, d] }); setDriverDraft(""); };
+  const renameDriver = (oldN) => {
+    const nn = (typeof prompt === "function") ? prompt(`Rename "${oldN}" to:`, oldN) : null;
+    if (!nn || !nn.trim() || nn.trim() === oldN) return;
+    const n = nn.trim();
+    onUpdate({ drivers: team.drivers.map((x) => (x === oldN ? n : x)), stints: stints.map((s) => (s.driver === oldN ? { ...s, driver: n } : s)) });
+  };
 
   const coverWarn = Math.abs(scheduledMin - totalMin) > (defaultStintLen / 2);
 
@@ -3526,10 +3780,6 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
           style={{ background: "#11233a", color: AMBER, border: `1px solid ${AMBER}55`, borderRadius: 7, padding: "7px 13px", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
           ↻ GENERATE ROTATION
         </button>
-        <button onClick={onRemove} className="mono" title="remove team"
-          style={{ background: "none", border: "1px solid #2a3543", color: "#ff6b6b", borderRadius: 7, padding: "7px 11px", cursor: "pointer", fontSize: 12 }}>
-          ✕
-        </button>
       </div>
 
       {/* drivers */}
@@ -3539,7 +3789,9 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
           <span key={d} className="mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12,
             background: "#0b1017", border: `1px solid ${driverColor[d]}55`, borderRadius: 6, padding: "4px 6px 4px 9px", color: driverColor[d], fontWeight: 600 }}>
             {d}
-            {totals[d] && <span style={{ color: "#5b6776", fontWeight: 400 }}>{fmtDur(totals[d].min)}</span>}
+            {totals[d] && <span style={{ color: "#66758a", fontWeight: 400 }}>{fmtDur(totals[d].min)}</span>}
+            <button onClick={() => renameDriver(d)} title="rename driver everywhere"
+              style={{ background: "none", border: "none", color: "#78889d", cursor: "pointer", fontSize: 11, lineHeight: 1, padding: 0 }}>✎</button>
             <button onClick={() => onUpdate({ drivers: team.drivers.filter((x) => x !== d), stints: stints.map((s) => s.driver === d ? { ...s, driver: "" } : s) })}
               style={{ background: "none", border: "none", color: "#ff8a5b", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: 0 }}>✕</button>
           </span>
@@ -3550,20 +3802,20 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
       </div>
 
       {/* coverage bar */}
-      <div style={{ height: 8, borderRadius: 4, background: "#0b1017", border: "1px solid #161d27", overflow: "hidden", display: "flex", marginBottom: 4 }}>
+      <div style={{ height: 8, borderRadius: 4, background: "#0b1017", border: "1px solid #1b2433", overflow: "hidden", display: "flex", marginBottom: 4 }}>
         {rows.map((r, i) => (
           <div key={r.id} title={`${r.driver || "unassigned"} · ${fmtDur(r.len)}`}
             style={{ width: `${(r.len / totalMin) * 100}%`, background: r.driver ? driverColor[r.driver] : "#2a3543",
-              opacity: i === activeIdx ? 1 : 0.55, borderRight: "1px solid #07090d" }} />
+              opacity: i === activeIdx ? 1 : 0.55, borderRight: "1px solid #05070b" }} />
         ))}
       </div>
-      <div className="mono" style={{ fontSize: 10.5, color: coverWarn ? "#ff8a5b" : "#5b6776", marginBottom: 14 }}>
+      <div className="mono" style={{ fontSize: 11.5, color: coverWarn ? "#ff8a5b" : "#66758a", marginBottom: 14 }}>
         scheduled {fmtDur(scheduledMin)} / {fmtDur(totalMin)} race{coverWarn ? "  ⚠ doesn't cover the full race" : "  ✓"}
       </div>
 
       {/* stint list */}
       {rows.length === 0 ? (
-        <div className="mono" style={{ fontSize: 12, color: "#5b6776", padding: "10px 0" }}>
+        <div className="mono" style={{ fontSize: 12, color: "#66758a", padding: "10px 0" }}>
           No stints yet. Add drivers, then Generate Rotation, or add stints one at a time below.
         </div>
       ) : (
@@ -3575,37 +3827,37 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
             return (
               <div key={r.id}>
               <div style={{ display: "grid", gridTemplateColumns: "26px 92px 1fr 84px 64px 30px", gap: 8, alignItems: "center",
-                background: active ? "#1a0a0e" : "#080d13", border: `1px solid ${active ? "#ff3355" : "#11171f"}`, borderRadius: 7, padding: "6px 9px" }}>
-                <span className="mono" style={{ color: "#5b6776", fontSize: 11 }}>{i + 1}</span>
-                <span className="mono" style={{ color: active ? "#ff3355" : "#c2cbd6", fontSize: 12, fontWeight: active ? 700 : 400 }}>
+                background: active ? "#1a0a0e" : "#080d13", border: `1px solid ${active ? "#ff2d4d" : "#11171f"}`, borderRadius: 7, padding: "6px 9px" }}>
+                <span className="mono" style={{ color: "#66758a", fontSize: 11 }}>{i + 1}</span>
+                <span className="mono" style={{ color: active ? "#ff2d4d" : "#c2cbd6", fontSize: 12, fontWeight: active ? 700 : 400 }}>
                   {fmtClockDay(startD, raceStart)}
                 </span>
                 <select value={r.driver || ""} onChange={(e) => setStints(stints.map((s) => s.id === r.id ? { ...s, driver: e.target.value } : s))}
-                  className="mono" style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 6,
-                    color: r.driver ? (driverColor[r.driver] || "#e6edf3") : "#5b6776", padding: "5px 7px", fontSize: 12.5, fontWeight: 600, width: "100%" }}>
+                  className="mono" style={{ background: "#11171f", border: "1px solid #2b3a4e", borderRadius: 6,
+                    color: r.driver ? (driverColor[r.driver] || "#e6edf3") : "#66758a", padding: "5px 7px", fontSize: 12.5, fontWeight: 600, width: "100%" }}>
                   <option value="">— unassigned —</option>
                   {team.drivers.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <input type="number" min="5" max="240" value={r.len}
                     onChange={(e) => setStints(stints.map((s) => s.id === r.id ? { ...s, len: Math.max(1, Number(e.target.value) || 0) } : s))}
-                    className="mono" style={{ background: "#11171f", border: "1px solid #222c38", borderRadius: 6, color: "#e6edf3", padding: "5px 6px", fontSize: 12, width: 56 }} />
-                  <span className="mono" style={{ color: "#5b6776", fontSize: 10 }}>min</span>
+                    className="mono" style={{ background: "#11171f", border: "1px solid #2b3a4e", borderRadius: 6, color: "#e6edf3", padding: "5px 6px", fontSize: 12, width: 56 }} />
+                  <span className="mono" style={{ color: "#66758a", fontSize: 10 }}>min</span>
                 </div>
-                <span className="mono" style={{ fontSize: 11, color: active ? "#ff8a5b" : "#5b6776", textAlign: "right" }}>
+                <span className="mono" style={{ fontSize: 11, color: active ? "#ff8a5b" : "#66758a", textAlign: "right" }}>
                   {active ? `${Math.max(0, Math.ceil(remain))}m left` : ""}
                 </span>
                 <button onClick={() => setStints(stints.filter((s) => s.id !== r.id))} className="mono"
                   style={{ background: "none", border: "none", color: "#ff6b6b", cursor: "pointer", fontSize: 13, padding: 0 }}>✕</button>
               </div>
-              {r.note && <div className="mono" style={{ fontSize: 10.5, color: "#8b7a4a", padding: "2px 9px 0 36px" }}>⚙ {r.note}</div>}
+              {r.note && <div className="mono" style={{ fontSize: 11.5, color: "#8b7a4a", padding: "2px 9px 0 36px" }}>⚙ {r.note}</div>}
               </div>
             );
           })}
         </div>
       )}
       <button onClick={() => setStints([...stints, { id: uid(), driver: team.drivers[0] || "", len: defaultStintLen }])}
-        className="mono" style={{ marginTop: 8, background: "none", border: "1px dashed #2a3543", color: "#8b97a7",
+        className="mono" style={{ marginTop: 8, background: "none", border: "1px dashed #2a3543", color: "#9aa8bb",
           borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>
         + add stint
       </button>
@@ -3649,7 +3901,7 @@ function StatsTable({ boxes, fieldMed }) {
     <div style={{ marginTop: 12, overflowX: "auto" }}>
       <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
         <thead>
-          <tr style={{ color: "#6b7685", textAlign: "right" }}>
+          <tr style={{ color: "#78889d", textAlign: "right" }}>
             {cols.map(([h, key], i) => {
               const activeKey = key === "gap" ? "avg" : key;
               const isActive = sort.key === activeKey;
@@ -3657,7 +3909,7 @@ function StatsTable({ boxes, fieldMed }) {
                 <th key={h} onClick={() => clickSort(activeKey)} 
                   style={{ padding: "6px 10px", textAlign: i === 0 ? "left" : "right",
                     borderBottom: "1px solid #1e2733", fontWeight: 500, cursor: "pointer", 
-                    color: isActive ? AMBER : "#6b7685", userSelect: "none" }}>
+                    color: isActive ? AMBER : "#78889d", userSelect: "none" }}>
                   {h}{isActive ? (sort.dir === "desc" ? " ▾" : " ▴") : ""}
                 </th>
               );
@@ -3674,7 +3926,7 @@ function StatsTable({ boxes, fieldMed }) {
                 <td style={td}>{fmt(b.avg)}</td>
                 <td style={td}>{fmt(b.cons)}</td>
                 <td style={td}>{b.inc}</td>
-                <td style={{ padding: "6px 10px", textAlign: "right", color: gap == null ? "#5b6776" : gap <= 0 ? "#43d977" : "#ff3355" }}>
+                <td style={{ padding: "6px 10px", textAlign: "right", color: gap == null ? "#66758a" : gap <= 0 ? "#2fd372" : "#ff2d4d" }}>
                   {gap == null ? "—" : gap <= 0 ? `${gap.toFixed(3)}s` : `+${gap.toFixed(3)}s`}
                 </td>
               </tr>
@@ -3688,15 +3940,15 @@ function StatsTable({ boxes, fieldMed }) {
 
 /* ---------- small ui ---------- */
 const td = { padding: "6px 10px", textAlign: "right", color: "#c2cbd6" };
-const inp = (w) => ({ background: "#11171f", border: "1px solid #222c38", borderRadius: 6,
-  color: "#e6edf3", padding: "5px 8px", fontSize: 12.5, width: "100%", maxWidth: w, fontFamily: "IBM Plex Mono, monospace" });
+const inp = (w) => ({ background: "#11171f", border: "1px solid #2b3a4e", borderRadius: 6,
+  color: "#e6edf3", padding: "5px 8px", fontSize: 12.5, width: "100%", maxWidth: w, fontFamily: "Barlow Semi Condensed, sans-serif" });
 const Label = ({ children }) => (
-  <div className="disp" style={{ fontSize: 12.5, color: "#8b97a7", letterSpacing: "1px",
+  <div className="disp" style={{ fontSize: 12.5, color: "#9aa8bb", letterSpacing: "1px",
     fontWeight: 600, marginBottom: 9, textTransform: "uppercase" }}>{children}</div>
 );
 function Panel({ title, children }) {
   return (
-    <div style={{ background: "#0a0f16", border: "1px solid #161d27", borderRadius: 12, padding: 18, marginBottom: 14 }}>
+    <div style={{ background: "#0a0f16", border: "1px solid #1b2433", borderRadius: 12, padding: 18, marginBottom: 14 }}>
       <div className="disp" style={{ fontSize: 13, color: AMBER, letterSpacing: "1.5px",
         fontWeight: 600, marginBottom: 14 }}>{title}</div>
       {children}
@@ -3707,7 +3959,7 @@ function Panel({ title, children }) {
 function Collapsible({ title, subtitle, defaultOpen = false, accent = AMBER, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ border: "1px solid #161d27", borderRadius: 10, marginBottom: 10,
+    <div style={{ border: "1px solid #1b2433", borderRadius: 10, marginBottom: 10,
       overflow: "hidden", background: "#0b1017" }}>
       <button onClick={() => setOpen((o) => !o)}
         style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 14px",
@@ -3716,7 +3968,7 @@ function Collapsible({ title, subtitle, defaultOpen = false, accent = AMBER, chi
           display: "inline-block", transition: "transform .15s", transform: open ? "rotate(90deg)" : "none" }}>▸</span>
         <span className="disp" style={{ color: "#e6edf3", fontWeight: 600, fontSize: 14,
           letterSpacing: "0.5px", flex: 1 }}>{title}</span>
-        {subtitle && <span className="mono" style={{ color: "#5b6776", fontSize: 11 }}>{subtitle}</span>}
+        {subtitle && <span className="mono" style={{ color: "#66758a", fontSize: 11 }}>{subtitle}</span>}
       </button>
       {open && <div style={{ padding: "6px 14px 16px" }}>{children}</div>}
     </div>
