@@ -19,13 +19,15 @@ async function token(site) {
   } catch { return null; }
 }
 
-// find the biggest array of competitor-like objects anywhere in the payload
+// find the competitor array (real key is "Competitors"; fall back to any array
+// of objects that look like timing rows)
 function findRows(o) {
+  if (o && Array.isArray(o.Competitors)) return o.Competitors;
   let best = [];
   (function walk(x) {
     if (Array.isArray(x)) {
       if (x.length && x.every((e) => e && typeof e === "object") &&
-          x.some((e) => "position" in e || "competitorNumber" in e || "number" in e || "name" in e)) {
+          x.some((e) => "CompetitorNumber" in e || "Position" in e || "competitorNumber" in e)) {
         if (x.length > best.length) best = x;
       }
       x.forEach(walk);
@@ -34,45 +36,47 @@ function findRows(o) {
   return best;
 }
 const pick = (o, ...k) => { for (const x of k) if (o && o[x] != null && o[x] !== "") return o[x]; return null; };
-function findStr(o, ...names) {
-  let hit = null;
-  (function walk(x) {
-    if (hit) return;
-    if (x && typeof x === "object" && !Array.isArray(x)) {
-      for (const n of names) if (typeof x[n] === "string" && x[n]) { hit = x[n]; return; }
-      Object.values(x).forEach(walk);
-    } else if (Array.isArray(x)) x.forEach(walk);
-  })(o);
-  return hit;
-}
+const msToSec = (v) => (typeof v === "number" && v > 0 ? (v / 1000).toFixed(3) : null);
 
 function transform(api) {
   const rows = findRows(api);
-  const clean = (s) => String(s || "").replace(/\*pen|\[\+penalty\]/gi, "").trim();
   const results = rows.map((r) => {
-    const name = pick(r, "name", "teamName", "team", "competitor") || "";
+    const name = pick(r, "TeamName", "CompetitorName", "DriverName", "name") || "";
+    const behind = pick(r, "Behind", "Gap", "gap");
+    const pos = pick(r, "Position", "position", "pos");
+    let gap = "";
+    if (pos !== 1 && behind != null) gap = /^[\d.]+$/.test(String(behind)) ? "+" + behind + "s" : String(behind);
     return {
-      position: pick(r, "position", "pos", "rank"),
-      kart: String(pick(r, "competitorNumber", "number", "kart", "num") || "").trim(),
-      name: clean(name), team: clean(name),
-      laps: pick(r, "laps", "lapCount", "lapsCompleted", "lap"),
-      gap: (pick(r, "gap", "gapToLeader", "interval") || null) && String(pick(r, "gap", "gapToLeader", "interval")),
-      best_lap_time: (pick(r, "bestLapTime", "bestLap", "best") || null) && String(pick(r, "bestLapTime", "bestLap", "best")),
-      last_lap_time: (pick(r, "lastLapTime", "lastLap", "last") || null) && String(pick(r, "lastLapTime", "lastLap", "last")),
-      penalty: !!pick(r, "penalty", "hasPenalty") || /\*pen|\[\+penalty\]/i.test(name),
+      position: pos,
+      kart: String(pick(r, "CompetitorNumber", "competitorNumber", "number", "kart") || "").trim(),
+      name: String(name).trim(), team: String(name).trim(),
+      laps: pick(r, "NumberOfLaps", "laps", "lapCount"),
+      gap,
+      best_lap_time: msToSec(pick(r, "BestLaptime", "bestLapTime", "best")),
+      last_lap_time: msToSec(pick(r, "LastLaptime", "lastLapTime", "last")),
+      in_pit: !!pick(r, "InPit"),
+      penalty: !!pick(r, "penalty", "Penalty"),
     };
   }).filter((r) => r.kart);
+
+  // per-kart lap history (LapTime is in ms) -> seconds strings for the analytics
   const lap_times = rows.map((r) => {
-    const ll = pick(r, "lapTimes", "lapList", "lapsList");
-    return Array.isArray(ll) && ll.length ? { kart: String(pick(r, "competitorNumber", "number", "kart") || ""), laps: ll.map(String) } : null;
+    const kart = String(pick(r, "CompetitorNumber", "competitorNumber", "number") || "").trim();
+    const L = pick(r, "Laps", "lapTimes", "lapList");
+    if (!kart || !Array.isArray(L) || !L.length) return null;
+    const laps = L.map((x) => (typeof x === "object" ? msToSec(x.LapTime) : msToSec(x))).filter(Boolean);
+    return laps.length ? { kart, laps } : null;
   }).filter(Boolean);
-  const st = (findStr(api, "status") || "live").toLowerCase();
+
+  const st = String(pick(api, "State", "Status", "status") || "live").toLowerCase();
+  const live = ["live", "running", "green", "started", "active"].includes(st);
   return {
     scraped_at: new Date().toISOString(),
     sessions: [{
-      label: findStr(api, "sessionName", "session", "name") || "Live",
-      type: (findStr(api, "sessionType", "type") || "race").toLowerCase(),
-      status: ["live", "running", "green"].includes(st) ? "live" : st,
+      label: pick(api, "SessionName", "sessionName", "name") || "Live",
+      type: String(pick(api, "SessionType", "sessionType", "type") || "race").toLowerCase(),
+      state: pick(api, "State"),
+      status: live ? "live" : st,
       results, lap_times, penalties: [],
     }],
   };
