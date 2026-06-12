@@ -2279,9 +2279,10 @@ const CLASH_MIN = 4;   // two of our teams pitting within this many minutes = a 
 // Teams that get their own dedicated command tab. Add { num, label } here to give
 // another team the same page Leeds A has (e.g. { num: "20", label: "◈ CARTEL" }).
 const COMMAND_TEAMS = [
-  { num: "18", label: "◈ LEEDS A" }, { num: "19", label: "LEEDS B" }, { num: "20", label: "LEEDS C" },
-  { num: "21", label: "LEEDS D" }, { num: "57", label: "GRADS A" }, { num: "58", label: "GRADS B" },
+  { num: "18", label: "◈ LEEDS A", color: TEAM_COLORS.A }, { num: "19", label: "LEEDS B", color: TEAM_COLORS.B }, { num: "20", label: "LEEDS C", color: TEAM_COLORS.C },
+  { num: "21", label: "LEEDS D", color: TEAM_COLORS.D }, { num: "57", label: "GRADS A", color: TEAM_COLORS.E }, { num: "58", label: "GRADS B", color: TEAM_COLORS.F },
 ];
+const teamColorOf = (num) => { const t = COMMAND_TEAMS.find((x) => String(x.num) === String(num)); return t ? t.color : AMBER; };
 // passcodes are validated server-side (api/roster) so no secrets ship in the client bundle
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -2493,6 +2494,7 @@ function Live24({ knownDrivers = [] }) {
   const ownedRef = useRef(owned); ownedRef.current = owned;
   const pendingRef = useRef({});        // num -> [{type:'add'|'remove'|'clear', entry?, id?, ts}]
   const planGuardRef = useRef({});      // num -> ts (suppress pulling plan right after a local edit)
+  const seqRef = useRef(LS("live24_seq", {}));   // num -> last version pushed (monotonic, survives refresh)
 
   const applyPending = (log, ops) => {
     let out = (log || []).slice();
@@ -2514,24 +2516,18 @@ function Live24({ knownDrivers = [] }) {
       body: JSON.stringify({ teamSync: { num: n, passcode: ownPass.current[n], ...extra } }) })
       .then(() => { setTimeout(pullNow, 600); setTimeout(pullNow, 2500); }).catch(() => {});
   };
+  // monotonic version per team (survives refresh via clock floor) so the server
+  // ignores out-of-order pushes — a fast log+undo can never resurrect a pit.
+  const nextSeq = (n) => { const s = Math.max(Date.now(), (seqRef.current[n] || 0) + 1); seqRef.current[n] = s; saveLS("live24_seq", seqRef.current); return s; };
+  const pushLog = (num, log) => { const n = String(num); sendTeam(n, { pitLog: log, seq: nextSeq(n) }); };
 
-  // optimistic local mutators (used by every team tab + the all-teams board)
-  const pitIn = (num, atMin) => { const e = { id: uid() + Date.now(), atMin, t: new Date().toISOString() };
-    setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: applyPending(t.pitLog, [{ type: "add", entry: e, ts: Date.now() }]) } : t) }));
-    queue(num, { type: "add", entry: e }); sendTeam(num, { pitAppend: e }); };
-  const pitUndo = (num) => {
-    const team = (cfg.teams || []).find((t) => String(t.num) === String(num));
-    const pl = (team && team.pitLog) || [];
-    if (!pl.length) return;
-    const id = pl[pl.length - 1].id;
-    if (id == null) { setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: (t.pitLog || []).slice(0, -1) } : t) })); return; }
-    setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: (t.pitLog || []).filter((p) => p.id !== id) } : t) }));
-    if (id != null) { queue(num, { type: "remove", id }); sendTeam(num, { pitRemove: id }); }
-  };
-  const pitClear = (num) => { setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: [] } : t) }));
-    queue(num, { type: "clear" }); sendTeam(num, { pitClear: true }); };
-  const pitEdit = (num, id, atMin) => { setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: (t.pitLog || []).map((p) => p.id === id ? { ...p, atMin } : p) } : t) }));
-    queue(num, { type: "edit", id, atMin }); sendTeam(num, { pitEdit: { id, atMin } }); };
+  const curLog = (num) => { const t = (cfg.teams || []).find((x) => String(x.num) === String(num)); return (t && t.pitLog) || []; };
+  const setLog = (num, log) => setCfg((c) => ({ ...c, teams: c.teams.map((t) => String(t.num) === String(num) ? { ...t, pitLog: log } : t) }));
+
+  const pitIn = (num, atMin) => { const log = [...curLog(num), { id: uid() + Date.now(), atMin, t: new Date().toISOString() }]; setLog(num, log); pushLog(num, log); };
+  const pitUndo = (num) => { const pl = curLog(num); if (!pl.length) return; const log = pl.slice(0, -1); setLog(num, log); pushLog(num, log); };
+  const pitClear = (num) => { setLog(num, []); pushLog(num, []); };
+  const pitEdit = (num, id, atMin) => { const log = curLog(num).map((p) => (p.id === id ? { ...p, atMin } : p)); setLog(num, log); pushLog(num, log); };
 
   // plan (lineup / stint) edits push immediately for owned teams
   const pushPlan = (num, team) => { planGuardRef.current[String(num)] = Date.now();
@@ -2706,10 +2702,12 @@ function Live24({ knownDrivers = [] }) {
   const simFastRef = useRef(simFast); simFastRef.current = simFast;
   useEffect(() => {
     if (!simOn) { setSimModel(null); return; }
-    const rivals = [["12", "Fastest House"], ["64", "Liverpool A"], ["50", "Loughborough A"], ["2", "Imp"], ["44", "Salford A"]];
+    const rivalNames = ["Fastest House","Liverpool A","Loughborough A","Imperial","Salford A","Birmingham A","Bath A","Cardiff A","Sheffield A","Nottingham A","Warwick A","Bristol A","Durham A","Exeter A","Newcastle A","Manchester A","Leeds Beckett","Glasgow A","Edinburgh A","Surrey A","Brunel A","Coventry A","Oxford A","Cambridge A","Southampton A","Lancaster A"];
+    const rivals = []; let rn = 30;
+    for (const nm of rivalNames) { rivals.push([String(rn), nm]); rivals.push([String(rn + 1), nm.replace(/ A$/, " B")]); rn += 2; }
     const ours = (cfg.teams || []).map((t) => [String(t.num), t.name]).filter((o) => o[0]);
     const seen = new Set(); const karts = [];
-    [...ours, ...rivals].forEach(([num, name]) => { if (!seen.has(num)) { seen.add(num); karts.push({ kart: num, team: name, base: 66 + Math.random() * 5, frac: Math.random(), laps: 0, lapArr: [], pitEvery: 70 + Math.floor(Math.random() * 25), lastPit: 0, pen: [] }); } });
+    [...ours, ...rivals].slice(0, 60).forEach(([num, name]) => { if (!seen.has(num)) { seen.add(num); karts.push({ kart: num, team: name, base: 66 + Math.random() * 5, frac: Math.random(), laps: 0, lapArr: [], pitEvery: 70 + Math.floor(Math.random() * 25), lastPit: 0, pen: [] }); } });
     const ourSet = new Set(ours.map((o) => o[0]));
     const bestOf = (arr) => getValidFastest(splitClean(arr).clean);
     const PENR = ["Contact", "Track limits", "Jump start", "Pit lane speeding"];
@@ -2807,14 +2805,19 @@ function Live24({ knownDrivers = [] }) {
       })()}
 
       <div className="apptabs" style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", paddingBottom: 2 }}>
-        {tabs.map(([k, l]) => (
+        {tabs.map(([k, l]) => {
+          const tc = k.startsWith("cmd:") ? teamColorOf(k.slice(4)) : AMBER;
+          const on = sub === k;
+          return (
           <button key={k} onClick={() => setSub(k)} className="disp"
             style={{ padding: "8px 16px", borderRadius: 6, fontWeight: 600, fontSize: 15.5, cursor: "pointer",
-              border: "1px solid", borderColor: sub === k ? AMBER : "#2b3a4e",
-              background: sub === k ? "#1a160a" : "#0b1017", color: sub === k ? AMBER : "#9aa8bb" }}>
+              border: "1px solid", borderColor: on ? tc : "#2b3a4e",
+              background: on ? tc + "22" : "#0b1017", color: on ? tc : "#9aa8bb",
+              borderLeft: k.startsWith("cmd:") ? `3px solid ${tc}` : "1px solid " + (on ? tc : "#2b3a4e") }}>
             {l}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {sub.startsWith("cmd:") && (() => {
@@ -3123,7 +3126,7 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, mo
   const [alertsOn, setAlertsOn] = useState(() => LS("live24_alerts", true));
   useEffect(() => { saveLS("live24_alerts", alertsOn); }, [alertsOn]);
   const firedRef = useRef({});
-  const pitAlert = () => {
+  const pitAlert = (title, body) => {
     try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch {}
     try {
       const ctx = window.__pwAudio || (window.__pwAudio = new (window.AudioContext || window.webkitAudioContext)());
@@ -3132,7 +3135,9 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, mo
         g.gain.setValueAtTime(0.15, ctx.currentTime + d); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + d + 0.2);
         o.start(ctx.currentTime + d); o.stop(ctx.currentTime + d + 0.22); });
     } catch {}
+    try { if ("Notification" in window && Notification.permission === "granted") new Notification(title || "Pitwall", { body: body || "", tag: "pitwall-" + team.num }); } catch {}
   };
+  const askNotify = () => { try { if ("Notification" in window && Notification.permission !== "granted") Notification.requestPermission(); } catch {} };
   const logPit = (atMin) => owned && pitIn(team.num, atMin);
   const undoPit = () => owned && pitUndo(team.num);
   const setLastPit = (atMin) => { if (!owned) return; const pl = team.pitLog || []; if (pl.length) pitEdit(team.num, pl[pl.length - 1].id, atMin); };
@@ -3244,17 +3249,29 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, mo
             {windowState && <div className="mono" style={{ marginTop: 8, fontSize: 12 }}><span style={{ color: "#78889d" }}>PIT WINDOW: </span><span style={{ color: windowState.c, fontWeight: 600 }}>{windowState.txt}</span></div>}
 
             {owned && (() => {
-              // pit alerts: buzz + beep once at 5 min and 1 min before the planned stop
+              const nm = inc ? inc.driver : null;
               if (alertsOn && rs.started && !rs.finished && toPit != null && toPit > -2) {
                 const k = rs.onKartIdx;
-                if (toPit <= 5 && !firedRef.current["5:" + k]) { firedRef.current["5:" + k] = 1; pitAlert(); }
-                if (toPit <= 1 && !firedRef.current["1:" + k]) { firedRef.current["1:" + k] = 1; pitAlert(); }
+                if (toPit <= 30 && toPit > 5 && !firedRef.current["30:" + k]) { firedRef.current["30:" + k] = 1; pitAlert(`#${team.num}: prepare ${nm || "next driver"}`, `Pit in ~30 min. Get ${nm || "the next driver"} ready.`); }
+                if (toPit <= 5 && !firedRef.current["5:" + k]) { firedRef.current["5:" + k] = 1; pitAlert(`#${team.num}: pit in 5 min`, `${nm || "Next driver"} to the pit lane.`); }
+                if (toPit <= 1 && !firedRef.current["1:" + k]) { firedRef.current["1:" + k] = 1; pitAlert(`#${team.num}: PIT NOW`, `Swap to ${nm || "next driver"}.`); }
               }
+              // driver-change alert: fires when the current driver index advances
+              if (alertsOn && rs.started && rs.currentDriver && firedRef.current.lastDriver && firedRef.current.lastDriver !== rs.currentDriver) {
+                pitAlert(`#${team.num}: ${rs.currentDriver} is out`, `Driver change logged — ${rs.currentDriver} now driving.`);
+              }
+              firedRef.current.lastDriver = rs.currentDriver;
               return (
-                <button onClick={() => setAlertsOn((a) => !a)} className="mono"
-                  style={{ marginTop: 8, background: "none", border: `1px solid ${alertsOn ? "#2fd37255" : "#2b3a4e"}`, color: alertsOn ? "#2fd372" : "#78889d", borderRadius: 7, padding: "6px 11px", fontSize: 11.5, cursor: "pointer" }}>
-                  {alertsOn ? "🔔 pit alerts ON — phone buzzes at 5 min and 1 min" : "🔕 pit alerts off"}
-                </button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                  <button onClick={() => { setAlertsOn((a) => !a); askNotify(); }} className="mono"
+                    style={{ background: "none", border: `1px solid ${alertsOn ? "#2fd37255" : "#2b3a4e"}`, color: alertsOn ? "#2fd372" : "#78889d", borderRadius: 7, padding: "7px 11px", fontSize: 11.5, cursor: "pointer" }}>
+                    {alertsOn ? "🔔 alerts ON — buzz + notify at 30/5/1 min & driver change" : "🔕 alerts off"}
+                  </button>
+                  <button onClick={() => { askNotify(); pitAlert(`#${team.num}: test alert`, "This is what a pit alert looks like."); }} className="mono"
+                    style={{ background: "none", border: "1px solid #2b3a4e", color: "#9aa8bb", borderRadius: 7, padding: "7px 11px", fontSize: 11.5, cursor: "pointer" }}>
+                    ▶ test alert
+                  </button>
+                </div>
               );
             })()}
 
@@ -3401,11 +3418,13 @@ function TeamCommand({ team, teamIdx, raceStart, totalMin, now, live, setCfg, mo
             const nextOut = dsi.find((x) => x.i > rs.onKartIdx);
             const nextMin = nextOut ? projStart(nextOut.i) : null;
             const rest = nextMin != null && rs.started ? nextMin - rs.nowMin : null;
+            const sDone = rs.started ? dsi.filter((x) => x.i < rs.onKartIdx).length : 0;
+            const sLeft = dsi.length - sDone;
             const status = isOn ? "DRIVING NOW" : nextMin != null ? `drives at ${clockOf(nextMin)}${rest != null ? ` · rest ${fmtDur(Math.max(0, rest))}` : ""}` : rs.started ? "finished" : "waiting to start";
             return (
               <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "9px 11px", borderRadius: 7, background: isOn ? "#ff2d4d18" : isNext ? AMBER + "15" : "#080d13" }}>
                 <div className="mono" style={{ fontSize: 13, fontWeight: isOn || isNext ? 700 : 500, color: isOn ? "#ff2d4d" : isNext ? AMBER : "#e6edf3" }}>{isOn ? "● " : isNext ? "▶ " : ""}{d}</div>
-                <div className="mono" style={{ fontSize: 11, color: "#9aa8bb", textAlign: "right" }}>{status}<br /><span style={{ color: "#66758a" }}>{dsi.length} stints · {fmtDur(total)} total</span></div>
+                <div className="mono" style={{ fontSize: 11, color: "#9aa8bb", textAlign: "right" }}>{status}<br /><span style={{ color: "#66758a" }}>{sLeft} of {dsi.length} stints left · {fmtDur(total)} total</span></div>
               </div>
             );
           })}
@@ -3595,7 +3614,7 @@ function PitBoard({ cfg, setCfg, raceStart, totalMin, now, liveModel, owned, pit
               <span className="disp" style={{ color: "#ff2d4d", fontWeight: 700, fontSize: 12 }}>⚠ PIT CLASH</span>
               {clashPairs.map(([a, b], i) => (
                 <div key={i} className="mono" style={{ fontSize: 11, color: "#ffb3a0", marginTop: 3 }}>
-                  #{a.team.num} &amp; #{b.team.num} both due ~{pitClockOf(a)} / {pitClockOf(b)} — only one crew can swap at a time
+                  #{a.team.num} &amp; #{b.team.num} both due ~{pitClockOf(a)} / {pitClockOf(b)} — get both crews ready, they pit around the same time
                 </div>
               ))}
             </div>
@@ -3859,7 +3878,7 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
   const coverWarn = Math.abs(scheduledMin - totalMin) > (defaultStintLen / 2);
 
   return (
-    <Panel title={`#${team.num || "?"} · ${team.name.toUpperCase()}`}>
+    <Panel title={`#${team.num || "?"} · ${team.name.toUpperCase()}`} accent={teamColorOf(team.num)}>
       {!owned && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14, padding: "9px 11px", background: "#0b1017", border: "1px solid #2b3a4e", borderRadius: 8 }}>
           <span className="mono" style={{ fontSize: 12, color: "#9aa8bb", flex: "1 1 160px" }}>🔒 View only. Enter this team's passcode to edit the plan.</span>
@@ -3938,9 +3957,9 @@ function StintTeamCard({ team, ti, raceStart, totalMin, defaultStintLen, now, st
                 </span>
                 <select value={r.driver || ""} onChange={(e) => setStints(stints.map((s) => s.id === r.id ? { ...s, driver: e.target.value } : s))}
                   className="mono" style={{ background: "#11171f", border: "1px solid #2b3a4e", borderRadius: 6,
-                    color: r.driver ? (driverColor[r.driver] || "#e6edf3") : "#66758a", padding: "5px 7px", fontSize: 12.5, fontWeight: 600, width: "100%" }}>
+                    color: r.driver ? (driverColor[r.driver] || "#e6edf3") : "#66758a", padding: "5px 7px", fontSize: 12.5, fontWeight: 600, width: "100%", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                   <option value="">— unassigned —</option>
-                  {team.drivers.map((d) => <option key={d} value={d}>{d}</option>)}
+                  {team.drivers.map((d) => <option key={d} value={d}>{d.length > 16 ? d.slice(0, 15) + "…" : d}</option>)}
                 </select>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <input type="number" min="5" max="240" value={r.len}
@@ -4050,10 +4069,11 @@ const Label = ({ children }) => (
   <div className="disp" style={{ fontSize: 12.5, color: "#9aa8bb", letterSpacing: "1px",
     fontWeight: 600, marginBottom: 9, textTransform: "uppercase" }}>{children}</div>
 );
-function Panel({ title, children }) {
+function Panel({ title, children, accent }) {
+  const a = accent || AMBER;
   return (
-    <div style={{ background: "#0a0f16", border: "1px solid #1b2433", borderRadius: 12, padding: 18, marginBottom: 16 }}>
-      <div className="disp" style={{ fontSize: 13, color: AMBER, letterSpacing: "1.5px",
+    <div style={{ background: "#0a0f16", border: "1px solid #1b2433", borderLeft: accent ? `3px solid ${a}` : "1px solid #1b2433", borderRadius: 12, padding: 18, marginBottom: 16 }}>
+      <div className="disp" style={{ fontSize: 13, color: a, letterSpacing: "1.5px",
         fontWeight: 600, marginBottom: 14 }}>{title}</div>
       {children}
     </div>
