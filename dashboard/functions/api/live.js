@@ -82,20 +82,43 @@ function transform(api) {
   };
 }
 
-export async function onRequestGet({ request }) {
+export async function onRequestGet(context) {
+  const { request } = context;
   const url = new URL(request.url);
   const site = (url.searchParams.get("site") || "bukc").replace(/[^a-z]/gi, "");
   const debug = url.searchParams.get("debug");
+
+  // shared edge cache: all viewers get one upstream fetch every few seconds
+  const cache = caches.default;
+  const ckey = new Request(`https://pitwall.cache/live/${site}${debug ? "/debug" : ""}`);
+  if (!debug) {
+    const hit = await cache.match(ckey);
+    if (hit) return hit;
+  }
+
+  const finish = (obj, maxAge) => {
+    const res = new Response(JSON.stringify(obj), { headers: {
+      "content-type": "application/json",
+      "cache-control": maxAge ? `public, max-age=${maxAge}` : "no-store",
+      "access-control-allow-origin": "*",
+    } });
+    if (!debug && maxAge) context.waitUntil(cache.put(ckey, res.clone()));
+    return res;
+  };
+
   try {
     const tk = await token(site);
     const headers = { "user-agent": "pitwall", "at-site": site };
     if (tk) headers["at-pst"] = tk;
     const r = await fetch(`${BASE}/api/v1/${site}/live/current`, { headers });
-    if (r.status !== 200) return J({ sessions: [], error: `upstream ${r.status}`, hadToken: !!tk }, 200);
-    const api = await r.json();
-    if (debug) return J({ rawKeys: Object.keys(api), raw: api });
-    return J(transform(api));
+    if (r.status === 204) return finish({ sessions: [], noSession: true }, 3);
+    if (r.status !== 200) return finish({ sessions: [], error: `upstream ${r.status}`, hadToken: !!tk }, 2);
+    const body = await r.text();
+    if (!body.trim()) return finish({ sessions: [], noSession: true }, 3);
+    let api; try { api = JSON.parse(body); } catch { return finish({ sessions: [], noSession: true }, 3); }
+    if (debug) return finish({ rawKeys: Object.keys(api), raw: api }, 0);
+    return finish(transform(api), 3);
   } catch (e) {
-    return J({ sessions: [], error: String(e) }, 200);
+    return finish({ sessions: [], error: String(e) }, 2);
   }
 }
