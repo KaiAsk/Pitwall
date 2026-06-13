@@ -2265,22 +2265,22 @@ export default function App() {
 const LIVE_SITE = (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("site")) || "bukc";
 const LIVE_FILE = `/api/live?site=${LIVE_SITE}`;
 const SEED_TEAMS = [
-  { num: "18", name: "Buzzer's Huzz", drivers: ["Kai Askey", "Khaled Saab", "Arion Nela", "Lucas Burrow", "Iago Sierlecki"] },
-  { num: "19", name: "Leeds (B)y a mile", drivers: ["Luca Wigley", "Morgan Driscoll", "Ben Jones", "Harrison Rowe", "Vivaan Baig", "Simon Wilkins", "Connor Morton", "Ademi Elukanlo"] },
-  { num: "20", name: "Leeds Cartel", drivers: ["Hari Sukumar", "Vasilisa Borovskaya", "Daria Talinskaya", "Ethan Roberts", "Edward Williamson", "Oliver Hainsworth", "Alice Kingswood", "Charlie Holt"] },
-  { num: "21", name: "DNFing Hell", drivers: ["Ho Chun Wong", "Harrison Wallis", "Benjamin Lees", "Finn Doherty", "Daniel Spiers", "Simon Kocsis", "Benjamin Laverack", "Anand Parmar"] },
+  { num: "9", name: "Buzzer's Huzz", drivers: ["Kai Askey", "Khaled Saab", "Arion Nela", "Lucas Burrow", "Iago Sierlecki"] },
+  { num: "10", name: "Leeds (B)y a mile", drivers: ["Luca Wigley", "Morgan Driscoll", "Ben Jones", "Harrison Rowe", "Vivaan Baig", "Simon Wilkins", "Connor Morton", "Ademi Elukanlo"] },
+  { num: "11", name: "Leeds Cartel", drivers: ["Hari Sukumar", "Vasilisa Borovskaya", "Daria Talinskaya", "Ethan Roberts", "Edward Williamson", "Oliver Hainsworth", "Alice Kingswood", "Charlie Holt"] },
+  { num: "12", name: "DNFing Hell", drivers: ["Ho Chun Wong", "Harrison Wallis", "Benjamin Lees", "Finn Doherty", "Daniel Spiers", "Simon Kocsis", "Benjamin Laverack", "Anand Parmar"] },
   { num: "57", name: "Leeds Gramp Turismo", drivers: ["Kamran Davies", "Joe Milnes", "Sam Middleton", "Alex Harley", "Daniel Gilbert", "Tom Dent", "Yiorgos Meliotis", "Heathcliff Howard"] },
   { num: "58", name: "Out of Office", drivers: ["Luke Tyson", "Ben Jones", "Lewis White", "Neil Gandhi", "Thomas Wood", "Dominic Porter", "Joshua Humphreys", "Samuel Garbutt", "Igor Niedzielski"] },
 ];
-const LIVE_SCHEMA = 2;
+const LIVE_SCHEMA = 3;
 const DEFAULT_LIVE = { v: LIVE_SCHEMA, raceStartISO: "2026-06-13T15:03", raceHours: 24, defaultStintLen: 45,
   trackCond: "dry", teams: SEED_TEAMS.map((t) => ({ ...t, stints: [] })) };
 const CLASH_MIN = 4;   // two of our teams pitting within this many minutes = a crew clash
 // Teams that get their own dedicated command tab. Add { num, label } here to give
 // another team the same page Leeds A has (e.g. { num: "20", label: "◈ CARTEL" }).
 const COMMAND_TEAMS = [
-  { num: "18", label: "◈ LEEDS A", color: TEAM_COLORS.A }, { num: "19", label: "LEEDS B", color: TEAM_COLORS.B }, { num: "20", label: "LEEDS C", color: TEAM_COLORS.C },
-  { num: "21", label: "LEEDS D", color: TEAM_COLORS.D }, { num: "57", label: "GRADS A", color: TEAM_COLORS.E }, { num: "58", label: "GRADS B", color: TEAM_COLORS.F },
+  { num: "9", label: "◈ LEEDS A", color: TEAM_COLORS.A }, { num: "10", label: "LEEDS B", color: TEAM_COLORS.B }, { num: "11", label: "LEEDS C", color: TEAM_COLORS.C },
+  { num: "12", label: "LEEDS D", color: TEAM_COLORS.D }, { num: "57", label: "GRADS A", color: TEAM_COLORS.E }, { num: "58", label: "GRADS B", color: TEAM_COLORS.F },
 ];
 const teamColorOf = (num) => { const t = COMMAND_TEAMS.find((x) => String(x.num) === String(num)); return t ? t.color : AMBER; };
 // passcodes are validated server-side (api/roster) so no secrets ship in the client bundle
