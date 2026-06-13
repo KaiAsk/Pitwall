@@ -2367,7 +2367,7 @@ function teamRaceState(team, raceStart, now) {
    - "Stint Start Time" + a "Stint Length" time column (Grads A)
    - "Planned Stint" range + "Name" + "Pitstop Notes" (Leeds B/C/D, Grads B)
    Sheets map to karts by name; drivers and per-pit notes come across too. */
-const SHEET_KART = { "Leeds A": "18", "Leeds B": "19", "Leeds C": "20", "Leeds D": "21", "Grads A": "57", "Grads B": "58" };
+const SHEET_KART = { "Leeds A": "9", "Leeds B": "10", "Leeds C": "11", "Leeds D": "12", "Grads A": "57", "Grads B": "58" };
 const excelMin = (v) => { const m = String(v || "").match(/(\d{1,2}):(\d{2})/); return m ? (+m[1] * 60 + +m[2]) : null; };
 const parseStintRange = (v) => {
   const m = String(v || "").match(/(\d{1,2}):(\d{2})\s*[-\u2013]\s*(\d{1,2}):(\d{2})/);
