@@ -5,7 +5,7 @@ const json = (obj, status = 200) =>
 // Per-team passcodes for the 24h global save. Anyone with a team's code can
 // push that team's stints + pit log; everyone else just reads. Casual gate to
 // stop accidental edits, not real security.
-const TEAM_PASSCODES = { "18": "huZZ", "19": "bee", "20": "cunty", "21": "wth", "57": "unc", "58": "free" };
+const TEAM_PASSCODES = { "9": "huZZ", "10": "bee", "11": "cunty", "12": "wth", "57": "unc", "58": "free" };
 const CONTROL_PW = "footjob";   // admin-lite: set the race start time on the day
 
 async function loadState(env) {
