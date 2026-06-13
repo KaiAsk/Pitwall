@@ -2542,14 +2542,26 @@ function Live24({ knownDrivers = [] }) {
     setCfg((c) => {
       let changed = false;
       const teams = (c.teams || []).map((t) => {
-        // The device that owns a team is the authority for it — never let an
-        // eventually-consistent server read clobber a pit stop just logged here.
-        if (ownedRef.current.has(String(t.num))) return t;
-        const gt = (g.teams || []).find((x) => String(x.num) === String(t.num));
+        const n = String(t.num);
+        const gt = (g.teams || []).find((x) => String(x.num) === n);
+        if (ownedRef.current.has(n)) {
+          // I'm the authority for this team — but if ANOTHER device pushed a
+          // NEWER version (higher seq) I adopt it, so co-captains see each other.
+          // A lagging read carries an OLD seq (<= mine) so it can never wipe a
+          // pit I just logged. This is the safe half of the version guard.
+          if (gt && (gt._seq || 0) > (seqRef.current[n] || 0)) {
+            seqRef.current[n] = gt._seq; saveLS("live24_seq", seqRef.current);
+            const next = { ...t, pitLog: gt.pitLog || [] };
+            if ((gt.stints || []).length) { next.name = gt.name || t.name; next.drivers = gt.drivers || t.drivers; next.stints = gt.stints; }
+            if (JSON.stringify(next) !== JSON.stringify(t)) changed = true;
+            return next;
+          }
+          return t;
+        }
         if (!gt) return t;
         const next = { ...t };
         if ((gt.stints || []).length) { next.name = gt.name || t.name; next.drivers = gt.drivers || t.drivers; next.stints = gt.stints; }
-        next.pitLog = gt.pitLog || [];                 // viewers mirror the shared log
+        next.pitLog = gt.pitLog || [];
         if (JSON.stringify(next) !== JSON.stringify(t)) changed = true;
         return next;
       });
