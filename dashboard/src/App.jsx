@@ -1523,6 +1523,8 @@ export default function App() {
           </Panel>
         )}
 
+        <Bukc24 />
+
         {hasData && (
           <>
             <div className="apptabs" style={{ display: "flex", gap: 8, margin: "20px 0 16px", flexWrap: "wrap", alignItems: "center" }}>
@@ -1539,8 +1541,7 @@ export default function App() {
                 ["special", "SPECIAL EVENTS"],
                 ["sectors", "SECTORS"],
                 ["lineup", "LINEUP"],
-                ["h2h", "HEAD-TO-HEAD"],
-                ["bukc24", "24H 2026"]
+                ["h2h", "HEAD-TO-HEAD"]
               ].map(([k, l]) => (
                 <button key={k} onClick={() => setTab(k)} className="disp"
                   style={{ padding: "8px 16px", borderRadius: 6, fontWeight: 600, fontSize: 15.5, cursor: "pointer",
@@ -2219,7 +2220,6 @@ export default function App() {
               </Panel>
             )}
 
-            {tab === "bukc24" && <Bukc24 />}
             {tab === "sectors" && (() => {
               const races = convertedSessions.filter((s) => s.isRound && s.laps.length && (/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel) || /practice/i.test(s.raceLabel)));
               const hasOurs = (s) => (s.karts || []).some((k) => !removed.has(`${s.id}|${k.num}`) && s.sectorsByKart && s.sectorsByKart[k.num] && (s.sectorsByKart[k.num].best != null || s.sectorsByKart[k.num].s1 != null));
