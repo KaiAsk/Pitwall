@@ -425,7 +425,136 @@ function convertEvent(data, extraTeams = [], extraNums = []) {
   });
 }
 
+/* ---- 24H of BUKC 2026 — finished-event analysis (teams as entries, drivers within) ---- */
+const BUKC24 = {
+  event: "24H OF BUKC · 13-14 JUN 2026",
+  teams: [
+    { num: "9",  name: "Buzzer's Huzz",        laps: 1012, clean: 986, avg: 82.738, best: 81.060, median: 82.614, sd: 0.78, stints: 15, color: TEAM_COLORS.A },
+    { num: "57", name: "Leeds Gramp Turismo",  laps: 970,  clean: 935, avg: 83.802, best: 81.995, median: 83.529, sd: 1.10, stints: 16, color: TEAM_COLORS.E },
+    { num: "10", name: "Leeds (B)y a mile",    laps: 991,  clean: 957, avg: 84.146, best: 82.313, median: 84.016, sd: 0.93, stints: 18, color: TEAM_COLORS.B },
+    { num: "58", name: "Out of Office",        laps: 970,  clean: 934, avg: 84.360, best: 81.999, median: 84.234, sd: 1.30, stints: 19, color: TEAM_COLORS.F },
+    { num: "12", name: "DNFing Hell",          laps: 990,  clean: 957, avg: 84.525, best: 82.558, median: 84.396, sd: 1.00, stints: 17, color: TEAM_COLORS.D },
+    { num: "11", name: "Leeds Cartel",         laps: 982,  clean: 945, avg: 85.183, best: 82.782, median: 84.881, sd: 1.46, stints: 17, color: TEAM_COLORS.C },
+  ],
+  // per-driver + per-stint breakdown, keyed by kart number (only teams with a known stint plan)
+  drivers: {
+    "9": {
+      perDriver: [
+        { driver: "Kai",    laps: 213, clean: 208, avg: 82.325, best: 81.060, sd: 0.75 },
+        { driver: "Khaled", laps: 167, clean: 164, avg: 82.676, best: 81.600, sd: 0.83 },
+        { driver: "Arion",  laps: 210, clean: 207, avg: 82.836, best: 81.541, sd: 0.73 },
+        { driver: "Lucas",  laps: 208, clean: 197, avg: 82.932, best: 81.943, sd: 0.70 },
+        { driver: "Iago",   laps: 214, clean: 211, avg: 82.955, best: 81.587, sd: 0.89 },
+      ],
+      stints: [
+        { n: 1, driver: "Khaled", laps: 66, avg: 83.174, best: 81.773 }, { n: 2, driver: "Arion", laps: 71, avg: 83.194, best: 81.959 },
+        { n: 3, driver: "Lucas", laps: 70, avg: 83.206, best: 81.968 }, { n: 4, driver: "Iago", laps: 71, avg: 83.134, best: 81.678 },
+        { n: 5, driver: "Kai", laps: 71, avg: 82.506, best: 81.526 }, { n: 6, driver: "Iago", laps: 71, avg: 83.055, best: 81.950 },
+        { n: 7, driver: "Lucas", laps: 68, avg: 82.664, best: 81.947 }, { n: 8, driver: "Khaled", laps: 71, avg: 82.451, best: 81.661 },
+        { n: 9, driver: "Arion", laps: 67, avg: 82.772, best: 81.818 }, { n: 10, driver: "Iago", laps: 72, avg: 82.679, best: 81.587 },
+        { n: 11, driver: "Kai", laps: 71, avg: 82.219, best: 81.060 }, { n: 12, driver: "Lucas", laps: 70, avg: 82.902, best: 81.943 },
+        { n: 13, driver: "Arion", laps: 72, avg: 82.541, best: 81.541 }, { n: 14, driver: "Kai", laps: 71, avg: 82.255, best: 81.389 },
+        { n: 15, driver: "Khaled", laps: 30, avg: 82.141, best: 81.600 },
+      ],
+      notes: ["Lap 6 (6.6 min) — engine change, no swap (Khaled)", "Lap 608 (8.7 min) — chain problem (Arion)", "Laps 196 & 433 (4-5 min) — mandatory service + incident"],
+    },
+  },
+};
+const fmtLap = (s) => (s == null ? "—" : `${Math.floor(s / 60)}:${(s % 60).toFixed(3).padStart(6, "0")}`);
+const DRIVER_PAL = ["#ff2d4d", "#00e0c6", "#b98cff", "#2fd372", "#ffb020", "#5aa9ff"];
+
+function Bukc24() {
+  const [openKart, setOpenKart] = React.useState("9");
+  const teams = BUKC24.teams;
+  const leader = teams[0].avg;
+  const sortedSd = [...teams].sort((a, b) => a.sd - b.sd);
+  return (
+    <Panel title={BUKC24.event} accent={AMBER}>
+      <div className="mono" style={{ fontSize: 11.5, color: "#9aa8bb", marginBottom: 14 }}>
+        Leeds teams only (Beckett excluded). Pace = average green lap, pit and incident laps filtered. Tap a team for its driver breakdown.
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 560 }}>
+          <thead><tr style={{ color: "#66758a", textAlign: "right" }}>
+            <th style={{ textAlign: "left", padding: "6px 8px" }}>#</th><th style={{ textAlign: "left", padding: "6px 8px" }}>TEAM</th>
+            <th style={{ padding: "6px 8px" }}>LAPS</th><th style={{ padding: "6px 8px" }}>AVG</th><th style={{ padding: "6px 8px" }}>GAP</th>
+            <th style={{ padding: "6px 8px" }}>BEST</th><th style={{ padding: "6px 8px" }}>±SD</th><th style={{ padding: "6px 8px" }}>STINTS</th>
+          </tr></thead>
+          <tbody>
+            {teams.map((t, i) => {
+              const hasPlan = !!BUKC24.drivers[t.num];
+              return (
+                <tr key={t.num} onClick={() => hasPlan && setOpenKart(openKart === t.num ? "" : t.num)}
+                  style={{ borderTop: "1px solid #1b2433", cursor: hasPlan ? "pointer" : "default", background: openKart === t.num ? t.color + "14" : "transparent", textAlign: "right" }}>
+                  <td style={{ textAlign: "left", padding: "8px", color: t.color, fontWeight: 700, borderLeft: `3px solid ${t.color}` }}>{i + 1}</td>
+                  <td style={{ textAlign: "left", padding: "8px", color: "#e6edf3" }}>#{t.num} {t.name}{hasPlan ? <span style={{ color: "#66758a" }}> {openKart === t.num ? "▾" : "▸"}</span> : ""}</td>
+                  <td style={{ padding: "8px" }}>{t.laps}</td>
+                  <td style={{ padding: "8px", color: i === 0 ? "#2fd372" : "#e6edf3", fontWeight: i === 0 ? 700 : 400 }}>{fmtLap(t.avg)}</td>
+                  <td style={{ padding: "8px", color: "#9aa8bb" }}>{i === 0 ? "—" : "+" + (t.avg - leader).toFixed(3)}</td>
+                  <td style={{ padding: "8px" }}>{fmtLap(t.best)}</td>
+                  <td style={{ padding: "8px", color: t.num === sortedSd[0].num ? "#2fd372" : "#9aa8bb" }}>±{t.sd.toFixed(2)}</td>
+                  <td style={{ padding: "8px" }}>{t.stints}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {openKart && BUKC24.drivers[openKart] && (() => {
+        const D = BUKC24.drivers[openKart], team = teams.find((t) => t.num === openKart);
+        const pcol = {}; D.perDriver.forEach((d, i) => (pcol[d.driver] = DRIVER_PAL[i % DRIVER_PAL.length]));
+        const fastest = [...D.perDriver].sort((a, b) => a.avg - b.avg)[0].driver;
+        const smooth = [...D.perDriver].sort((a, b) => a.sd - b.sd)[0].driver;
+        return (
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: `2px solid ${team.color}` }}>
+            <div className="disp" style={{ color: team.color, fontSize: 14, fontWeight: 700, letterSpacing: "0.6px", marginBottom: 10 }}>#{openKart} {team.name.toUpperCase()} · BY DRIVER</div>
+            <div style={{ overflowX: "auto", marginBottom: 14 }}>
+              <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 480 }}>
+                <thead><tr style={{ color: "#66758a", textAlign: "right" }}>
+                  <th style={{ textAlign: "left", padding: "6px 8px" }}>DRIVER</th><th style={{ padding: "6px 8px" }}>LAPS</th>
+                  <th style={{ padding: "6px 8px" }}>AVG</th><th style={{ padding: "6px 8px" }}>BEST</th><th style={{ padding: "6px 8px" }}>±SD</th>
+                </tr></thead>
+                <tbody>
+                  {[...D.perDriver].sort((a, b) => a.avg - b.avg).map((d) => (
+                    <tr key={d.driver} style={{ borderTop: "1px solid #1b2433", textAlign: "right" }}>
+                      <td style={{ textAlign: "left", padding: "7px 8px", color: pcol[d.driver], fontWeight: 600 }}>
+                        {d.driver}{d.driver === fastest ? " ⚡" : ""}{d.driver === smooth ? " ◎" : ""}
+                      </td>
+                      <td style={{ padding: "7px 8px" }}>{d.laps}</td><td style={{ padding: "7px 8px", color: "#e6edf3" }}>{fmtLap(d.avg)}</td>
+                      <td style={{ padding: "7px 8px" }}>{fmtLap(d.best)}</td><td style={{ padding: "7px 8px", color: "#9aa8bb" }}>±{d.sd.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mono" style={{ fontSize: 11, color: "#66758a", marginBottom: 12 }}>⚡ quickest average · ◎ most consistent</div>
+            <div className="disp" style={{ color: "#9aa8bb", fontSize: 12, letterSpacing: "0.6px", marginBottom: 8 }}>STINT TIMELINE</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+              {D.stints.map((s) => (
+                <div key={s.n} style={{ flex: "1 1 92px", minWidth: 92, background: "#0b1017", border: `1px solid ${pcol[s.driver] || "#2b3a4e"}55`, borderRadius: 7, padding: "7px 9px" }}>
+                  <div className="mono" style={{ fontSize: 10, color: "#66758a" }}>S{s.n} · {s.laps} laps</div>
+                  <div className="mono" style={{ fontSize: 12.5, color: pcol[s.driver] || "#e6edf3", fontWeight: 600 }}>{s.driver}</div>
+                  <div className="mono" style={{ fontSize: 12, color: "#e6edf3" }}>{fmtLap(s.avg)}</div>
+                </div>
+              ))}
+            </div>
+            {D.notes && (
+              <div className="mono" style={{ fontSize: 11, color: "#9aa8bb", lineHeight: 1.6 }}>
+                {D.notes.map((n, i) => <div key={i}>· {n}</div>)}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+      {openKart && !BUKC24.drivers[openKart] && (
+        <div className="mono" style={{ fontSize: 12, color: "#66758a", marginTop: 12 }}>Stint plan not provided for this team yet — give me its driver order and I'll add the per-driver breakdown.</div>
+      )}
+    </Panel>
+  );
+}
+
 export default function App() {
+
   const [assign, setAssign] = useState(() => LS("assign", {}));
   const [importMsg, setImportMsg] = useState("");
   const csvRef = useRef();
@@ -1410,7 +1539,8 @@ export default function App() {
                 ["special", "SPECIAL EVENTS"],
                 ["sectors", "SECTORS"],
                 ["lineup", "LINEUP"],
-                ["h2h", "HEAD-TO-HEAD"]
+                ["h2h", "HEAD-TO-HEAD"],
+                ["bukc24", "24H 2026"]
               ].map(([k, l]) => (
                 <button key={k} onClick={() => setTab(k)} className="disp"
                   style={{ padding: "8px 16px", borderRadius: 6, fontWeight: 600, fontSize: 15.5, cursor: "pointer",
@@ -2089,6 +2219,7 @@ export default function App() {
               </Panel>
             )}
 
+            {tab === "bukc24" && <Bukc24 />}
             {tab === "sectors" && (() => {
               const races = convertedSessions.filter((s) => s.isRound && s.laps.length && (/race/i.test(s.raceLabel) || /quali/i.test(s.raceLabel) || /practice/i.test(s.raceLabel)));
               const hasOurs = (s) => (s.karts || []).some((k) => !removed.has(`${s.id}|${k.num}`) && s.sectorsByKart && s.sectorsByKart[k.num] && (s.sectorsByKart[k.num].best != null || s.sectorsByKart[k.num].s1 != null));
